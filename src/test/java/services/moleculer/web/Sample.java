@@ -1,5 +1,7 @@
 package services.moleculer.web;
 
+import java.util.concurrent.TimeUnit;
+
 import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
 import services.moleculer.cacher.Cache;
@@ -40,6 +42,7 @@ public class Sample {
 			
 			NettyGateway gateway = new NettyGateway();
 			gateway.setUseSSL(false);
+			gateway.setPort(3001);
 			gateway.setKeyStoreFilePath("/temp/test.jks");
 			gateway.setKeyStorePassword("test");
 			
@@ -60,13 +63,13 @@ public class Sample {
 			gateway.setRoutes(new Route[]{r});
 
 			gateway.use(new ServeStatic("/pages", "c:/temp"));
-			gateway.use(new SessionCookie());
+			//gateway.use(new SessionCookie());
 			gateway.use(new RequestLogger());
 		
 			broker.createService(new Service("math") {
 
 				@Name("add")
-				@RateLimit(20)
+				@RateLimit(5)
 				@Cache(keys = { "a", "b" }, ttl = 30)
 				public Action add = ctx -> {
 
@@ -77,6 +80,7 @@ public class Sample {
 
 				@Name("test")
 				@Version("1")
+				@RateLimit(value = 20, window = 1, unit = TimeUnit.MINUTES)
 				public Action test = ctx -> {
 
 					return ctx.params.get("a", 0) + ctx.params.get("b", 0);
