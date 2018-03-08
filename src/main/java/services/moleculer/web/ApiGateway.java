@@ -33,6 +33,7 @@ package services.moleculer.web;
 
 import static services.moleculer.util.CommonUtils.nameOf;
 
+import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -196,7 +197,8 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 
 	// --- COMMON HTTP REQUEST PROCESSOR ---
 
-	public Promise processRequest(String httpMethod, String path, Tree headers, String query, byte[] body) {
+	public Promise processRequest(InetAddress address, String httpMethod, String path, Tree headers, String query,
+			byte[] body) {
 		try {
 
 			// Try to find in static mappings (eg. "/user")
@@ -226,7 +228,7 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 
 			// Invoke mapping
 			if (mapping != null) {
-				Promise response = mapping.processRequest(httpMethod, path, headers, query, body);
+				Promise response = mapping.processRequest(address, httpMethod, path, headers, query, body);
 				if (response != null) {
 					return response;
 				}
@@ -270,7 +272,7 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 					writeLock.unlock();
 				}
 
-				Promise response = mapping.processRequest(httpMethod, path, headers, query, body);
+				Promise response = mapping.processRequest(address, httpMethod, path, headers, query, body);
 				if (response != null) {
 					return response;
 				}
@@ -285,7 +287,7 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 				if (!checkedMiddlewares.isEmpty()) {
 					mapping.use(checkedMiddlewares);
 				}
-				Promise response = mapping.processRequest(httpMethod, path, headers, query, body);
+				Promise response = mapping.processRequest(address, httpMethod, path, headers, query, body);
 				if (response != null) {
 					return response;
 				}
