@@ -6,9 +6,6 @@ import static services.moleculer.util.CommonUtils.formatNumber;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import io.datatree.Tree;
 import services.moleculer.Promise;
 import services.moleculer.context.Context;
@@ -20,13 +17,9 @@ import services.moleculer.web.common.HttpConstants;
 @Name("Request Logger")
 public class RequestLogger extends Middleware implements HttpConstants {
 
-	// --- LOGGER ---
-
-	protected static final Logger logger = LoggerFactory.getLogger(RequestLogger.class);
-
 	// --- NEW LINE ---
 	
-	protected static final char[] crlf = System.getProperty("line.separator", "\r\n").toCharArray();
+	protected static final char[] CR_LF = System.getProperty("line.separator", "\r\n").toCharArray();
 
 	// --- CREATE NEW ACTION ---
 
@@ -43,13 +36,13 @@ public class RequestLogger extends Middleware implements HttpConstants {
 					tmp.append("======= REQUEST PROCESSED IN ");
 					tmp.append(formatNamoSec(duration).toUpperCase());
 					tmp.append(" =======");
-					tmp.append(crlf);
+					tmp.append(CR_LF);
 					tmp.append("Request:");
-					tmp.append(crlf);
+					tmp.append(CR_LF);
 					tmp.append(ctx.params);
-					tmp.append(crlf);
+					tmp.append(CR_LF);
 					tmp.append("Response:");
-					tmp.append(crlf);
+					tmp.append(CR_LF);
 					if (rsp == null) {
 						tmp.append("<null>");
 					} else {
@@ -60,16 +53,16 @@ public class RequestLogger extends Middleware implements HttpConstants {
 							if (rsp.getType() == byte[].class) {
 								byte[] bytes = (byte[]) rsp.asBytes();
 								if (bytes.length == 0) {
-									tmp.append(crlf);
+									tmp.append(CR_LF);
 									tmp.append("<empty body>");
 								} else {
-									tmp.append(crlf);
+									tmp.append(CR_LF);
 									tmp.append('<');
 									tmp.append(formatNumber(bytes.length));		
 									tmp.append(" bytes of binary response>");
 								}
 							} else {
-								tmp.append(crlf);
+								tmp.append(CR_LF);
 								tmp.append(rsp);
 							}
 						}
@@ -81,13 +74,13 @@ public class RequestLogger extends Middleware implements HttpConstants {
 					tmp.append("======= REQUEST PROCESSED IN ");
 					tmp.append(formatNamoSec(duration).toUpperCase());
 					tmp.append(" =======");
-					tmp.append(crlf);
+					tmp.append(CR_LF);
 					tmp.append("Request:");
-					tmp.append(crlf);
+					tmp.append(CR_LF);
 					tmp.append(ctx.params);
-					tmp.append(crlf);
+					tmp.append(CR_LF);
 					tmp.append("Response:");
-					tmp.append(crlf);
+					tmp.append(CR_LF);
 					StringWriter stringWriter = new StringWriter(512);
 					PrintWriter printWriter = new PrintWriter(stringWriter, true);
 					cause.printStackTrace(printWriter);

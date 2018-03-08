@@ -43,6 +43,7 @@ import services.moleculer.context.CallingOptions;
 import services.moleculer.context.Context;
 import services.moleculer.context.ContextFactory;
 import services.moleculer.service.Action;
+import services.moleculer.service.ActionEndpoint;
 import services.moleculer.service.Middleware;
 import services.moleculer.web.common.HttpConstants;
 
@@ -69,6 +70,8 @@ public class Mapping implements HttpConstants {
 
 	protected final ContextFactory contextFactory;
 
+	protected final Tree config;
+	
 	// --- CONSTRUCTOR ---
 
 	public Mapping(ServiceBroker broker, String httpMethod, String pathPattern, String actionName,
@@ -79,7 +82,7 @@ public class Mapping implements HttpConstants {
 		this.actionName = actionName;
 		this.opts = opts;
 		this.contextFactory = broker.getConfig().getContextFactory();
-
+		
 		// Parse "path pattern"
 		int starPos = pathPattern.indexOf('*');
 		isStatic = pathPattern.indexOf(':') == -1 && starPos == -1;
@@ -113,13 +116,38 @@ public class Mapping implements HttpConstants {
 			indexes[i] = indexList.get(i);
 			names[i] = nameList.get(i);
 		}
-
+		
 		// Generate hashcode
 		final int prime = 31;
 		int result = 1;
 		result = prime * result + actionName.hashCode();
 		result = prime * result + pathPrefix.hashCode();
 		hashCode = result;
+		
+		// Set config
+		this.config = new Tree();
+		this.config.put("action", actionName);
+		this.config.put("pattern", pathPattern);
+		this.config.put("static", isStatic);
+		this.config.put("prefix", pathPrefix);
+		if (opts != null) {
+			this.config.put("nodeID", opts.nodeID);
+			this.config.put("retryCount", opts.retryCount);
+			this.config.put("timeout", opts.timeout);
+		}
+		String currentNodeID = broker.getNodeID();
+		if (opts == null || opts.nodeID == null || currentNodeID.equals(opts.nodeID)) {
+			try {
+				Action action = broker.getConfig().getServiceRegistry().getAction(actionName, currentNodeID);
+				if (action != null && action instanceof ActionEndpoint) {
+					ActionEndpoint endpoint = (ActionEndpoint) action;
+					this.config.copyFrom(endpoint.getConfig());
+				}				
+			} catch (Exception ignored) {
+				
+				// Action name is not valid
+			}
+		}
 	}
 
 	// --- MATCH TYPE ---
@@ -233,16 +261,6 @@ public class Mapping implements HttpConstants {
 	protected Action current = brokerAction;
 
 	public void use(Collection<Middleware> middlewares) {
-		Tree config = new Tree();
-		config.put("action", actionName);
-		config.put("pattern", pathPattern);
-		config.put("static", isStatic);
-		config.put("prefix", pathPrefix);
-		if (opts != null) {
-			config.put("nodeID", opts.nodeID);
-			config.put("retryCount", opts.retryCount);
-			config.put("timeout", opts.timeout);
-		}
 		for (Middleware middleware : middlewares) {
 			if (checkedMiddlewares.add(middleware)) {
 				Action action = middleware.install(current, config);

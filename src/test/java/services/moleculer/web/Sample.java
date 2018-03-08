@@ -2,6 +2,7 @@ package services.moleculer.web;
 
 import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
+import services.moleculer.cacher.Cache;
 import services.moleculer.config.ServiceBrokerConfig;
 import services.moleculer.context.CallingOptions;
 import services.moleculer.context.Context;
@@ -15,6 +16,11 @@ import services.moleculer.service.Service;
 import services.moleculer.service.Version;
 import services.moleculer.transporter.RedisTransporter;
 import services.moleculer.web.middleware.CorsHeaders;
+import services.moleculer.web.middleware.RateLimiter;
+import services.moleculer.web.middleware.RequestLogger;
+import services.moleculer.web.middleware.ServeStatic;
+import services.moleculer.web.middleware.SessionCookie;
+import services.moleculer.web.middleware.limiter.RateLimit;
 import services.moleculer.web.router.Alias;
 import services.moleculer.web.router.MappingPolicy;
 import services.moleculer.web.router.Route;
@@ -50,16 +56,18 @@ public class Sample {
 			
 			Route r = new Route(gateway, path, policy, opts, whitelist, aliases);
 			r.use(new CorsHeaders());
+			r.use(new RateLimiter());
 			gateway.setRoutes(new Route[]{r});
 
-			// gateway.use(new ServeStatic("/pages", "c:/temp"));
-			// gateway.use(new SessionCookie());
-			// gateway.use(new RequestLogger());
+			gateway.use(new ServeStatic("/pages", "c:/temp"));
+			gateway.use(new SessionCookie());
+			gateway.use(new RequestLogger());
 		
 			broker.createService(new Service("math") {
 
 				@Name("add")
-				//@Cache(keys = { "a", "b" }, ttl = 30)
+				@RateLimit(20)
+				@Cache(keys = { "a", "b" }, ttl = 30)
 				public Action add = ctx -> {
 
 					//broker.getLogger().info("Call " + ctx.params);

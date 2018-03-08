@@ -54,7 +54,7 @@ public class Route {
 	// --- LOGGER ---
 
 	protected static final Logger logger = LoggerFactory.getLogger(Route.class);
-	
+
 	// --- PARENT GATEWAY ---
 
 	protected final ApiGateway gateway;
@@ -113,8 +113,8 @@ public class Route {
 		if (aliases != null && aliases.length > 0) {
 			for (Alias alias : aliases) {
 				if ("ALL".equals(alias.httpMethod) || httpMethod.equals(alias.httpMethod)) {
-					Mapping mapping = new Mapping(gateway.getBroker(), httpMethod, this.path + alias.pathPattern, alias.actionName,
-							opts);
+					Mapping mapping = new Mapping(gateway.getBroker(), httpMethod, this.path + alias.pathPattern,
+							alias.actionName, opts);
 					if (mapping.matches(httpMethod, path)) {
 						if (!checkedMiddlewares.isEmpty()) {
 							mapping.use(checkedMiddlewares);
@@ -131,7 +131,8 @@ public class Route {
 		if (whitelist != null && whitelist.length > 0) {
 			for (String pattern : whitelist) {
 				if (Matcher.matches(shortPath, pattern)) {
-					Mapping mapping = new Mapping(gateway.getBroker(), httpMethod, this.path + pattern, actionName, opts);
+					Mapping mapping = new Mapping(gateway.getBroker(), httpMethod, this.path + pattern, actionName,
+							opts);
 					if (!checkedMiddlewares.isEmpty()) {
 						mapping.use(checkedMiddlewares);
 					}
@@ -156,17 +157,17 @@ public class Route {
 	}
 
 	// --- START MIDDLEWARES ---
-	
+
 	public void started(ServiceBroker broker, HashSet<Middleware> checkedMiddlewares) throws Exception {
-		
+
 		// Start middlewares
-		for (Middleware middleware: checkedMiddlewares) {
+		for (Middleware middleware : checkedMiddlewares) {
 			if (!checkedMiddlewares.contains(middleware)) {
 				middleware.started(broker);
 			}
 		}
 	}
-	
+
 	// --- GLOBAL MIDDLEWARES ---
 
 	protected HashSet<Middleware> checkedMiddlewares = new HashSet<>(32);
@@ -180,11 +181,11 @@ public class Route {
 	}
 
 	// --- STOP MIDDLEWARES ---
-	
+
 	public void stopped(HashSet<Middleware> checkedMiddlewares) {
-		
+
 		// Start middlewares
-		for (Middleware middleware: checkedMiddlewares) {
+		for (Middleware middleware : checkedMiddlewares) {
 			if (!checkedMiddlewares.contains(middleware)) {
 				try {
 					middleware.stopped();
@@ -194,9 +195,9 @@ public class Route {
 			}
 		}
 	}
-	
+
 	// --- CONVERT TO TREE ---
-	
+
 	public Tree toTree() {
 		Tree tree = new Tree();
 		tree.put("path", path);
@@ -209,7 +210,7 @@ public class Route {
 		}
 		if (aliases != null) {
 			Tree as = tree.putList("aliases");
-			for (Alias alias: aliases) {
+			for (Alias alias : aliases) {
 				Tree a = as.addMap();
 				a.put("httpMethod", alias.httpMethod);
 				a.put("pathPattern", alias.pathPattern);
@@ -218,7 +219,7 @@ public class Route {
 		}
 		return tree;
 	}
-	
+
 	// --- PROPERTY GETTERS ---
 
 	public ApiGateway getApiGateway() {
