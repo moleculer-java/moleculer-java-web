@@ -8,7 +8,6 @@ import services.moleculer.context.CallingOptions;
 import services.moleculer.context.Context;
 import services.moleculer.eventbus.Listener;
 import services.moleculer.eventbus.Subscribe;
-import services.moleculer.repl.LocalRepl;
 import services.moleculer.service.Action;
 import services.moleculer.service.Middleware;
 import services.moleculer.service.Name;
@@ -35,9 +34,7 @@ public class Sample {
 			RedisTransporter t = new RedisTransporter();
 			t.setDebug(false);
 			// cfg.setTransporter(t);
-			
-			cfg.setRepl(new LocalRepl());
-			
+						
 			NettyGateway gateway = new NettyGateway();
 			gateway.setUseSSL(false);
 			gateway.setKeyStoreFilePath("/temp/test.jks");
@@ -90,6 +87,7 @@ public class Sample {
 
 			});			
 			broker.start();
+			broker.repl();
 			broker.use(new Middleware() {
 
 				@Override
