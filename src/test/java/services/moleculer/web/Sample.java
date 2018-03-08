@@ -36,10 +36,11 @@ public class Sample {
 			gateway.setUseSSL(false);
 			gateway.setKeyStoreFilePath("/temp/test.jks");
 			gateway.setKeyStorePassword("test");
-			cfg.setApiGateway(gateway);
 			
 			ServiceBroker broker = new ServiceBroker(cfg);
 
+			broker.createService("api-gw", gateway);
+			
 			String path = "/math";
 			MappingPolicy policy = MappingPolicy.ALL;
 			CallingOptions.Options opts = CallingOptions.retryCount(3);
