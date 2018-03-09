@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
@@ -144,10 +145,19 @@ public class UndertowGateway extends ApiGateway implements HttpHandler, IoCallba
 
 				// Get query string
 				String query = exchange.getQueryString();
-
-				// Invoke action
+				
+				// Get body
 				exchange.getRequestReceiver().receiveFullBytes((ex, reqBody) -> {
-					processRequest(httpMethod, path, reqHeaders, query, reqBody).then(rsp -> {
+					
+					// Get remote address
+					InetAddress address = null;
+					try {
+						address = exchange.getSourceAddress().getAddress();
+					} catch (Exception ingored) {
+					}
+					
+					// Invoke processor
+					processRequest(address, httpMethod, path, reqHeaders, query, reqBody).then(rsp -> {
 
 						// Default status
 						int status = 200;

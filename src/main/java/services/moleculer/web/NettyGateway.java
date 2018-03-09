@@ -39,6 +39,7 @@ import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.io.StringWriter;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -412,7 +413,16 @@ public class NettyGateway extends ApiGateway implements HttpConstants {
 
 					// Invoke Action
 					executor.execute(() -> {
-						processRequest(method, path, headers, query, bytes).then(rsp -> {
+						
+						// Get remote address
+						InetAddress address = null;
+						try {
+							address = ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress();
+						} catch (Exception ingored) {
+						}
+						
+						// Invoke processor
+						processRequest(address, method, path, headers, query, bytes).then(rsp -> {
 
 							// Send normal HTTP response
 							sendHttpResponse(ctx, keepAlive, rsp);
@@ -443,7 +453,16 @@ public class NettyGateway extends ApiGateway implements HttpConstants {
 				// Process WebSocket message frame
 				if (request instanceof WebSocketFrame) {
 					executor.execute(() -> {
-						processRequest("WS", path, null, null, readFully(((WebSocketFrame) request).content()))
+						
+						// Get remote address
+						InetAddress address = null;
+						try {
+							address = ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress();
+						} catch (Exception ingored) {
+						}
+						
+						// Invoke processor
+						processRequest(address, "WS", path, null, null, readFully(((WebSocketFrame) request).content()))
 								.then(rsp -> {
 
 									// Send websocket response

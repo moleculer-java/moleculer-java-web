@@ -11,6 +11,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -122,13 +123,20 @@ public class SunGateway extends ApiGateway implements HttpHandler {
 				}
 			});
 
+			// Get remote address
+			InetAddress address = null;
+			try {
+				address = exchange.getRemoteAddress().getAddress();				
+			} catch (Exception ingored) {
+			}
+			
 			String query = uri.getQuery();
 			byte[] reqBody = null;
 			InputStream in = exchange.getRequestBody();
 			if (in != null) {
 				reqBody = readFully(in);
 			}
-			processRequest(httpMethod, path, reqHeaders, query, reqBody).then(rsp -> {
+			processRequest(address, httpMethod, path, reqHeaders, query, reqBody).then(rsp -> {
 
 				// Default status
 				int status = 200;

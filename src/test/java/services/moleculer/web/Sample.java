@@ -21,7 +21,6 @@ import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.middleware.RateLimiter;
 import services.moleculer.web.middleware.RequestLogger;
 import services.moleculer.web.middleware.ServeStatic;
-import services.moleculer.web.middleware.SessionCookie;
 import services.moleculer.web.middleware.limiter.RateLimit;
 import services.moleculer.web.router.Alias;
 import services.moleculer.web.router.MappingPolicy;
