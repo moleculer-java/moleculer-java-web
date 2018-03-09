@@ -1,15 +1,9 @@
 /**
- * MOLECULER MICROSERVICES FRAMEWORK<br>
- * <br>
- * This project is based on the idea of Moleculer Microservices
- * Framework for NodeJS (https://moleculer.services). Special thanks to
- * the Moleculer's project owner (https://github.com/icebob) for the
- * consultations.<br>
- * <br>
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
  * Copyright 2017 Andras Berkes [andras.berkes@programmer.net]<br>
- * <br>
+ * Based on Moleculer Framework for NodeJS [https://moleculer.services].
+ * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
@@ -119,7 +113,7 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 
 	/**
 	 * Initializes gateway instance.
-	 * 
+	 *
 	 * @param broker
 	 *            parent ServiceBroker
 	 * @param config
@@ -347,7 +341,7 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 	 * if the path is "/rest-services" and service list is "service1", the
 	 * service's "func" action will available on
 	 * "http://host:port/rest-services/service1/func").
-	 * 
+	 *
 	 * @param path
 	 *            path prefix for all enumerated services (eg. "/rest-services")
 	 * @param serviceList
@@ -377,7 +371,7 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 	/**
 	 * Define a route to a single action. The action will available on the
 	 * specified path.
-	 * 
+	 *
 	 * @param httpMethod
 	 *            HTTP method (eg. "GET", "POST", "ALL", "REST", etc.)
 	 * @param path
@@ -400,7 +394,7 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 
 	/**
 	 * Adds a route to the list of routes.
-	 * 
+	 *
 	 * @param route
 	 *            the new route
 	 * @return route the new route

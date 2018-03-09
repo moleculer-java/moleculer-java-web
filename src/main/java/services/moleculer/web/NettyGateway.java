@@ -1,15 +1,9 @@
 /**
- * MOLECULER MICROSERVICES FRAMEWORK<br>
- * <br>
- * This project is based on the idea of Moleculer Microservices
- * Framework for NodeJS (https://moleculer.services). Special thanks to
- * the Moleculer's project owner (https://github.com/icebob) for the
- * consultations.<br>
- * <br>
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
  * Copyright 2017 Andras Berkes [andras.berkes@programmer.net]<br>
- * <br>
+ * Based on Moleculer Framework for NodeJS [https://moleculer.services].
+ * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
@@ -116,7 +110,7 @@ import services.moleculer.web.common.LazyTree;
  * <br>
  * // https://mvnrepository.com/artifact/io.netty/netty-handler<br>
  * compile group: 'io.netty', name: 'netty-handler', version: '4.1.22.Final'
- * 
+ *
  * @see SunGateway
  */
 @Name("Netty HTTP Server API Gateway")
@@ -413,14 +407,14 @@ public class NettyGateway extends ApiGateway implements HttpConstants {
 
 					// Invoke Action
 					executor.execute(() -> {
-						
+
 						// Get remote address
 						InetAddress address = null;
 						try {
 							address = ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress();
 						} catch (Exception ingored) {
 						}
-						
+
 						// Invoke processor
 						processRequest(address, method, path, headers, query, bytes).then(rsp -> {
 
@@ -453,14 +447,14 @@ public class NettyGateway extends ApiGateway implements HttpConstants {
 				// Process WebSocket message frame
 				if (request instanceof WebSocketFrame) {
 					executor.execute(() -> {
-						
+
 						// Get remote address
 						InetAddress address = null;
 						try {
 							address = ((InetSocketAddress) ctx.channel().remoteAddress()).getAddress();
 						} catch (Exception ingored) {
 						}
-						
+
 						// Invoke processor
 						processRequest(address, "WS", path, null, null, readFully(((WebSocketFrame) request).content()))
 								.then(rsp -> {
