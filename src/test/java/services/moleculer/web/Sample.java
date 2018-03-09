@@ -42,7 +42,7 @@ public class Sample {
 
 			NettyGateway gateway = new NettyGateway();
 			gateway.setUseSSL(false);
-			gateway.setPort(3000);
+			gateway.setPort(4000);
 			gateway.setKeyStoreFilePath("/temp/test.jks");
 			gateway.setKeyStorePassword("test");			
 			broker.createService("api-gw", gateway);

@@ -72,9 +72,8 @@ public class SessionCookie extends Middleware implements HttpConstants {
 						}
 					}
 					tmp.append(cookieName);
-					tmp.append("=\"");
+					tmp.append('=');
 					tmp.append(sessionID);
-					tmp.append('\"');
 					if (postfix != null) {
 						tmp.append(postfix);
 					}
