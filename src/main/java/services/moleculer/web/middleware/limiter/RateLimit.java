@@ -15,7 +15,7 @@ public @interface RateLimit {
 
 	int value();
 	
-	int window() default 10;
+	int window() default 1;
 	
 	TimeUnit unit() default TimeUnit.SECONDS;
 

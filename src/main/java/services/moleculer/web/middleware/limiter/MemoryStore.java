@@ -5,24 +5,34 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class MemoryStore implements RatingStore {
 	
-	protected HashMap<String, AtomicLong> hits = new HashMap<String, AtomicLong>();
+	protected final long windowMillis;
 	
-	public long inc(String address) {
+	protected final HashMap<String, AtomicLong> hits = new HashMap<String, AtomicLong>();
+
+	protected volatile long lastCleared;
+	
+	public MemoryStore(long windowMillis) {
+		this.windowMillis = windowMillis;
+	}
+	
+	public long incrementAndGet(String address) {
+		long now = System.currentTimeMillis();
 		AtomicLong counter;
 		synchronized (hits) {
-			counter = hits.get(address);
-			if (counter == null) {
+			if (lastCleared + windowMillis < now) {
+				lastCleared = now;
+				hits.clear();
 				counter = new AtomicLong();
 				hits.put(address, counter);				
+			} else {
+				counter = hits.get(address);
+				if (counter == null) {
+					counter = new AtomicLong();
+					hits.put(address, counter);				
+				}				
 			}
 		}
 		return counter.incrementAndGet();
-	}
-	
-	public void reset() {
-		synchronized (hits) {
-			hits.clear();
-		}
 	}
 	
 }

@@ -10,7 +10,6 @@ import services.moleculer.context.CallingOptions;
 import services.moleculer.context.Context;
 import services.moleculer.eventbus.Listener;
 import services.moleculer.eventbus.Subscribe;
-import services.moleculer.repl.LocalRepl;
 import services.moleculer.service.Action;
 import services.moleculer.service.Middleware;
 import services.moleculer.service.Name;
@@ -21,6 +20,7 @@ import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.middleware.RateLimiter;
 import services.moleculer.web.middleware.RequestLogger;
 import services.moleculer.web.middleware.ServeStatic;
+import services.moleculer.web.middleware.SessionCookie;
 import services.moleculer.web.middleware.limiter.RateLimit;
 import services.moleculer.web.router.Alias;
 import services.moleculer.web.router.MappingPolicy;
@@ -36,17 +36,14 @@ public class Sample {
 			RedisTransporter t = new RedisTransporter();
 			t.setDebug(false);
 			// cfg.setTransporter(t);
-			
-			cfg.setRepl(new LocalRepl());
-			
-			NettyGateway gateway = new NettyGateway();
-			gateway.setUseSSL(false);
-			gateway.setPort(3001);
-			gateway.setKeyStoreFilePath("/temp/test.jks");
-			gateway.setKeyStorePassword("test");
-			
+								
 			ServiceBroker broker = new ServiceBroker(cfg);
 
+			NettyGateway gateway = new NettyGateway();
+			gateway.setUseSSL(false);
+			gateway.setPort(3000);
+			gateway.setKeyStoreFilePath("/temp/test.jks");
+			gateway.setKeyStorePassword("test");			
 			broker.createService("api-gw", gateway);
 			
 			String path = "/math";
@@ -62,13 +59,14 @@ public class Sample {
 			gateway.setRoutes(new Route[]{r});
 
 			gateway.use(new ServeStatic("/pages", "c:/temp"));
-			//gateway.use(new SessionCookie());
+			gateway.use(new SessionCookie());
+			gateway.use(new RateLimiter(10, false));
 			gateway.use(new RequestLogger());
 		
 			broker.createService(new Service("math") {
 
 				@Name("add")
-				@RateLimit(5)
+				@RateLimit(value = 10, window = 1, unit = TimeUnit.MINUTES)
 				@Cache(keys = { "a", "b" }, ttl = 30)
 				public Action add = ctx -> {
 
@@ -79,7 +77,6 @@ public class Sample {
 
 				@Name("test")
 				@Version("1")
-				@RateLimit(value = 20, window = 1, unit = TimeUnit.MINUTES)
 				public Action test = ctx -> {
 
 					return ctx.params.get("a", 0) + ctx.params.get("b", 0);

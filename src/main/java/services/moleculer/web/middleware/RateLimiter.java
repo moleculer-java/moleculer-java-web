@@ -30,36 +30,36 @@ public class RateLimiter extends Middleware implements HttpConstants {
 	/**
 	 * Default rate limit
 	 */
-	protected long limit = 30;
+	protected long limit = 50;
 
 	/**
-	 * 
+	 * Time "window" length
 	 */
 	protected long window = 1;
-	
-	/**
-	 * 
-	 */
-	protected boolean headers = true;
-	
-	/**
-	 * 
-	 */
-	protected TimeUnit unit = TimeUnit.MINUTES;
 
 	/**
-	 * 
+	 * Add headers to all HTTP response (eg. "X-Rate-Limit-Remaining", etc.)
+	 */
+	protected boolean headers = true;
+
+	/**
+	 * Unit of the time "window"
+	 */
+	protected TimeUnit unit = TimeUnit.SECONDS;
+
+	/**
+	 * Hits per IP addresses store
 	 */
 	protected RatingStoreFactory storeFactory = new MemoryStoreFactory();
-	
+
 	// --- CONSTRUCTORS ---
 
 	public RateLimiter() {
-		this(30, 1, TimeUnit.MINUTES, true);
+		this(50, 1, TimeUnit.SECONDS, false);
 	}
-	
-	public RateLimiter(int rateLimit) {
-		this(rateLimit, 1, TimeUnit.MINUTES, true);
+
+	public RateLimiter(int rateLimit, boolean applyForAll) {
+		this(rateLimit, 1, TimeUnit.SECONDS, applyForAll);
 	}
 
 	public RateLimiter(int rateLimit, int window, TimeUnit unit, boolean applyForAll) {
@@ -70,37 +70,37 @@ public class RateLimiter extends Middleware implements HttpConstants {
 	}
 
 	// --- START INSTANCE ---
-	
+
 	@Override
 	public void started(ServiceBroker broker) throws Exception {
 		super.started(broker);
 		storeFactory.started(broker);
 	}
-	
+
 	// --- CREATE NEW ACTION ---
 
 	public Action install(Action action, Tree config) {
 
 		// Check annotation
 		Tree rateLimit = config.get("rateLimit");
-		
+
 		// Properties
 		long actionLimit;
 		long actionWindow;
 		TimeUnit actionUnit;
-		
+
 		// Get action's config values
 		if (rateLimit == null) {
 			if (applyForAll) {
-				
+
 				// Set to default values
 				actionLimit = limit;
 				actionWindow = window;
 				actionUnit = unit;
 			} else {
-				
+
 				// Do not limit the workload
-				return null;				
+				return null;
 			}
 		} else {
 			actionLimit = rateLimit.get("value", limit);
@@ -110,10 +110,10 @@ public class RateLimiter extends Middleware implements HttpConstants {
 
 		// Convert to milliseconds
 		long windowMillis = actionUnit.toMillis(actionWindow);
-		
+
 		// Convert to seconds
-		String windowSec = Long.toString(actionUnit.toSeconds(actionWindow));
-		
+		long windowSec = actionUnit.toSeconds(actionWindow);
+
 		// Check value of limit
 		if (actionLimit < 1) {
 			throw new IllegalArgumentException("Zero or negative \"rateLimit\" (" + actionLimit + ")!");
@@ -127,56 +127,47 @@ public class RateLimiter extends Middleware implements HttpConstants {
 			@Override
 			public Object handler(Context ctx) throws Exception {
 
-				// Get remote address			
+				// Get remote address
 				Tree reqMeta = ctx.params.getMeta();
-				//String address = reqMeta.get("sessionID", "");
-				String address = "icebob";
-				
-				long remaining = actionLimit - store.inc(address); 
-				
+				String address = reqMeta.get(ADDRESS, "");
+
+				long remaining = actionLimit - store.incrementAndGet(address);
 				if (remaining <= 0) {
-					
-					 // Reject request, the limit is reached
-					 Tree out = new Tree();
-					 Tree meta = out.getMeta();
-					 meta.put(STATUS, 429); // 429 - Rate limit exceeded
-					 
-					 Tree metaHeaders = meta.putMap(HEADERS, true);
-					 
-					 if (headers) {
-						 metaHeaders.put("X-Rate-Limit-Limit", actionLimit);
-						 metaHeaders.put("X-Rate-Limit-Remaining", "0");
-						 metaHeaders.put("X-Rate-Limit-Reset", windowSec);
-					 }					 
-					 return out;					
+
+					// Reject request, the limit is reached
+					Tree out = new Tree();
+					Tree meta = out.getMeta();
+
+					// 429 - Rate limit exceeded
+					meta.put(STATUS, 429);
+
+					if (headers) {
+						Tree metaHeaders = meta.putMap(HEADERS, true);
+						metaHeaders.put("X-Rate-Limit-Limit", actionLimit);
+						metaHeaders.put("X-Rate-Limit-Remaining", 0);
+						metaHeaders.put("X-Rate-Limit-Reset", windowSec);
+					}
+					return out;
 				}
-				
-				
+
 				// Invoke action
 				Object result = action.handler(ctx);
 
 				// Set outgoing headers and statuses
 				return Promise.resolve(result).then(rsp -> {
 					if (headers) {
-						
-						// Get response meta
-						Tree rspMeta = rsp.getMeta();
-						
-						// Get response headers
-						Tree metaHeaders = rspMeta.putMap(HEADERS, true);
-
+						Tree metaHeaders = rsp.getMeta().putMap(HEADERS, true);
 						metaHeaders.put("X-Rate-Limit-Limit", actionLimit);
 						metaHeaders.put("X-Rate-Limit-Remaining", remaining);
 						metaHeaders.put("X-Rate-Limit-Reset", windowSec);
 					}
 				});
 			}
-
 		};
 	}
 
 	// --- STOP INSTANCE ---
-	
+
 	@Override
 	public void stopped() {
 		super.stopped();
@@ -216,7 +207,7 @@ public class RateLimiter extends Middleware implements HttpConstants {
 	}
 
 	public void setUnit(TimeUnit unit) {
-		this.unit = Objects.requireNonNull(unit);;
+		this.unit = Objects.requireNonNull(unit);
 	}
 
 	public RatingStoreFactory getStoreFactory() {
@@ -226,5 +217,5 @@ public class RateLimiter extends Middleware implements HttpConstants {
 	public void setStoreFactory(RatingStoreFactory storeFactory) {
 		this.storeFactory = Objects.requireNonNull(storeFactory);
 	}
-	
+
 }
