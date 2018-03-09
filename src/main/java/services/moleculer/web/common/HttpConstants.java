@@ -11,6 +11,7 @@ public interface HttpConstants {
 	public static final String REQ_ACCEPT_ENCODING = "accept-encoding";
 	public static final String REQ_CONTENT_ENCODING = "content-encoding";
 	public static final String REQ_COOKIE = "cookie";
+	public static final String REQ_X_FORWARDED_FOR = "x-forwarded-for";
 	
 	// --- RESPONSE HEADERS ---
 

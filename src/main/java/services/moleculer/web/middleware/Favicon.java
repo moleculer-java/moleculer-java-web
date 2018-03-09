@@ -61,7 +61,7 @@ public class Favicon extends Middleware implements HttpConstants {
 			throw new IllegalArgumentException("File or resource not found: " + iconPath);
 		}
 		response = new CheckedTree(bytes);
-		Tree headers = response.getMeta().get(HEADERS);
+		Tree headers = response.getMeta().putMap(HEADERS);
 		if (maxAge > 0) {
 			headers.put(RSP_CACHE_CONTROL, "public, max-age=" + maxAge);
 		}

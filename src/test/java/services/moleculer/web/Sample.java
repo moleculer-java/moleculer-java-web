@@ -17,6 +17,7 @@ import services.moleculer.service.Service;
 import services.moleculer.service.Version;
 import services.moleculer.transporter.RedisTransporter;
 import services.moleculer.web.middleware.CorsHeaders;
+import services.moleculer.web.middleware.Favicon;
 import services.moleculer.web.middleware.RateLimiter;
 import services.moleculer.web.middleware.RequestLogger;
 import services.moleculer.web.middleware.ServeStatic;
@@ -55,12 +56,14 @@ public class Sample {
 			
 			Route r = new Route(gateway, path, policy, opts, whitelist, aliases);
 			r.use(new CorsHeaders());
-			r.use(new RateLimiter());
+			RateLimiter rl = new RateLimiter(10, false);
+			rl.setHeaders(false);
+			r.use(rl);
 			gateway.setRoutes(new Route[]{r});
 
 			gateway.use(new ServeStatic("/pages", "c:/temp"));
+			gateway.use(new Favicon());
 			gateway.use(new SessionCookie());
-			gateway.use(new RateLimiter(10, false));
 			gateway.use(new RequestLogger());
 		
 			broker.createService(new Service("math") {

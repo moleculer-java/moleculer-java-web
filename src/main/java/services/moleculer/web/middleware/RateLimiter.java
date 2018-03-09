@@ -129,8 +129,16 @@ public class RateLimiter extends Middleware implements HttpConstants {
 
 				// Get remote address
 				Tree reqMeta = ctx.params.getMeta();
-				String address = reqMeta.get(ADDRESS, "");
+				Tree reqHeaders = reqMeta.get(HEADERS);
+				String address = null;
+				if (reqHeaders != null) {
+					address = reqHeaders.get(REQ_X_FORWARDED_FOR, (String) null);
+				}
+				if (address == null) {
+					address = reqMeta.get(ADDRESS, "");
+				}
 
+				// Calculate remaining number of requests
 				long remaining = actionLimit - store.incrementAndGet(address);
 				if (remaining <= 0) {
 
@@ -138,7 +146,7 @@ public class RateLimiter extends Middleware implements HttpConstants {
 					Tree out = new Tree();
 					Tree meta = out.getMeta();
 
-					// 429 - Rate limit exceeded
+					// 429 = Rate limit exceeded
 					meta.put(STATUS, 429);
 
 					if (headers) {
@@ -153,15 +161,17 @@ public class RateLimiter extends Middleware implements HttpConstants {
 				// Invoke action
 				Object result = action.handler(ctx);
 
-				// Set outgoing headers and statuses
-				return Promise.resolve(result).then(rsp -> {
-					if (headers) {
+				// Set outgoing headers
+				if (headers) {
+					return Promise.resolve(result).then(rsp -> {
 						Tree metaHeaders = rsp.getMeta().putMap(HEADERS, true);
 						metaHeaders.put("X-Rate-Limit-Limit", actionLimit);
 						metaHeaders.put("X-Rate-Limit-Remaining", remaining);
 						metaHeaders.put("X-Rate-Limit-Reset", windowSec);
-					}
-				});
+					});
+				} else {
+					return result;
+				}
 			}
 		};
 	}
@@ -216,6 +226,14 @@ public class RateLimiter extends Middleware implements HttpConstants {
 
 	public void setStoreFactory(RatingStoreFactory storeFactory) {
 		this.storeFactory = Objects.requireNonNull(storeFactory);
+	}
+
+	public boolean isHeaders() {
+		return headers;
+	}
+
+	public void setHeaders(boolean headers) {
+		this.headers = headers;
 	}
 
 }
