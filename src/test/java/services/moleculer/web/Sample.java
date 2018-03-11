@@ -31,7 +31,7 @@ import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
 import services.moleculer.cacher.Cache;
 import services.moleculer.config.ServiceBrokerConfig;
-import services.moleculer.context.CallingOptions;
+import services.moleculer.context.CallOptions;
 import services.moleculer.context.Context;
 import services.moleculer.eventbus.Listener;
 import services.moleculer.eventbus.Subscribe;
@@ -75,7 +75,7 @@ public class Sample {
 
 			String path = "/math";
 			MappingPolicy policy = MappingPolicy.ALL;
-			CallingOptions.Options opts = CallingOptions.retryCount(3);
+			CallOptions.Options opts = CallOptions.retryCount(3);
 			String[] whitelist = {};
 			Alias[] aliases = new Alias[1];
 			aliases[0] = new Alias(Alias.ALL, "/add", "math.add");

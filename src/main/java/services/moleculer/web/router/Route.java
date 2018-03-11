@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
 
 import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
-import services.moleculer.context.CallingOptions;
+import services.moleculer.context.CallOptions;
 import services.moleculer.eventbus.Matcher;
 import services.moleculer.service.Middleware;
 import services.moleculer.web.ApiGateway;
@@ -57,13 +57,13 @@ public class Route {
 
 	protected final String path;
 	protected final MappingPolicy mappingPolicy;
-	protected final CallingOptions.Options opts;
+	protected final CallOptions.Options opts;
 	protected final String[] whitelist;
 	protected final Alias[] aliases;
 
 	// --- CONSTRUCTOR ---
 
-	public Route(ApiGateway gateway, String path, MappingPolicy mappingPolicy, CallingOptions.Options opts,
+	public Route(ApiGateway gateway, String path, MappingPolicy mappingPolicy, CallOptions.Options opts,
 			String[] whitelist, Alias[] aliases) {
 		this.gateway = Objects.requireNonNull(gateway);
 		this.path = formatPath(path);
@@ -228,7 +228,7 @@ public class Route {
 		return mappingPolicy;
 	}
 
-	public CallingOptions.Options getOpts() {
+	public CallOptions.Options getOpts() {
 		return opts;
 	}
 

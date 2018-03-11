@@ -34,7 +34,7 @@ import java.util.HashSet;
 import io.datatree.Tree;
 import services.moleculer.Promise;
 import services.moleculer.ServiceBroker;
-import services.moleculer.context.CallingOptions;
+import services.moleculer.context.CallOptions;
 import services.moleculer.context.Context;
 import services.moleculer.context.ContextFactory;
 import services.moleculer.service.Action;
@@ -59,7 +59,7 @@ public class Mapping implements HttpConstants {
 	protected final int[] indexes;
 	protected final String[] names;
 
-	protected final CallingOptions.Options opts;
+	protected final CallOptions.Options opts;
 
 	protected final int hashCode;
 
@@ -70,7 +70,7 @@ public class Mapping implements HttpConstants {
 	// --- CONSTRUCTOR ---
 
 	public Mapping(ServiceBroker broker, String httpMethod, String pathPattern, String actionName,
-			CallingOptions.Options opts) {
+			CallOptions.Options opts) {
 		this.broker = broker;
 		this.httpMethod = "ALL".equals(httpMethod) ? null : httpMethod;
 		this.pathPattern = pathPattern;
