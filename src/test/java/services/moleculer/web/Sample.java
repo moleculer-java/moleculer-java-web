@@ -39,7 +39,6 @@ import services.moleculer.service.Action;
 import services.moleculer.service.Middleware;
 import services.moleculer.service.Name;
 import services.moleculer.service.Service;
-import services.moleculer.service.Version;
 import services.moleculer.transporter.RedisTransporter;
 import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.middleware.Favicon;
@@ -105,7 +104,6 @@ public class Sample {
 				};
 
 				@Name("test")
-				@Version("1")
 				public Action test = ctx -> {
 
 					return ctx.params.get("a", 0) + ctx.params.get("b", 0);
