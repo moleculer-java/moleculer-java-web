@@ -1,4 +1,4 @@
-include ':moleculer-java'
-project(':moleculer-java').projectDir = new File(settingsDir, '../moleculer-java')
+// include ':moleculer-java'
+// project(':moleculer-java').projectDir = new File(settingsDir, '../moleculer-java')
 
 rootProject.name = 'moleculer-java-web'

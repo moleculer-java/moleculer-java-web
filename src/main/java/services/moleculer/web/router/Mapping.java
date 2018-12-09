@@ -31,8 +31,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 
+import io.datatree.Promise;
 import io.datatree.Tree;
-import services.moleculer.Promise;
 import services.moleculer.ServiceBroker;
 import services.moleculer.context.CallOptions;
 import services.moleculer.context.Context;
@@ -235,7 +235,7 @@ public class Mapping implements HttpConstants {
 			if (current == brokerAction) {
 				return broker.call(actionName, params, opts);
 			}
-			return new Promise(current.handler(contextFactory.create(actionName, params, opts, null)));
+			return new Promise(current.handler(contextFactory.create(actionName, params, opts, null, null)));
 
 		} catch (Throwable cause) {
 			return Promise.reject(cause);

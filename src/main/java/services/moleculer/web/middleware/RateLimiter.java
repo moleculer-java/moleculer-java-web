@@ -28,8 +28,8 @@ package services.moleculer.web.middleware;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
+import io.datatree.Promise;
 import io.datatree.Tree;
-import services.moleculer.Promise;
 import services.moleculer.ServiceBroker;
 import services.moleculer.context.Context;
 import services.moleculer.service.Action;

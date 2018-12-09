@@ -38,8 +38,8 @@ import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import io.datatree.Promise;
 import io.datatree.Tree;
-import services.moleculer.Promise;
 import services.moleculer.ServiceBroker;
 import services.moleculer.service.Middleware;
 import services.moleculer.service.Name;

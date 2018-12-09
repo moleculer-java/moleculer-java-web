@@ -159,7 +159,7 @@ public class ServeStatic extends Middleware implements HttpConstants {
 	public void started(services.moleculer.ServiceBroker broker) throws Exception {
 		super.started(broker);
 		if (fileCache == null) {
-			fileCache = new Cache<>(numberOfCachedFiles, false);
+			fileCache = new Cache<>(numberOfCachedFiles);
 		}
 	}
 
@@ -871,7 +871,7 @@ public class ServeStatic extends Middleware implements HttpConstants {
 
 	public void setNumberOfCachedFiles(int numberOfCachedFiles) {
 		if (this.numberOfCachedFiles != numberOfCachedFiles) {
-			fileCache = new Cache<>(numberOfCachedFiles, false);
+			fileCache = new Cache<>(numberOfCachedFiles);
 		}
 		this.numberOfCachedFiles = numberOfCachedFiles;
 	}

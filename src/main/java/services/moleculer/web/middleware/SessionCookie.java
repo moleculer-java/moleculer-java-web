@@ -29,8 +29,8 @@ import java.net.HttpCookie;
 import java.util.List;
 import java.util.UUID;
 
+import io.datatree.Promise;
 import io.datatree.Tree;
-import services.moleculer.Promise;
 import services.moleculer.context.Context;
 import services.moleculer.service.Action;
 import services.moleculer.service.Middleware;

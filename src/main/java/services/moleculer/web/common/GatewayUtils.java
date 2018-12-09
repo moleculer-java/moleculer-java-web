@@ -98,7 +98,7 @@ public final class GatewayUtils {
 
 	// --- FILE HANDLERS ---
 
-	protected static final Cache<String, URL> urlCache = new Cache<>(2048, false);
+	protected static final Cache<String, URL> urlCache = new Cache<>(2048);
 
 	protected static final long jarTimestamp = System.currentTimeMillis();
 
