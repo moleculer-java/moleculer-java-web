@@ -39,7 +39,6 @@ import services.moleculer.service.Action;
 import services.moleculer.service.Middleware;
 import services.moleculer.service.Name;
 import services.moleculer.service.Service;
-import services.moleculer.transporter.RedisTransporter;
 import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.middleware.Favicon;
 import services.moleculer.web.middleware.RateLimiter;
@@ -58,9 +57,8 @@ public class Sample {
 		try {
 			ServiceBrokerConfig cfg = new ServiceBrokerConfig();
 
-			RedisTransporter t = new RedisTransporter();
-			t.setDebug(false);
-
+			// RedisTransporter t = new RedisTransporter();
+			// t.setDebug(false);
 			// cfg.setTransporter(t);
 
 			ServiceBroker broker = new ServiceBroker(cfg);
@@ -68,9 +66,11 @@ public class Sample {
 			NettyGateway gateway = new NettyGateway();
 			gateway.setUseSSL(false);
 			gateway.setPort(3000);
-			gateway.setKeyStoreFilePath("/temp/test.jks");
-			gateway.setKeyStorePassword("test");
+			// gateway.setKeyStoreFilePath("/temp/test.jks");
+			// gateway.setKeyStorePassword("test");
 			broker.createService("api-gw", gateway);
+
+			// http://localhost:3000/math/add?a=5&b=6
 
 			String path = "/math";
 			MappingPolicy policy = MappingPolicy.ALL;
@@ -78,7 +78,7 @@ public class Sample {
 			String[] whitelist = {};
 			Alias[] aliases = new Alias[1];
 			aliases[0] = new Alias(Alias.ALL, "/add", "math.add");
-
+			
 			Route r = new Route(gateway, path, policy, opts, whitelist, aliases);
 			r.use(new CorsHeaders());
 			RateLimiter rl = new RateLimiter(10, false);
