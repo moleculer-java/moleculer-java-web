@@ -35,31 +35,70 @@ import services.moleculer.web.WebResponse;
 
 public class NonBlockingWebResponse implements WebResponse {
 
+	// --- RESPONSE VARIABLES ---
+	
 	protected final AsyncContext async;
 	protected final HttpServletResponse rsp;
 	protected final ServletOutputStream out;
 
+	// --- CONSTRUCTOR ---
+	
 	public NonBlockingWebResponse(AsyncContext async, HttpServletResponse rsp) throws IOException {
 		this.async = async;
 		this.rsp = rsp;
 		this.out = (ServletOutputStream) rsp.getOutputStream();
 	}
 
+	// --- PUBLIC WEBRESPONSE METHODS ---
+	
+	/**
+	 * Sets the status code for this response. This method is used to set the
+	 * return status code when there is no error (for example, for the 200 or
+	 * 404 status codes). This method preserves any cookies and other response
+	 * headers. Valid status codes are those in the 2XX, 3XX, 4XX, and 5XX
+	 * ranges. Other status codes are treated as container specific.
+	 * 
+	 * @param code
+	 *            the status code
+	 */
 	@Override
 	public void setStatus(int code) {
 		rsp.setStatus(code);
 	}
 
+	/**
+	 * Sets a response header with the given name and value. If the header had
+	 * already been set, the new value overwrites the previous one.
+	 * 
+	 * @param name
+	 *            the name of the header
+	 * @param value
+	 *            the header value If it contains octet string, it should be
+	 *            encoded according to RFC 2047
+	 */
 	@Override
 	public void setHeader(String name, String value) {
 		rsp.setHeader(name, value);
 	}
 
+	/**
+	 * Writes b.length bytes of body from the specified byte array to the output
+	 * stream.
+	 * 
+	 * @param bytes
+	 *            the data
+	 * @throws IOException
+	 *             if an I/O error occurs
+	 */
 	@Override
 	public void send(byte[] bytes) throws IOException {
 		out.write(bytes);
+		out.flush();
 	}
 
+	/**
+	 * Completes the asynchronous operation that was started on the request.
+	 */
 	@Override
 	public void end() {
 		try {

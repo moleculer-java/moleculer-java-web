@@ -25,6 +25,7 @@
  */
 package services.moleculer.web.netty;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
@@ -40,27 +41,48 @@ public class NettyWebResponse implements WebResponse {
 	// --- REQUEST PROPERTIES ----
 	
 	protected final ChannelHandlerContext ctx;
-
 	protected final NettyWebRequest req;
 	
 	// --- RESPONSE VARIABLES ---
 	
 	protected int code = 200;
-
 	protected HashMap<String, String> headers;
-
 	protected AtomicBoolean first = new AtomicBoolean(true);
 
+	// --- CONSTRUCTOR ---
+	
 	public NettyWebResponse(ChannelHandlerContext ctx, NettyWebRequest req) {
 		this.ctx = ctx;
 		this.req = req;
 	}
 
+	// --- PUBLIC WEBRESPONSE METHODS ---
+	
+	/**
+	 * Sets the status code for this response. This method is used to set the
+	 * return status code when there is no error (for example, for the 200 or
+	 * 404 status codes). This method preserves any cookies and other response
+	 * headers. Valid status codes are those in the 2XX, 3XX, 4XX, and 5XX
+	 * ranges. Other status codes are treated as container specific.
+	 * 
+	 * @param code
+	 *            the status code
+	 */
 	@Override
 	public void setStatus(int code) {
 		this.code = code;
 	}
 
+	/**
+	 * Sets a response header with the given name and value. If the header had
+	 * already been set, the new value overwrites the previous one.
+	 * 
+	 * @param name
+	 *            the name of the header
+	 * @param value
+	 *            the header value If it contains octet string, it should be
+	 *            encoded according to RFC 2047
+	 */
 	@Override
 	public void setHeader(String name, String value) {
 		if (headers == null) {
@@ -69,6 +91,15 @@ public class NettyWebResponse implements WebResponse {
 		headers.put(name, value);
 	}
 
+	/**
+	 * Writes b.length bytes of body from the specified byte array to the output
+	 * stream.
+	 * 
+	 * @param bytes
+	 *            the data
+	 * @throws IOException
+	 *             if an I/O error occurs
+	 */
 	@Override
 	public void send(byte[] bytes) {
 		if (first.compareAndSet(true, false)) {
@@ -100,11 +131,14 @@ public class NettyWebResponse implements WebResponse {
 			ctx.write(Unpooled.wrappedBuffer(header.toString().getBytes(StandardCharsets.UTF_8)));
 		}
 		ctx.write(Unpooled.wrappedBuffer(bytes));
+		ctx.flush();
 	}
 
+	/**
+	 * Completes the asynchronous operation that was started on the request.
+	 */
 	@Override
 	public void end() {
-		ctx.flush();
 		if (req.parser != null) {
 			try {
 				req.parser.close();				
