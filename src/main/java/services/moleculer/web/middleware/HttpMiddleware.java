@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2017 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -23,23 +23,25 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package services.moleculer.web.common;
-
-import java.util.Map;
-import java.util.function.Consumer;
+package services.moleculer.web.middleware;
 
 import io.datatree.Tree;
+import services.moleculer.service.Service;
+import services.moleculer.web.RequestProcessor;
 
-public class LazyTree extends Tree {
+public abstract class HttpMiddleware extends Service {
 
-	// --- SERIAL VERSION ID ---
+	// --- CONSTRUCTORS ---
 
-	private static final long serialVersionUID = -9176218153752352961L;
-
-	// --- CONSTRUCTOR ---
-
-	public LazyTree(Consumer<Map<String, Object>> converter) {
-		super(new LazyMap<>(converter), null);
+	public HttpMiddleware() {
 	}
 
+	public HttpMiddleware(String name) {
+		super(name);
+	}
+	
+	// --- CREATE / INSTALL MIDDLEWARE ---
+	
+	public abstract RequestProcessor install(RequestProcessor next, Tree config);
+		
 }

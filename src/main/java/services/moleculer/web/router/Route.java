@@ -40,8 +40,7 @@ import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
 import services.moleculer.context.CallOptions;
 import services.moleculer.eventbus.Matcher;
-import services.moleculer.service.Middleware;
-import services.moleculer.web.ApiGateway;
+import services.moleculer.web.middleware.HttpMiddleware;
 
 public class Route {
 
@@ -49,9 +48,9 @@ public class Route {
 
 	protected static final Logger logger = LoggerFactory.getLogger(Route.class);
 
-	// --- PARENT GATEWAY ---
+	// --- PARENT BROKER ---
 
-	protected final ApiGateway gateway;
+	protected final ServiceBroker broker;
 
 	// --- PROPERTIES ---
 
@@ -61,11 +60,15 @@ public class Route {
 	protected final String[] whitelist;
 	protected final Alias[] aliases;
 
+	// --- INSTALLED MIDDLEWARES ---
+	
+	protected final HashSet<HttpMiddleware> checkedMiddlewares = new HashSet<>(32);
+	
 	// --- CONSTRUCTOR ---
 
-	public Route(ApiGateway gateway, String path, MappingPolicy mappingPolicy, CallOptions.Options opts,
+	public Route(ServiceBroker broker, String path, MappingPolicy mappingPolicy, CallOptions.Options opts,
 			String[] whitelist, Alias[] aliases) {
-		this.gateway = Objects.requireNonNull(gateway);
+		this.broker = Objects.requireNonNull(broker);
 		this.path = formatPath(path);
 		this.mappingPolicy = mappingPolicy;
 		this.opts = opts;
@@ -106,9 +109,9 @@ public class Route {
 		String shortPath = path.substring(this.path.length());
 		if (aliases != null && aliases.length > 0) {
 			for (Alias alias : aliases) {
-				if ("ALL".equals(alias.httpMethod) || httpMethod.equals(alias.httpMethod)) {
-					Mapping mapping = new Mapping(gateway.getBroker(), httpMethod, this.path + alias.pathPattern,
-							alias.actionName, opts);
+				if (Alias.ALL.equals(alias.httpMethod) || httpMethod.equals(alias.httpMethod)) {
+					Mapping mapping = new Mapping(broker, httpMethod, this.path + alias.pathPattern, alias.actionName,
+							opts);
 					if (mapping.matches(httpMethod, path)) {
 						if (!checkedMiddlewares.isEmpty()) {
 							mapping.use(checkedMiddlewares);
@@ -125,8 +128,7 @@ public class Route {
 		if (whitelist != null && whitelist.length > 0) {
 			for (String pattern : whitelist) {
 				if (Matcher.matches(shortPath, pattern)) {
-					Mapping mapping = new Mapping(gateway.getBroker(), httpMethod, this.path + pattern, actionName,
-							opts);
+					Mapping mapping = new Mapping(broker, httpMethod, this.path + pattern, actionName, opts);
 					if (!checkedMiddlewares.isEmpty()) {
 						mapping.use(checkedMiddlewares);
 					}
@@ -141,7 +143,7 @@ public class Route {
 			} else {
 				pattern = this.path + '*';
 			}
-			Mapping mapping = new Mapping(gateway.getBroker(), httpMethod, pattern, actionName, opts);
+			Mapping mapping = new Mapping(broker, httpMethod, pattern, actionName, opts);
 			if (!checkedMiddlewares.isEmpty()) {
 				mapping.use(checkedMiddlewares);
 			}
@@ -150,37 +152,35 @@ public class Route {
 		return null;
 	}
 
+	// --- ADD MIDDLEWARES TO ROUTE ---
+
+	public void use(HttpMiddleware... middlewares) {
+		use(Arrays.asList(middlewares));
+	}
+
+	public void use(Collection<HttpMiddleware> middlewares) {
+		checkedMiddlewares.addAll(middlewares);
+	}
+	
 	// --- START MIDDLEWARES ---
 
-	public void started(ServiceBroker broker, HashSet<Middleware> checkedMiddlewares) throws Exception {
+	public void started(ServiceBroker broker, HashSet<HttpMiddleware> checkedMiddlewares) throws Exception {
 
-		// Start middlewares
-		for (Middleware middleware : checkedMiddlewares) {
-			if (!checkedMiddlewares.contains(middleware)) {
+		// TODO Start middlewares
+		for (HttpMiddleware middleware : checkedMiddlewares) {
+			if (!this.checkedMiddlewares.contains(middleware)) {
 				middleware.started(broker);
 			}
 		}
 	}
 
-	// --- GLOBAL MIDDLEWARES ---
-
-	protected HashSet<Middleware> checkedMiddlewares = new HashSet<>(32);
-
-	public void use(Middleware... middlewares) {
-		use(Arrays.asList(middlewares));
-	}
-
-	public void use(Collection<Middleware> middlewares) {
-		checkedMiddlewares.addAll(middlewares);
-	}
-
 	// --- STOP MIDDLEWARES ---
 
-	public void stopped(HashSet<Middleware> checkedMiddlewares) {
+	public void stopped(HashSet<HttpMiddleware> checkedMiddlewares) {
 
-		// Start middlewares
-		for (Middleware middleware : checkedMiddlewares) {
-			if (!checkedMiddlewares.contains(middleware)) {
+		// TODO Stop middlewares
+		for (HttpMiddleware middleware : checkedMiddlewares) {
+			if (this.checkedMiddlewares.contains(middleware)) {
 				try {
 					middleware.stopped();
 				} catch (Exception ignored) {
@@ -212,32 +212,6 @@ public class Route {
 			}
 		}
 		return tree;
-	}
-
-	// --- PROPERTY GETTERS ---
-
-	public ApiGateway getApiGateway() {
-		return gateway;
-	}
-
-	public String getPath() {
-		return path;
-	}
-
-	public MappingPolicy getMappingPolicy() {
-		return mappingPolicy;
-	}
-
-	public CallOptions.Options getOpts() {
-		return opts;
-	}
-
-	public String[] getWhitelist() {
-		return whitelist;
-	}
-
-	public Alias[] getAliases() {
-		return aliases;
 	}
 
 }

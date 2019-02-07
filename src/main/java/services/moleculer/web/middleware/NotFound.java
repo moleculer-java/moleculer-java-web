@@ -29,50 +29,58 @@ import java.nio.charset.StandardCharsets;
 
 import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
-import services.moleculer.context.Context;
-import services.moleculer.service.Action;
-import services.moleculer.service.Middleware;
 import services.moleculer.service.Name;
+import services.moleculer.web.RequestProcessor;
+import services.moleculer.web.WebRequest;
+import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 @Name("Not Found")
-public class NotFound extends Middleware implements HttpConstants {
+public class NotFound extends HttpMiddleware implements HttpConstants {
 
 	// --- JSON / HTML RESPONSE ---
 
 	protected boolean htmlResponse;
 
-	// --- CREATE NEW ACTION ---
+	// --- CREATE NEW PROCESSOR ---
 
-	public Action install(Action action, Tree config) {
-		return new Action() {
+	@Override
+	public RequestProcessor install(RequestProcessor next, Tree config) {
+		return new RequestProcessor() {
 
 			@Override
-			public Object handler(Context ctx) throws Exception {
+			public void service(WebRequest req, WebResponse rsp) throws Exception {
+				try {
 
-				// Get path
-				String path = ctx.params.getMeta().get(PATH, "/");
+					// Get path
+					String path = req.getPath();
 
-				// 404 Not Found
-				Tree rsp = new Tree();
-				Tree meta = rsp.getMeta();
-				meta.put(STATUS, 404);
-				Tree headers = meta.putMap(HEADERS, true);
-				if (htmlResponse) {
-					headers.put(RSP_CONTENT_TYPE, "text/html;charset=utf-8");
-					StringBuilder body = new StringBuilder(512);
-					body.append("<html><body><h1>Not found: ");
-					body.append(path);
-					body.append("</h1><hr/>");
-					body.append("Moleculer V");
-					body.append(ServiceBroker.SOFTWARE_VERSION);
-					body.append("</body></html>");
-					rsp.setObject(body.toString().getBytes(StandardCharsets.UTF_8));
-				} else {
-					headers.put(RSP_CONTENT_TYPE, "application/json;charset=utf-8");
-					rsp.put("message", "Not Found: " + path);
+					// 404 Not Found
+					rsp.setStatus(404);
+					if (htmlResponse) {
+						rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_HTML);
+
+						StringBuilder body = new StringBuilder(512);
+						body.append("<html><body><h1>404 - Not found</h1><h2>");
+						body.append(path);
+						body.append("</h2><hr/>");
+						body.append("Moleculer V");
+						body.append(ServiceBroker.SOFTWARE_VERSION);
+						body.append("</body></html>");
+
+						rsp.send(body.toString().getBytes(StandardCharsets.UTF_8));
+					} else {
+						rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_JSON);
+
+						Tree body = new Tree();
+						body.put("success", false);
+						body.put("message", "Not Found: " + path);
+
+						rsp.send(body.toBinary());
+					}
+				} finally {
+					rsp.end();
 				}
-				return rsp;
 			}
 
 		};

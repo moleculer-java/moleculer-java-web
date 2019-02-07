@@ -28,20 +28,19 @@ package services.moleculer.web.middleware;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
-import io.datatree.Promise;
 import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
-import services.moleculer.context.Context;
-import services.moleculer.service.Action;
-import services.moleculer.service.Middleware;
 import services.moleculer.service.Name;
+import services.moleculer.web.RequestProcessor;
+import services.moleculer.web.WebRequest;
+import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 import services.moleculer.web.middleware.limiter.MemoryStoreFactory;
 import services.moleculer.web.middleware.limiter.RatingStore;
 import services.moleculer.web.middleware.limiter.RatingStoreFactory;
 
 @Name("Rate Limiter")
-public class RateLimiter extends Middleware implements HttpConstants {
+public class RateLimiter extends HttpMiddleware implements HttpConstants {
 
 	// --- PROPERTIES ---
 
@@ -102,9 +101,10 @@ public class RateLimiter extends Middleware implements HttpConstants {
 		storeFactory.started(broker);
 	}
 
-	// --- CREATE NEW ACTION ---
+	// --- CREATE NEW PROCESSOR ---
 
-	public Action install(Action action, Tree config) {
+	@Override
+	public RequestProcessor install(RequestProcessor next, Tree config) {
 
 		// Check annotation
 		Tree rateLimit = config.get("rateLimit");
@@ -139,28 +139,27 @@ public class RateLimiter extends Middleware implements HttpConstants {
 		// Convert to seconds
 		long windowSec = actionUnit.toSeconds(actionWindow);
 
+		// Convert to String
+		String actionLimitString = Long.toString(actionLimit);
+		String windowSecString = Long.toString(windowSec);
+
 		// Check value of limit
 		if (actionLimit < 1) {
 			throw new IllegalArgumentException("Zero or negative \"rateLimit\" (" + actionLimit + ")!");
 		}
 
 		// Create new middleware-layer
-		return new Action() {
+		return new RequestProcessor() {
 
 			private RatingStore store = storeFactory.createStore(windowMillis);
 
 			@Override
-			public Object handler(Context ctx) throws Exception {
+			public void service(WebRequest req, WebResponse rsp) throws Exception {
 
 				// Get remote address
-				Tree reqMeta = ctx.params.getMeta();
-				Tree reqHeaders = reqMeta.get(HEADERS);
-				String address = null;
-				if (reqHeaders != null) {
-					address = reqHeaders.get(REQ_X_FORWARDED_FOR, (String) null);
-				}
-				if (address == null) {
-					address = reqMeta.get(ADDRESS, "");
+				String address = req.getHeader(X_FORWARDED_FOR);
+				if (address == null || address.isEmpty()) {
+					address = req.getAddress();
 				}
 
 				// Calculate remaining number of requests
@@ -168,35 +167,30 @@ public class RateLimiter extends Middleware implements HttpConstants {
 				if (remaining <= 0) {
 
 					// Reject request, the limit is reached
-					Tree out = new Tree();
-					Tree meta = out.getMeta();
-
 					// 429 = Rate limit exceeded
-					meta.put(STATUS, 429);
+					rsp.setStatus(429);
 
+					// Set outgoing headers
 					if (headers) {
-						Tree metaHeaders = meta.putMap(HEADERS, true);
-						metaHeaders.put("X-Rate-Limit-Limit", actionLimit);
-						metaHeaders.put("X-Rate-Limit-Remaining", 0);
-						metaHeaders.put("X-Rate-Limit-Reset", windowSec);
+						rsp.setHeader("X-Rate-Limit-Limit", actionLimitString);
+						rsp.setHeader("X-Rate-Limit-Remaining", "0");
+						rsp.setHeader("X-Rate-Limit-Reset", windowSecString);
 					}
-					return out;
-				}
 
-				// Invoke action
-				Object result = action.handler(ctx);
+					// Response finished
+					rsp.end();
+					return;
+				}
 
 				// Set outgoing headers
 				if (headers) {
-					return Promise.resolve(result).then(rsp -> {
-						Tree metaHeaders = rsp.getMeta().putMap(HEADERS, true);
-						metaHeaders.put("X-Rate-Limit-Limit", actionLimit);
-						metaHeaders.put("X-Rate-Limit-Remaining", remaining);
-						metaHeaders.put("X-Rate-Limit-Reset", windowSec);
-					});
-				} else {
-					return result;
+					rsp.setHeader("X-Rate-Limit-Limit", actionLimitString);
+					rsp.setHeader("X-Rate-Limit-Remaining", Long.toString(remaining));
+					rsp.setHeader("X-Rate-Limit-Reset", windowSecString);
 				}
+
+				// Invoke next action
+				next.service(req, rsp);
 			}
 		};
 	}

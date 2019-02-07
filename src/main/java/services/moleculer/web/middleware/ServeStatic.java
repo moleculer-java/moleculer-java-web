@@ -27,24 +27,19 @@ package services.moleculer.web.middleware;
 
 import static services.moleculer.util.CommonUtils.compress;
 import static services.moleculer.util.CommonUtils.formatPath;
-import static services.moleculer.web.common.GatewayUtils.getFileSize;
-import static services.moleculer.web.common.GatewayUtils.getFileURL;
 import static services.moleculer.web.common.GatewayUtils.getLastModifiedTime;
 import static services.moleculer.web.common.GatewayUtils.isReadable;
 import static services.moleculer.web.common.GatewayUtils.readAllBytes;
 
-import java.io.File;
-import java.net.URI;
-import java.net.URL;
 import java.util.HashMap;
 import java.util.zip.Deflater;
 
 import io.datatree.Tree;
 import io.datatree.dom.Cache;
-import services.moleculer.context.Context;
-import services.moleculer.service.Action;
-import services.moleculer.service.Middleware;
 import services.moleculer.service.Name;
+import services.moleculer.web.RequestProcessor;
+import services.moleculer.web.WebRequest;
+import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 /**
@@ -63,7 +58,7 @@ import services.moleculer.web.common.HttpConstants;
  * "http://localhost:3000/pages/index.html"
  */
 @Name("Static File Provider")
-public class ServeStatic extends Middleware implements HttpConstants {
+public class ServeStatic extends HttpMiddleware implements HttpConstants {
 
 	// --- URL PATH AND ROOT DIRECTORY ---
 
@@ -163,59 +158,45 @@ public class ServeStatic extends Middleware implements HttpConstants {
 		}
 	}
 
-	// --- FILE HANDLER ---
+	// --- CREATE NEW PROCESSOR ---
 
 	@Override
-	public Action install(Action action, Tree config) {
-		return new Action() {
+	public RequestProcessor install(RequestProcessor next, Tree config) {
+		return new RequestProcessor() {
 
 			@Override
-			public Object handler(Context ctx) throws Exception {
+			public void service(WebRequest req, WebResponse rsp) throws Exception {
 				try {
 
 					// Realtive path
-					String relativePath = null;
-
-					// Get path and headers block
-					Tree meta = ctx.params.getMeta(false);
-					if (meta != null) {
-						Tree pathNode = meta.get(PATH);
-						if (pathNode != null) {
-							relativePath = pathNode.asString();
-						}
-					}
+					String relativePath = req.getPath();
 					if (relativePath == null || !relativePath.startsWith(path)) {
-						return action.handler(ctx);
+						
+						// Invalid path
+						next.service(req, rsp);
+						return;
 					}
 
 					// If-None-Match header
 					String ifNoneMatch = null;
 
-					// Client supports compressed content
+					// Client supports compressed content					
 					boolean compressionSupported = false;
-					if (meta != null) {
-						Tree headers = meta.get(HEADERS);
-						if (headers != null) {
-							if (useETags) {
-								ifNoneMatch = headers.get(REQ_IF_NONE_MATCH, "");
-							}
-							if (compressAbove > 0) {
-								compressionSupported = headers.get(REQ_ACCEPT_ENCODING, "").contains(DEFLATE);
-							}
-						}
+					if (useETags) {
+						ifNoneMatch = req.getHeader(IF_NONE_MATCH);
+					}
+					if (compressAbove > 0) {
+						String acceptEncoding = req.getHeader(ACCEPT_ENCODING);
+						compressionSupported = acceptEncoding != null && acceptEncoding.contains(DEFLATE);
 					}
 
 					// Remove prefix
 					relativePath = relativePath.substring(path.length());
-
-					// Get response meta and headers
-					Tree out = new Tree();
-					meta = out.getMeta(true);
-					Tree headers = meta.putMap(HEADERS, true);
 					if (relativePath == null || relativePath.isEmpty() || relativePath.contains("..")) {
 
 						// 404 Not Found
-						return action.handler(ctx);
+						next.service(req, rsp);
+						return;
 					}
 
 					// Absolute path
@@ -242,7 +223,8 @@ public class ServeStatic extends Middleware implements HttpConstants {
 
 							// 404 Not Found
 							fileCache.remove(relativePath);
-							return action.handler(ctx);
+							next.service(req, rsp);
+							return;
 						}
 					}
 
@@ -257,7 +239,7 @@ public class ServeStatic extends Middleware implements HttpConstants {
 					String contentType = getContentType(extension);
 
 					// Set "Content-Type" header
-					headers.put(RSP_CONTENT_TYPE, contentType);
+					rsp.setHeader(CONTENT_TYPE, contentType);
 
 					// Handling ETag
 					String etag = null;
@@ -274,15 +256,15 @@ public class ServeStatic extends Middleware implements HttpConstants {
 						if (ifNoneMatch != null && ifNoneMatch.equals(etag) && (reload || cached != null)) {
 
 							// 304 Not Modified
-							headers.put(RSP_CONTENT_TYPE, contentType);
-							meta.put(STATUS, 304);
-							out.setObject(new byte[0]);
-							return out;
+							rsp.setStatus(304);
+							rsp.setHeader(CONTENT_TYPE, contentType);
+							rsp.end();
+							return;
 
 						} else {
 
 							// Send ETag header
-							headers.put(RSP_ETAG, etag);
+							rsp.setHeader(ETAG, etag);
 						}
 					}
 
@@ -292,29 +274,21 @@ public class ServeStatic extends Middleware implements HttpConstants {
 
 						// Set cached content
 						if (!compressionSupported || cached.compressedBody == null) {
-							out.setObject(cached.body);
+							rsp.send(cached.body);
 						} else {
 
 							// Client supports compressed content
-							out.setObject(cached.compressedBody);
+							rsp.send(cached.compressedBody);
 							compressed = true;
 						}
 
 					} else {
 
-						// Get file size
-						long max = getFileSize(absolutePath);
-						if (max > maxCachedFileSize) {
+						// Read all bytes of the file
+						byte[] body = readAllBytes(absolutePath);
 
-							// Send as file
-							URL url = getFileURL(absolutePath);
-							File file = new File(new URI(url.toString()));
-							out.setObject(file);
-
-						} else {
-
-							// Read all bytes of the file
-							byte[] body = readAllBytes(absolutePath);
+						// Check file size
+						if (body.length <= maxCachedFileSize) {
 
 							// Store in cache
 							cached = new CachedFile();
@@ -331,21 +305,20 @@ public class ServeStatic extends Middleware implements HttpConstants {
 								}
 							}
 							fileCache.put(relativePath, cached);
-							out.setObject(body);
 						}
+						rsp.send(body);
 					}
 
 					// Add "Content-Encoding" header
 					if (compressed) {
-						headers.put(RSP_CONTENT_ENCODING, DEFLATE);
+						rsp.setHeader(CONTENT_ENCODING, DEFLATE);
 					}
 
-					// Return response
-					return out;
+					// Processing finished
+					rsp.end();					
 				} catch (Exception cause) {
 					logger.warn("Unable to process request!", cause);
 				}
-				return action.handler(ctx);
 			}
 		};
 	}

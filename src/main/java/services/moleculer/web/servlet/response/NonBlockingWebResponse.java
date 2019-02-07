@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2017 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -23,33 +23,50 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package services.moleculer.web.common;
+package services.moleculer.web.servlet.response;
 
-public interface HttpConstants {
+import java.io.IOException;
 
-	// --- HEADER NAMES ---
+import javax.servlet.AsyncContext;
+import javax.servlet.ServletOutputStream;
+import javax.servlet.http.HttpServletResponse;
 
-	public static final String X_FORWARDED_FOR = "X-Forwarded-For";
-	public static final String COOKIE = "Cookie";
-	public static final String IF_NONE_MATCH = "If-None-Match";
-	public static final String CONTENT_TYPE = "Content-Type";
-	public static final String CONTENT_LENGTH = "Content-Length";
-	public static final String CONNECTION = "Connection";
-	public static final String ACCEPT_ENCODING = "Accept-Encoding";
-	public static final String CONTENT_ENCODING = "Content-Encoding";
-	public static final String ETAG = "ETag";
-	public static final String SET_COOKIE = "Set-Cookie";
-	public static final String CACHE_CONTROL = "Cache-Control";
+import services.moleculer.web.WebResponse;
 
-	// --- HTTP HEADER VALUES ---
+public class NonBlockingWebResponse implements WebResponse {
 
-	public static final String DEFLATE = "deflate";
-	public static final String KEEP_ALIVE = "keep-alive";
-	public static final String CLOSE = "close";
+	protected final AsyncContext async;
+	protected final HttpServletResponse rsp;
+	protected final ServletOutputStream out;
 
-	// --- CONTENT TYPES ---
+	public NonBlockingWebResponse(AsyncContext async, HttpServletResponse rsp) throws IOException {
+		this.async = async;
+		this.rsp = rsp;
+		this.out = (ServletOutputStream) rsp.getOutputStream();
+	}
 
-	public static final String CONTENT_TYPE_JSON = "application/json;charset=utf-8";
-	public static final String CONTENT_TYPE_HTML = "text/html;charset=utf-8";
+	@Override
+	public void setStatus(int code) {
+		rsp.setStatus(code);
+	}
+
+	@Override
+	public void setHeader(String name, String value) {
+		rsp.setHeader(name, value);
+	}
+
+	@Override
+	public void send(byte[] bytes) throws IOException {
+		out.write(bytes);
+	}
+
+	@Override
+	public void end() {
+		try {
+			out.close();
+		} catch (Exception ignored) {
+		}
+		async.complete();
+	}
 
 }

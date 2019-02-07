@@ -35,12 +35,12 @@ import io.datatree.Promise;
 import io.datatree.Tree;
 import services.moleculer.context.Context;
 import services.moleculer.service.Action;
-import services.moleculer.service.Middleware;
 import services.moleculer.service.Name;
+import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.common.HttpConstants;
 
 @Name("Request Logger")
-public class RequestLogger extends Middleware implements HttpConstants {
+public class RequestLogger extends HttpMiddleware implements HttpConstants {
 
 	// --- NEW LINE ---
 
@@ -48,6 +48,12 @@ public class RequestLogger extends Middleware implements HttpConstants {
 
 	// --- CREATE NEW ACTION ---
 
+	@Override
+	public RequestProcessor install(RequestProcessor next, Tree config) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+	
 	public Action install(Action action, Tree config) {
 		return new Action() {
 

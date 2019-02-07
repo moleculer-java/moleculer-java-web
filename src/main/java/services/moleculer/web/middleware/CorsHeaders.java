@@ -25,16 +25,15 @@
  */
 package services.moleculer.web.middleware;
 
-import io.datatree.Promise;
 import io.datatree.Tree;
-import services.moleculer.context.Context;
-import services.moleculer.service.Action;
-import services.moleculer.service.Middleware;
 import services.moleculer.service.Name;
+import services.moleculer.web.RequestProcessor;
+import services.moleculer.web.WebRequest;
+import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 @Name("CORS Headers")
-public class CorsHeaders extends Middleware implements HttpConstants {
+public class CorsHeaders extends HttpMiddleware implements HttpConstants {
 
 	// --- PROPERTIES ---
 
@@ -68,44 +67,45 @@ public class CorsHeaders extends Middleware implements HttpConstants {
 	 */
 	protected int maxAge;
 
-	// --- ADD MIDDLEWARE TO ACTION ---
+	// --- CREATE NEW PROCESSOR ---
 
-	public Action install(Action action, Tree config) {
-		return new Action() {
+	@Override
+	public RequestProcessor install(RequestProcessor next, Tree config) {
+		return new RequestProcessor() {
 
 			@Override
-			public Object handler(Context ctx) throws Exception {
-				return new Promise(action.handler(ctx)).then(rsp -> {
-					Tree headers = rsp.getMeta().putMap(HEADERS, true);
+			public void service(WebRequest req, WebResponse rsp) throws Exception {
 
-					// Add the Access-Control-Allow-Origin header
-					if (origin != null) {
-						headers.put("Access-Control-Allow-Origin", origin);
-					}
+				// Add the Access-Control-Allow-Origin header
+				if (origin != null) {
+					rsp.setHeader("Access-Control-Allow-Origin", origin);
+				}
 
-					// Add the Access-Control-Allow-Methods header
-					if (methods != null) {
-						headers.put("Access-Control-Allow-Methods", methods);
-					}
+				// Add the Access-Control-Allow-Methods header
+				if (methods != null) {
+					rsp.setHeader("Access-Control-Allow-Methods", methods);
+				}
 
-					// Add the Access-Control-Allow-Headers header
-					if (allowedHeaders != null) {
-						headers.put("Access-Control-Allow-Headers", allowedHeaders);
-					}
+				// Add the Access-Control-Allow-Headers header
+				if (allowedHeaders != null) {
+					rsp.setHeader("Access-Control-Allow-Headers", allowedHeaders);
+				}
 
-					// Add the Access-Control-Expose-Headers header
-					if (exposedHeaders != null) {
-						headers.put("Access-Control-Expose-Headers", exposedHeaders);
-					}
+				// Add the Access-Control-Expose-Headers header
+				if (exposedHeaders != null) {
+					rsp.setHeader("Access-Control-Expose-Headers", exposedHeaders);
+				}
 
-					// Add the Access-Control-Allow-Credentials header
-					headers.put("Access-Control-Allow-Credentials", Boolean.toString(credentials));
+				// Add the Access-Control-Allow-Credentials header
+				rsp.setHeader("Access-Control-Allow-Credentials", Boolean.toString(credentials));
 
-					// Add the Access-Control-Max-Age header
-					if (maxAge > 0) {
-						headers.put("Access-Control-Max-Age", maxAge);
-					}
-				});
+				// Add the Access-Control-Max-Age header
+				if (maxAge > 0) {
+					rsp.setHeader("Access-Control-Max-Age", Integer.toString(maxAge));
+				}
+				
+				// Invoke next handler
+				next.service(req, rsp);
 			}
 
 		};

@@ -28,22 +28,17 @@ package services.moleculer.web.common;
 import static services.moleculer.util.CommonUtils.readFully;
 
 import java.io.File;
-import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
-import java.security.KeyStore;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
-
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.datatree.Tree;
 import io.datatree.dom.Cache;
+import services.moleculer.ServiceBroker;
+import services.moleculer.service.Service;
+import services.moleculer.service.ServiceRegistry;
 import services.moleculer.web.middleware.ServeStatic;
 
 public final class GatewayUtils {
@@ -52,48 +47,22 @@ public final class GatewayUtils {
 
 	private static final Logger logger = LoggerFactory.getLogger(GatewayUtils.class);
 
-	// --- CREATE SSL CONTEXT ---
+	// --- FIND SERVICE BY CLASS ---
 
-	public static final SSLContext getSslContext(String keyStoreFilePath, String keyStorePassword, String keyStoreType,
-			TrustManager[] trustManagers) throws Exception {
-
-		// Load KeyStore
-		KeyStore keyStore = KeyStore.getInstance(keyStoreType);
-		InputStream keyStoreInputStream = getFileURL(keyStoreFilePath).openStream();
-		keyStore.load(keyStoreInputStream, keyStorePassword == null ? null : keyStorePassword.toCharArray());
-		KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
-		keyManagerFactory.getProvider();
-		keyManagerFactory.init(keyStore, keyStorePassword == null ? null : keyStorePassword.toCharArray());
-
-		// Create TrustManager
-		TrustManager[] mgrs;
-		if (trustManagers == null) {
-			mgrs = new TrustManager[] { new X509TrustManager() {
-
-				@Override
-				public void checkClientTrusted(X509Certificate[] x509Certificates, String s)
-						throws CertificateException {
+	@SuppressWarnings("unchecked")
+	public static final <T extends Service> T getService(ServiceBroker broker, Class<T> type) {
+		ServiceRegistry registry = broker.getConfig().getServiceRegistry();
+		Tree info = registry.getDescriptor();
+		for (Tree service : info.get("services")) {
+			String name = service.get("name", "");
+			if (name != null && !name.isEmpty()) {
+				Service instance = broker.getLocalService(name);
+				if (type.isAssignableFrom(instance.getClass())) {
+					return (T) instance;
 				}
-
-				@Override
-				public void checkServerTrusted(X509Certificate[] x509Certificates, String s)
-						throws CertificateException {
-				}
-
-				@Override
-				public X509Certificate[] getAcceptedIssuers() {
-					return new X509Certificate[0];
-				}
-
-			} };
-		} else {
-			mgrs = trustManagers;
+			}
 		}
-
-		// Create SSL context
-		SSLContext sslContext = SSLContext.getInstance("TLS");
-		sslContext.init(keyManagerFactory.getKeyManagers(), mgrs, null);
-		return sslContext;
+		return null;
 	}
 
 	// --- FILE HANDLERS ---

@@ -29,16 +29,15 @@ import java.net.HttpCookie;
 import java.util.List;
 import java.util.UUID;
 
-import io.datatree.Promise;
 import io.datatree.Tree;
-import services.moleculer.context.Context;
-import services.moleculer.service.Action;
-import services.moleculer.service.Middleware;
 import services.moleculer.service.Name;
+import services.moleculer.web.RequestProcessor;
+import services.moleculer.web.WebRequest;
+import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 @Name("Session Cookie Handler")
-public class SessionCookie extends Middleware implements HttpConstants {
+public class SessionCookie extends HttpMiddleware implements HttpConstants {
 
 	// --- PROPERTIES ---
 
@@ -55,21 +54,17 @@ public class SessionCookie extends Middleware implements HttpConstants {
 		this.cookieName = cookieName;
 	}
 
-	// --- CREATE NEW ACTION ---
+	// --- CREATE NEW PROCESSOR ---
 
-	public Action install(Action action, Tree config) {
-		return new Action() {
+	@Override
+	public RequestProcessor install(RequestProcessor next, Tree config) {
+		return new RequestProcessor() {
 
 			@Override
-			public Object handler(Context ctx) throws Exception {
+			public void service(WebRequest req, WebResponse rsp) throws Exception {
 
 				// Get cookie's value
-				Tree meta = ctx.params.getMeta();
-				Tree headers = meta.get(HEADERS);
-				String headerValue = null;
-				if (headers != null) {
-					headerValue = headers.get(REQ_COOKIE, (String) null);
-				}
+				String headerValue = req.getHeader(COOKIE);
 
 				// Get sessionID
 				String sessionID = null;
@@ -82,47 +77,42 @@ public class SessionCookie extends Middleware implements HttpConstants {
 						}
 					}
 				}
+
+				// Generate new sessionID
 				if (sessionID == null || sessionID.isEmpty()) {
-
-					// Generate new sessionID
 					sessionID = UUID.randomUUID().toString();
-					final String newHeader;
-					StringBuilder tmp = new StringBuilder(64);
-					if (httpCookies != null) {
-						for (HttpCookie httpCookie : httpCookies) {
-							if (!cookieName.equals(httpCookie.getName())) {
-								tmp.append(httpCookie.toString());
-								tmp.append(',');
-							}
-						}
-					}
-					tmp.append(cookieName);
-					tmp.append("=\"");
-					tmp.append(sessionID);
-					tmp.append('\"');
-					if (postfix != null) {
-						tmp.append(postfix);
-					}
-					newHeader = tmp.toString();
-
-					// Store sessionID in meta
-					meta.put("sessionID", sessionID);
-
-					// Invoke action
-					Object result = action.handler(ctx);
-
-					// Set outgoing cookie
-					return Promise.resolve(result).then(rsp -> {
-						rsp.getMeta().putMap(HEADERS, true).put(RSP_SET_COOKIE, newHeader);
-					});
 				}
 
-				// Store sessionID in meta
-				meta.put("sessionID", sessionID);
+				// Create "Set-Cookie" header
+				String setCookieHeader;
+				StringBuilder tmp = new StringBuilder(64);
+				if (httpCookies != null) {
+					for (HttpCookie httpCookie : httpCookies) {
+						if (!cookieName.equals(httpCookie.getName())) {
+							tmp.append(httpCookie.toString());
+							tmp.append(',');
+						}
+					}
+				}
+				tmp.append(cookieName);
+				tmp.append("=\"");
+				tmp.append(sessionID);
+				tmp.append('\"');
+				if (postfix != null) {
+					tmp.append(postfix);
+				}
+				setCookieHeader = tmp.toString();
 
-				// Just invoke the next action
-				return action.handler(ctx);
+				// Set outgoing cookie
+				rsp.setHeader(SET_COOKIE, setCookieHeader);
+
+				// TODO Store sessionID in meta
+				// meta.put("sessionID", sessionID);
+
+				// Invoke next handler
+				next.service(req, rsp);
 			}
+
 		};
 	}
 

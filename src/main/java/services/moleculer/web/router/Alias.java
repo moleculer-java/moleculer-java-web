@@ -27,6 +27,8 @@ package services.moleculer.web.router;
 
 import static services.moleculer.util.CommonUtils.formatPath;
 
+import java.util.Objects;
+
 public class Alias {
 
 	// --- HTTP METHODS ---
@@ -48,7 +50,6 @@ public class Alias {
 	protected final String httpMethod;
 	protected final String pathPattern;
 	protected final String actionName;
-
 	protected final int hashCode;
 
 	// --- CONSTRUCTOR ---
@@ -63,7 +64,7 @@ public class Alias {
 		while (actionName.endsWith(".")) {
 			actionName = actionName.substring(0, actionName.length() - 1);
 		}
-		this.actionName = actionName;
+		this.actionName = Objects.requireNonNull(actionName);
 
 		// Generate hashcode
 		final int prime = 31;
@@ -72,20 +73,6 @@ public class Alias {
 		result = prime * result + httpMethod.hashCode();
 		result = prime * result + pathPattern.hashCode();
 		hashCode = result;
-	}
-
-	// --- PROPERTY GETTERS ---
-
-	public String getHttpMethod() {
-		return httpMethod;
-	}
-
-	public String getPathPattern() {
-		return pathPattern;
-	}
-
-	public String getActionName() {
-		return actionName;
 	}
 
 	// --- COLLECTION HELPERS ---
@@ -103,32 +90,12 @@ public class Alias {
 		if (obj == null) {
 			return false;
 		}
-		if (getClass() != obj.getClass()) {
+		if (Alias.class != obj.getClass()) {
 			return false;
 		}
 		Alias other = (Alias) obj;
-		if (actionName == null) {
-			if (other.actionName != null) {
-				return false;
-			}
-		} else if (!actionName.equals(other.actionName)) {
-			return false;
-		}
-		if (httpMethod == null) {
-			if (other.httpMethod != null) {
-				return false;
-			}
-		} else if (!httpMethod.equals(other.httpMethod)) {
-			return false;
-		}
-		if (pathPattern == null) {
-			if (other.pathPattern != null) {
-				return false;
-			}
-		} else if (!pathPattern.equals(other.pathPattern)) {
-			return false;
-		}
-		return true;
+		return hashCode == other.hashCode && actionName.equals(other.actionName) && httpMethod.equals(other.httpMethod)
+				&& pathPattern.equals(other.pathPattern);
 	}
 
 }

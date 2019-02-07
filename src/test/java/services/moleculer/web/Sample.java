@@ -46,6 +46,7 @@ import services.moleculer.web.middleware.RequestLogger;
 import services.moleculer.web.middleware.ServeStatic;
 import services.moleculer.web.middleware.SessionCookie;
 import services.moleculer.web.middleware.limiter.RateLimit;
+import services.moleculer.web.netty.NettyServer;
 import services.moleculer.web.router.Alias;
 import services.moleculer.web.router.MappingPolicy;
 import services.moleculer.web.router.Route;
@@ -53,6 +54,20 @@ import services.moleculer.web.router.Route;
 public class Sample {
 
 	public static void main(String[] args) {
+		System.out.println("START");
+		try {
+			ServiceBroker b = new ServiceBroker();
+			b.start();
+			
+			NettyServer c = new NettyServer();
+			c.started(b);
+			
+		} catch (Exception cause) {
+			cause.printStackTrace();
+		}
+	}
+	
+	public static void main2(String[] args) {
 		System.out.println("START");
 		try {
 			ServiceBrokerConfig cfg = new ServiceBrokerConfig();
@@ -63,13 +78,16 @@ public class Sample {
 
 			ServiceBroker broker = new ServiceBroker(cfg);
 
-			NettyGateway gateway = new NettyGateway();
-			gateway.setUseSSL(false);
-			gateway.setPort(3000);
+			NettyServer server = new NettyServer();
+			// gateway.setUseSSL(false);
+			// gateway.setPort(3000);
 			// gateway.setKeyStoreFilePath("/temp/test.jks");
 			// gateway.setKeyStorePassword("test");
-			broker.createService("api-gw", gateway);
+			broker.createService(server);
 
+			ApiGateway gateway = new ApiGateway();
+			broker.createService(gateway);
+			
 			// http://localhost:3000/math/add?a=5&b=6
 
 			String path = "/math";
@@ -79,7 +97,7 @@ public class Sample {
 			Alias[] aliases = new Alias[1];
 			aliases[0] = new Alias(Alias.ALL, "/add", "math.add");
 			
-			Route r = new Route(gateway, path, policy, opts, whitelist, aliases);
+			Route r = new Route(broker, path, policy, opts, whitelist, aliases);
 			r.use(new CorsHeaders());
 			RateLimiter rl = new RateLimiter(10, false);
 			rl.setHeaders(false);

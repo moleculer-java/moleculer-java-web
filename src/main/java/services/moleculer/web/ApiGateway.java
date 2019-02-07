@@ -27,7 +27,6 @@ package services.moleculer.web;
 
 import static services.moleculer.util.CommonUtils.nameOf;
 
-import java.net.InetAddress;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -38,29 +37,18 @@ import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import io.datatree.Promise;
-import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
-import services.moleculer.service.Middleware;
-import services.moleculer.service.Name;
 import services.moleculer.service.Service;
 import services.moleculer.service.ServiceRegistry;
 import services.moleculer.transporter.Transporter;
-import services.moleculer.web.common.HttpConstants;
+import services.moleculer.web.middleware.HttpMiddleware;
 import services.moleculer.web.middleware.NotFound;
 import services.moleculer.web.router.Alias;
 import services.moleculer.web.router.Mapping;
 import services.moleculer.web.router.MappingPolicy;
 import services.moleculer.web.router.Route;
 
-/**
- * Base superclass of all Moleculer Web Server ("API Gateway") implementations.
- *
- * @see NettyGateway
- * @see SunGateway
- */
-@Name("API Gateway")
-public abstract class ApiGateway extends Service implements HttpConstants {
+public class ApiGateway extends Service implements RequestProcessor {
 
 	// --- COMPONENTS ---
 
@@ -75,7 +63,7 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 
 	protected Route lastRoute;
 
-	protected Middleware lastMiddleware = new NotFound();
+	protected HttpMiddleware lastMiddleware = new NotFound();
 
 	// --- PROPERTIES ---
 
@@ -93,6 +81,10 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 
 	protected LinkedHashMap<String, Mapping> staticMappings;
 	protected final LinkedList<Mapping> dynamicMappings = new LinkedList<>();
+
+	// --- INSTALLED MIDDLEWARES ---
+
+	protected HashSet<HttpMiddleware> checkedMiddlewares = new HashSet<>(32);
 
 	// --- LOCKS ---
 
@@ -138,7 +130,7 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 		this.transporter = broker.getConfig().getTransporter();
 
 		// Start middlewares
-		for (Middleware middleware : checkedMiddlewares) {
+		for (HttpMiddleware middleware : checkedMiddlewares) {
 			middleware.started(broker);
 			if (debug) {
 				logger.info(nameOf(middleware, true) + " middleware started.");
@@ -152,7 +144,7 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 		}
 
 		// Set last route (ServeStatic, "404 Not Found", etc.)
-		lastRoute = new Route(this, "", MappingPolicy.ALL, null, null, null);
+		lastRoute = new Route(broker, "", MappingPolicy.ALL, null, null, null);
 		lastRoute.use(lastMiddleware);
 	}
 
@@ -165,7 +157,7 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 	public void stopped() {
 
 		// Stop middlewares
-		for (Middleware middleware : checkedMiddlewares) {
+		for (HttpMiddleware middleware : checkedMiddlewares) {
 			try {
 				middleware.stopped();
 				if (debug) {
@@ -186,133 +178,121 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 		} finally {
 			writeLock.unlock();
 		}
-		logger.info("HTTP server stopped.");
+		logger.info("ApiGateway server stopped.");
 	}
 
-	// --- COMMON HTTP REQUEST PROCESSOR ---
+	// --- PROCESS (SERVLET OR NETTY) HTTP REQUEST ---
 
-	public Promise processRequest(InetAddress address, String httpMethod, String path, Tree headers, String query,
-			byte[] body) {
+	@Override
+	public void service(WebRequest req, WebResponse rsp) throws Exception {
+
+		// Try to find in static mappings (eg. "/user")
+		String httpMethod = req.getMethod();
+		String path = req.getPath();
+		String staticKey = httpMethod + '|' + path;
+		Mapping mapping;
+		readLock.lock();
 		try {
+			mapping = staticMappings.get(staticKey);
+			if (mapping == null) {
 
-			// Try to find in static mappings (eg. "/user")
-			String staticKey = httpMethod + '|' + path;
-			Mapping mapping;
-			readLock.lock();
-			try {
-				mapping = staticMappings.get(staticKey);
-				if (mapping == null) {
-
-					// Try to find in dynamic mappings (eg. "/user/:id")
-					for (Mapping dynamicMapping : dynamicMappings) {
-						if (dynamicMapping.matches(httpMethod, path)) {
-							if (debug) {
-								logger.info(httpMethod + ' ' + path + " found in dyncmic mapping cache.");
-							}
-							mapping = dynamicMapping;
-							break;
-						}
-					}
-				} else if (debug) {
-					logger.info(httpMethod + ' ' + path + " found in static mapping cache (key: " + staticKey + ").");
-				}
-			} finally {
-				readLock.unlock();
-			}
-
-			// Invoke mapping
-			if (mapping != null) {
-				Promise response = mapping.processRequest(address, httpMethod, path, headers, query, body);
-				if (response != null) {
-					return response;
-				}
-			}
-
-			// Find in routes
-			for (Route route : routes) {
-				mapping = route.findMapping(httpMethod, path);
-				if (mapping != null) {
-					if (debug) {
-						logger.info("New mapping created by the following route:\r\n" + route.toTree());
-					}
-					if (!checkedMiddlewares.isEmpty()) {
-						mapping.use(checkedMiddlewares);
-					}
-					break;
-				}
-			}
-
-			// Process mapping
-			if (mapping != null) {
-
-				// Store new mapping
-				writeLock.lock();
-				try {
-					if (mapping.isStatic()) {
-						staticMappings.put(staticKey, mapping);
+				// Try to find in dynamic mappings (eg. "/user/:id")
+				for (Mapping dynamicMapping : dynamicMappings) {
+					if (dynamicMapping.matches(httpMethod, path)) {
 						if (debug) {
-							logger.info("New stored in static mapping cache (key: " + staticKey + ").");
+							logger.info(httpMethod + ' ' + path + " found in dyncmic mapping cache.");
 						}
-					} else {
-						dynamicMappings.addLast(mapping);
-						if (dynamicMappings.size() > cachedRoutes) {
-							dynamicMappings.removeFirst();
-						}
-						if (debug) {
-							logger.info("New stored in dynamic mapping cache.");
-						}
+						mapping = dynamicMapping;
+						break;
 					}
-				} finally {
-					writeLock.unlock();
 				}
-
-				Promise response = mapping.processRequest(address, httpMethod, path, headers, query, body);
-				if (response != null) {
-					return response;
-				}
+			} else if (debug) {
+				logger.info(httpMethod + ' ' + path + " found in static mapping cache (key: " + staticKey + ").");
 			}
+		} finally {
+			readLock.unlock();
+		}
 
-			// Custom "404 Not Found", ServeStatic, etc...
-			if (debug) {
-				logger.info("Mapping not found, invoking default middlewares...");
-			}
-			mapping = lastRoute.findMapping(httpMethod, path);
+		// Invoke mapping
+		if (mapping != null) {
+			mapping.service(req, rsp);
+			return;
+		}
+
+		// Find in routes
+		for (Route route : routes) {
+			mapping = route.findMapping(httpMethod, path);
 			if (mapping != null) {
+				if (debug) {
+					logger.info("New mapping created by the following route:\r\n" + route.toTree());
+				}
 				if (!checkedMiddlewares.isEmpty()) {
 					mapping.use(checkedMiddlewares);
 				}
-				Promise response = mapping.processRequest(address, httpMethod, path, headers, query, body);
-				if (response != null) {
-					return response;
-				}
+				break;
 			}
-
-			// Default "404 Not Found"
-			if (debug) {
-				logger.info("Invoking the default \"404 Not found\" handler...");
-			}
-			Tree rsp = new Tree();
-			Tree meta = rsp.getMeta();
-			meta.put(STATUS, 404);
-			return Promise.resolve(rsp);
-
-		} catch (Throwable cause) {
-			logger.error("Unable to process request!", cause);
-			return Promise.reject(cause);
 		}
+
+		// Process mapping
+		if (mapping != null) {
+
+			// Store new mapping
+			writeLock.lock();
+			try {
+				if (mapping.isStatic()) {
+					staticMappings.put(staticKey, mapping);
+					if (debug) {
+						logger.info("New mapping stored in the static mapping cache (key: " + staticKey + ").");
+					}
+				} else {
+					dynamicMappings.addLast(mapping);
+					if (dynamicMappings.size() > cachedRoutes) {
+						dynamicMappings.removeFirst();
+					}
+					if (debug) {
+						logger.info("New mapping stored in the dynamic mapping cache.");
+					}
+				}
+			} finally {
+				writeLock.unlock();
+			}
+
+			if (mapping != null) {
+				mapping.service(req, rsp);
+				return;
+			}
+		}
+
+		// Custom "404 Not Found", ServeStatic, etc...
+		if (debug) {
+			logger.info("Mapping not found, invoking default middlewares...");
+		}
+		mapping = lastRoute.findMapping(httpMethod, path);
+		if (mapping != null) {
+			if (!checkedMiddlewares.isEmpty()) {
+				mapping.use(checkedMiddlewares);
+			}
+			mapping.service(req, rsp);
+			return;
+		}
+
+		// 404 Not Found
+		if (debug) {
+			logger.info("Mapping not found for request: " + path);
+		}
+		rsp.setStatus(404);
+		rsp.end();
 	}
 
 	// --- GLOBAL MIDDLEWARES ---
 
-	protected HashSet<Middleware> checkedMiddlewares = new HashSet<>(32);
-
-	public void use(Middleware... middlewares) {
+	public void use(HttpMiddleware... middlewares) {
 		use(Arrays.asList(middlewares));
 	}
 
-	public void use(Collection<Middleware> middlewares) {
-		LinkedList<Middleware> newMiddlewares = new LinkedList<>();
-		for (Middleware middleware : middlewares) {
+	public void use(Collection<HttpMiddleware> middlewares) {
+		LinkedList<HttpMiddleware> newMiddlewares = new LinkedList<>();
+		for (HttpMiddleware middleware : middlewares) {
 			if (checkedMiddlewares.add(middleware)) {
 				newMiddlewares.addLast(middleware);
 			}
@@ -350,7 +330,7 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 	 *            optional middlewares (eg. CorsHeaders)
 	 * @return route the new route
 	 */
-	public Route addRoute(String path, String serviceList, Middleware... middlewares) {
+	public Route addRoute(String path, String serviceList, HttpMiddleware... middlewares) {
 		String[] serviceNames = serviceList.split(",");
 		LinkedList<String> list = new LinkedList<>();
 		for (String serviceName : serviceNames) {
@@ -361,7 +341,7 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 		}
 		String[] whiteList = new String[list.size()];
 		list.toArray(whiteList);
-		Route route = new Route(this, path, MappingPolicy.RESTRICT, null, whiteList, null);
+		Route route = new Route(broker, path, MappingPolicy.RESTRICT, null, whiteList, null);
 		if (middlewares != null && middlewares.length > 0) {
 			route.use(middlewares);
 		}
@@ -383,9 +363,9 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 	 *            optional middlewares (eg. CorsHeaders)
 	 * @return route the new route
 	 */
-	public Route addRoute(String httpMethod, String path, String actionName, Middleware... middlewares) {
+	public Route addRoute(String httpMethod, String path, String actionName, HttpMiddleware... middlewares) {
 		Alias alias = new Alias(httpMethod, path, actionName);
-		Route route = new Route(this, "", MappingPolicy.RESTRICT, null, null, new Alias[] { alias });
+		Route route = new Route(broker, "", MappingPolicy.RESTRICT, null, null, new Alias[] { alias });
 		if (middlewares != null && middlewares.length > 0) {
 			route.use(middlewares);
 		}
@@ -443,11 +423,11 @@ public abstract class ApiGateway extends Service implements HttpConstants {
 		this.cachedRoutes = cacheSize;
 	}
 
-	public Middleware getLastMiddleware() {
+	public HttpMiddleware getLastMiddleware() {
 		return lastMiddleware;
 	}
 
-	public void setLastMiddleware(Middleware lastMiddleware) {
+	public void setLastMiddleware(HttpMiddleware lastMiddleware) {
 		this.lastMiddleware = lastMiddleware;
 	}
 

@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2017 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -23,33 +23,14 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package services.moleculer.web.common;
+package services.moleculer.web;
 
-public interface HttpConstants {
+import services.moleculer.context.Context;
+import services.moleculer.web.router.Route;
 
-	// --- HEADER NAMES ---
+@FunctionalInterface
+public interface BeforeCallProcessor {
 
-	public static final String X_FORWARDED_FOR = "X-Forwarded-For";
-	public static final String COOKIE = "Cookie";
-	public static final String IF_NONE_MATCH = "If-None-Match";
-	public static final String CONTENT_TYPE = "Content-Type";
-	public static final String CONTENT_LENGTH = "Content-Length";
-	public static final String CONNECTION = "Connection";
-	public static final String ACCEPT_ENCODING = "Accept-Encoding";
-	public static final String CONTENT_ENCODING = "Content-Encoding";
-	public static final String ETAG = "ETag";
-	public static final String SET_COOKIE = "Set-Cookie";
-	public static final String CACHE_CONTROL = "Cache-Control";
-
-	// --- HTTP HEADER VALUES ---
-
-	public static final String DEFLATE = "deflate";
-	public static final String KEEP_ALIVE = "keep-alive";
-	public static final String CLOSE = "close";
-
-	// --- CONTENT TYPES ---
-
-	public static final String CONTENT_TYPE_JSON = "application/json;charset=utf-8";
-	public static final String CONTENT_TYPE_HTML = "text/html;charset=utf-8";
-
+	void onBeforeCall(Context ctx, Route route, WebRequest req, WebResponse res);
+	
 }

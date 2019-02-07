@@ -25,58 +25,46 @@
  */
 package services.moleculer.web.router;
 
-import java.net.InetAddress;
-import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Objects;
 
-import io.datatree.Promise;
 import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
 import services.moleculer.context.CallOptions;
-import services.moleculer.context.Context;
-import services.moleculer.context.ContextFactory;
-import services.moleculer.service.Action;
-import services.moleculer.service.ActionEndpoint;
-import services.moleculer.service.Middleware;
+import services.moleculer.service.ServiceInvoker;
+import services.moleculer.web.RequestProcessor;
+import services.moleculer.web.WebRequest;
+import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
+import services.moleculer.web.middleware.HttpMiddleware;
 
-public class Mapping implements HttpConstants {
-
-	// --- PARENT BROKER ---
-
-	protected final ServiceBroker broker;
+public class Mapping implements RequestProcessor, HttpConstants {
 
 	// --- PROPERTIES ---
 
 	protected final String httpMethod;
 	protected final String actionName;
-	protected final String pathPattern;
 	protected final boolean isStatic;
 	protected final String pathPrefix;
-
-	protected final int[] indexes;
-	protected final String[] names;
-
-	protected final CallOptions.Options opts;
-
 	protected final int hashCode;
-
-	protected final ContextFactory contextFactory;
-
 	protected final Tree config;
+
+	// --- LAST PROCESSOR ---
+
+	protected RequestProcessor lastProcessor;
+
+	// --- INSTALLED MIDDLEWARES ---
+
+	protected HashSet<HttpMiddleware> checkedMiddlewares = new HashSet<>(32);
 
 	// --- CONSTRUCTOR ---
 
 	public Mapping(ServiceBroker broker, String httpMethod, String pathPattern, String actionName,
 			CallOptions.Options opts) {
-		this.broker = broker;
 		this.httpMethod = "ALL".equals(httpMethod) ? null : httpMethod;
-		this.pathPattern = pathPattern;
-		this.actionName = actionName;
-		this.opts = opts;
-		this.contextFactory = broker.getConfig().getContextFactory();
+		this.actionName = Objects.requireNonNull(actionName);
 
 		// Parse "path pattern"
 		int starPos = pathPattern.indexOf('*');
@@ -105,8 +93,8 @@ public class Mapping implements HttpConstants {
 			}
 			pathPrefix = pathPattern.substring(0, endIndex);
 		}
-		indexes = new int[indexList.size()];
-		names = new String[nameList.size()];
+		int[] indexes = new int[indexList.size()];
+		String[] names = new String[nameList.size()];
 		for (int i = 0; i < indexes.length; i++) {
 			indexes[i] = indexList.get(i);
 			names[i] = nameList.get(i);
@@ -119,42 +107,21 @@ public class Mapping implements HttpConstants {
 		result = prime * result + pathPrefix.hashCode();
 		hashCode = result;
 
-		// Set config
-		this.config = new Tree();
-		this.config.put("action", actionName);
-		this.config.put("pattern", pathPattern);
-		this.config.put("static", isStatic);
-		this.config.put("prefix", pathPrefix);
+		// Create config
+		config = new Tree();
+		config.put("action", actionName);
+		config.put("pattern", pathPattern);
+		config.put("static", isStatic);
+		config.put("prefix", pathPrefix);
 		if (opts != null) {
-			this.config.put("nodeID", opts.nodeID);
-			this.config.put("retryCount", opts.retryCount);
-			this.config.put("timeout", opts.timeout);
+			config.put("nodeID", opts.nodeID);
+			config.put("retryCount", opts.retryCount);
+			config.put("timeout", opts.timeout);
 		}
-		String currentNodeID = broker.getNodeID();
-		if (opts == null || opts.nodeID == null || currentNodeID.equals(opts.nodeID)) {
-			try {
-				Action action = broker.getConfig().getServiceRegistry().getAction(actionName, currentNodeID);
-				if (action != null && action instanceof ActionEndpoint) {
-					ActionEndpoint endpoint = (ActionEndpoint) action;
-					this.config.copyFrom(endpoint.getConfig());
-				}
-			} catch (Exception ignored) {
 
-				// Action name is not valid
-			}
-		}
-	}
-
-	// --- MATCH TYPE ---
-
-	public boolean isStatic() {
-		return isStatic;
-	}
-
-	// --- PATH PREFIX ---
-
-	public String getPathPrefix() {
-		return pathPrefix;
+		// Set first RequestProcessor in the WebMiddleware chain
+		ServiceInvoker serviceInvoker = broker.getConfig().getServiceInvoker();
+		lastProcessor = new ActionInvoker(actionName, pathPattern, isStatic, pathPrefix, indexes, names, opts, serviceInvoker);
 	}
 
 	// --- MATCH TEST ---
@@ -175,97 +142,30 @@ public class Mapping implements HttpConstants {
 		return true;
 	}
 
-	// --- REQUEST PROCESSOR ---
-
-	public Promise processRequest(InetAddress address, String httpMethod, String path, Tree headers, String query,
-			byte[] body) {
-		try {
-
-			// Parse request
-			Tree params = null;
-			if (isStatic) {
-				if (body == null || body.length < 1) {
-
-					// Empty body
-					params = new Tree();
-				} else if (body[0] == '{' || body[0] == '[') {
-
-					// JSON body
-					params = new Tree(body);
-				}
-				if (query != null && !query.isEmpty()) {
-
-					// URL-encoded Query String
-					if (params == null) {
-						params = new Tree();
-					}
-					String[] pairs = query.split("&");
-					int i;
-					for (String pair : pairs) {
-						i = pair.indexOf("=");
-						if (i > -1) {
-							params.put(URLDecoder.decode(pair.substring(0, i), "UTF-8"),
-									URLDecoder.decode(pair.substring(i + 1), "UTF-8"));
-						}
-					}
-				}
-			} else {
-
-				// Parameters in URL (eg "/path/:id/:name")
-				params = new Tree();
-				String[] tokens = pathPattern.split("/");
-				for (int i = 0; i < indexes.length; i++) {
-					params.put(names[i], tokens[i]);
-				}
-			}
-
-			// Set path
-			Tree meta = params.getMeta();
-			meta.put(ADDRESS, address);
-			meta.put(METHOD, httpMethod);
-			meta.put(PATH, path);
-			meta.put(PATTERN, pathPattern);
-
-			// Copy headers
-			if (headers != null) {
-				meta.putObject(HEADERS, headers.asObject());
-			}
-
-			// Call action
-			if (current == brokerAction) {
-				return broker.call(actionName, params, opts);
-			}
-			return new Promise(current.handler(contextFactory.create(actionName, params, opts, null, null)));
-
-		} catch (Throwable cause) {
-			return Promise.reject(cause);
-		}
-	}
-
 	// --- ACTION WITH MIDDLEWARES ---
 
-	protected HashSet<Middleware> checkedMiddlewares = new HashSet<>(32);
-
-	protected final Action brokerAction = new Action() {
-
-		@Override
-		public Object handler(Context ctx) throws Exception {
-			return broker.call(ctx.name, ctx.params, ctx.opts);
-		}
-
-	};
-
-	protected Action current = brokerAction;
-
-	public void use(Collection<Middleware> middlewares) {
-		for (Middleware middleware : middlewares) {
+	public void use(Collection<HttpMiddleware> middlewares) {
+		for (HttpMiddleware middleware : middlewares) {
 			if (checkedMiddlewares.add(middleware)) {
-				Action action = middleware.install(current, config);
-				if (action != null) {
-					current = action;
+				RequestProcessor processor = middleware.install(lastProcessor, config);
+				if (processor != null) {
+					lastProcessor = processor;
 				}
 			}
 		}
+	}
+	
+	// --- PROCESS (SERVLET OR NETTY) HTTP REQUEST ---
+
+	@Override
+	public void service(WebRequest req, WebResponse rsp) throws Exception {
+		lastProcessor.service(req, rsp);
+	}
+
+	// --- PROPERTY GETTERS ---
+
+	public boolean isStatic() {
+		return isStatic;
 	}
 
 	// --- COLLECTION HELPERS ---
@@ -283,17 +183,11 @@ public class Mapping implements HttpConstants {
 		if (obj == null) {
 			return false;
 		}
-		if (getClass() != obj.getClass()) {
+		if (Mapping.class != obj.getClass()) {
 			return false;
 		}
 		Mapping other = (Mapping) obj;
-		if (actionName.equals(other.actionName)) {
-			return true;
-		}
-		if (pathPrefix.equals(other.pathPrefix)) {
-			return true;
-		}
-		return false;
+		return hashCode == other.hashCode && actionName.equals(other.actionName) && pathPrefix.equals(other.pathPrefix);
 	}
 
 }
