@@ -48,6 +48,20 @@ public class NotFound extends HttpMiddleware implements HttpConstants {
 	public RequestProcessor install(RequestProcessor next, Tree config) {
 		return new RequestProcessor() {
 
+			/**
+			 * Handles request of the HTTP client.
+			 * 
+			 * @param req
+			 *            WebRequest object that contains the request the client made of
+			 *            the ApiGateway
+			 * @param rsp
+			 *            WebResponse object that contains the response the ApiGateway
+			 *            returns to the client
+			 * 
+			 * @throws Exception
+			 *             if an input or output error occurs while the ApiGateway is
+			 *             handling the HTTP request
+			 */
 			@Override
 			public void service(WebRequest req, WebResponse rsp) throws Exception {
 				try {

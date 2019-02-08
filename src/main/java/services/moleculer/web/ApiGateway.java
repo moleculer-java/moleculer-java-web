@@ -39,8 +39,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import services.moleculer.ServiceBroker;
 import services.moleculer.service.Service;
-import services.moleculer.service.ServiceRegistry;
-import services.moleculer.transporter.Transporter;
 import services.moleculer.web.middleware.HttpMiddleware;
 import services.moleculer.web.middleware.NotFound;
 import services.moleculer.web.router.Alias;
@@ -50,41 +48,48 @@ import services.moleculer.web.router.Route;
 
 public class ApiGateway extends Service implements RequestProcessor {
 
-	// --- COMPONENTS ---
-
-	protected ServiceRegistry registry;
-	protected Transporter transporter;
-
 	// --- ROUTES ---
 
 	protected Route[] routes = new Route[0];
 
-	// --- LAST / BUILTIN ROUTE ---
-
+	/**
+	 * Last route (for the last middleware)
+	 */
 	protected Route lastRoute;
 
+	/**
+	 * Last middleware (custom error pages, HTTP-redirector, etc.)
+	 */
 	protected HttpMiddleware lastMiddleware = new NotFound();
 
 	// --- PROPERTIES ---
 
 	/**
-	 * Print more debug messages
+	 * Print more debug messages.
 	 */
 	protected boolean debug;
 
-	// --- CACHED MAPPINGS ---
-
 	/**
-	 * Maximum number of cached routes
+	 * Maximum number of cached routes.
 	 */
 	protected int cachedRoutes = 1024;
 
+	// --- VARIABLES ---
+
+	/**
+	 * Static mappings.
+	 */
 	protected LinkedHashMap<String, Mapping> staticMappings;
+
+	/**
+	 * Dynamic mappings.
+	 */
 	protected final LinkedList<Mapping> dynamicMappings = new LinkedList<>();
 
-	// --- INSTALLED MIDDLEWARES ---
-
-	protected HashSet<HttpMiddleware> checkedMiddlewares = new HashSet<>(32);
+	/**
+	 * Global middlewares.
+	 */
+	protected HashSet<HttpMiddleware> globalMiddlewares = new HashSet<>(32);
 
 	// --- LOCKS ---
 
@@ -114,7 +119,9 @@ public class ApiGateway extends Service implements RequestProcessor {
 	@Override
 	public void started(ServiceBroker broker) throws Exception {
 		super.started(broker);
-		staticMappings = new LinkedHashMap<String, Mapping>(64) {
+		
+		// Static mappings
+		staticMappings = new LinkedHashMap<String, Mapping>((cachedRoutes + 1) * 2) {
 
 			private static final long serialVersionUID = 2994447707758047152L;
 
@@ -126,18 +133,18 @@ public class ApiGateway extends Service implements RequestProcessor {
 			};
 
 		};
-		this.registry = broker.getConfig().getServiceRegistry();
-		this.transporter = broker.getConfig().getTransporter();
 
-		// Start middlewares
-		for (HttpMiddleware middleware : checkedMiddlewares) {
+		// Start global middlewares
+		for (HttpMiddleware middleware : globalMiddlewares) {
 			middleware.started(broker);
 			if (debug) {
-				logger.info(nameOf(middleware, true) + " middleware started.");
+				logger.info(nameOf(middleware, true) + " global middleware started.");
 			}
 		}
+		
+		// Start routes (annd route-specific middlewares)
 		for (Route route : routes) {
-			route.started(broker, checkedMiddlewares);
+			route.started(broker, globalMiddlewares);
 			if (debug) {
 				logger.info("Route installed:\r\n" + route.toTree());
 			}
@@ -157,7 +164,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	public void stopped() {
 
 		// Stop middlewares
-		for (HttpMiddleware middleware : checkedMiddlewares) {
+		for (HttpMiddleware middleware : globalMiddlewares) {
 			try {
 				middleware.stopped();
 				if (debug) {
@@ -167,14 +174,17 @@ public class ApiGateway extends Service implements RequestProcessor {
 				logger.warn("Unable to stop middleware!");
 			}
 		}
+		
+		// Stop routes (and route-specific middlewares)
 		for (Route route : routes) {
-			route.stopped(checkedMiddlewares);
+			route.stopped(globalMiddlewares);				
 		}
 		setRoutes(new Route[0]);
 
+		// Clear middleware registry
 		writeLock.lock();
 		try {
-			checkedMiddlewares.clear();
+			globalMiddlewares.clear();
 		} finally {
 			writeLock.unlock();
 		}
@@ -183,6 +193,20 @@ public class ApiGateway extends Service implements RequestProcessor {
 
 	// --- PROCESS (SERVLET OR NETTY) HTTP REQUEST ---
 
+	/**
+	 * Handles request of the HTTP client.
+	 * 
+	 * @param req
+	 *            WebRequest object that contains the request the client made of
+	 *            the ApiGateway
+	 * @param rsp
+	 *            WebResponse object that contains the response the ApiGateway
+	 *            returns to the client
+	 * 
+	 * @throws Exception
+	 *             if an input or output error occurs while the ApiGateway is
+	 *             handling the HTTP request
+	 */
 	@Override
 	public void service(WebRequest req, WebResponse rsp) throws Exception {
 
@@ -213,7 +237,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 			readLock.unlock();
 		}
 
-		// Invoke mapping
+		// Invoke cached mapping
 		if (mapping != null) {
 			mapping.service(req, rsp);
 			return;
@@ -226,17 +250,15 @@ public class ApiGateway extends Service implements RequestProcessor {
 				if (debug) {
 					logger.info("New mapping created by the following route:\r\n" + route.toTree());
 				}
-				if (!checkedMiddlewares.isEmpty()) {
-					mapping.use(checkedMiddlewares);
+				if (!globalMiddlewares.isEmpty()) {
+					mapping.use(globalMiddlewares);
 				}
 				break;
 			}
 		}
 
-		// Process mapping
+		// Store new mapping in cache
 		if (mapping != null) {
-
-			// Store new mapping
 			writeLock.lock();
 			try {
 				if (mapping.isStatic()) {
@@ -257,26 +279,27 @@ public class ApiGateway extends Service implements RequestProcessor {
 				writeLock.unlock();
 			}
 
+			// Invoke new (and cached) mapping
 			if (mapping != null) {
 				mapping.service(req, rsp);
 				return;
 			}
 		}
 
-		// Custom "404 Not Found", ServeStatic, etc...
+		// Find in "lastRoute" (~=executes NotFound middleware)
 		if (debug) {
 			logger.info("Mapping not found, invoking default middlewares...");
 		}
 		mapping = lastRoute.findMapping(httpMethod, path);
 		if (mapping != null) {
-			if (!checkedMiddlewares.isEmpty()) {
-				mapping.use(checkedMiddlewares);
+			if (!globalMiddlewares.isEmpty()) {
+				mapping.use(globalMiddlewares);
 			}
 			mapping.service(req, rsp);
 			return;
 		}
 
-		// 404 Not Found
+		// 404 Not Found (this does not happen, "lastRoute" will execute)
 		if (debug) {
 			logger.info("Mapping not found for request: " + path);
 		}
@@ -293,7 +316,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	public void use(Collection<HttpMiddleware> middlewares) {
 		LinkedList<HttpMiddleware> newMiddlewares = new LinkedList<>();
 		for (HttpMiddleware middleware : middlewares) {
-			if (checkedMiddlewares.add(middleware)) {
+			if (globalMiddlewares.add(middleware)) {
 				newMiddlewares.addLast(middleware);
 			}
 		}

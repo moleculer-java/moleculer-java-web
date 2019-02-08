@@ -102,6 +102,29 @@ public class NettyWebResponse implements WebResponse {
 	 */
 	@Override
 	public void send(byte[] bytes) {
+		if (bytes != null && bytes.length > 0) {
+			sendHeaders();
+			ctx.write(Unpooled.wrappedBuffer(bytes));
+			ctx.flush();
+		}
+	}
+
+	/**
+	 * Completes the asynchronous operation that was started on the request.
+	 */
+	@Override
+	public void end() {
+		sendHeaders();
+		if (req.parser != null) {
+			try {
+				req.parser.close();				
+			} catch (Exception ignored) {
+			}
+			req.parser = null;
+		}
+	}
+	
+	protected void sendHeaders() {
 		if (first.compareAndSet(true, false)) {
 			StringBuilder header = new StringBuilder();
 			if (code == 200) {
@@ -119,32 +142,9 @@ public class NettyWebResponse implements WebResponse {
 					header.append("\r\n");
 				}
 			}
-			if (headers == null || !headers.containsKey("Content-Length")) {
-				header.append("Content-Length: ");
-				header.append(bytes.length);
-				header.append("\r\n");
-			}
-			if (headers == null || !headers.containsKey("Content-Type")) {
-				header.append("Content-Type:application/json;charset=utf-8\r\n");
-			}
 			header.append("\r\n");
 			ctx.write(Unpooled.wrappedBuffer(header.toString().getBytes(StandardCharsets.UTF_8)));
-		}
-		ctx.write(Unpooled.wrappedBuffer(bytes));
-		ctx.flush();
-	}
-
-	/**
-	 * Completes the asynchronous operation that was started on the request.
-	 */
-	@Override
-	public void end() {
-		if (req.parser != null) {
-			try {
-				req.parser.close();				
-			} catch (Exception ignored) {
-			}
-		}
+		}	
 	}
 	
 }

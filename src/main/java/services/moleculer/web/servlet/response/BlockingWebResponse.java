@@ -37,20 +37,20 @@ import services.moleculer.web.WebResponse;
 public class BlockingWebResponse implements WebResponse {
 
 	// --- RESPONSE VARIABLES ---
-	
+
 	protected final HttpServletResponse rsp;
-	protected final ServletOutputStream out;	
+	protected final ServletOutputStream out;
 	protected final AtomicBoolean closed = new AtomicBoolean();
-	
+
 	// --- CONSTRUCTOR ---
-	
+
 	public BlockingWebResponse(HttpServletResponse rsp) throws IOException {
 		this.rsp = rsp;
 		this.out = (ServletOutputStream) rsp.getOutputStream();
 	}
 
 	// --- THREAD BLOCKER ---
-	
+
 	public void waitFor(long timeout) throws TimeoutException, InterruptedException {
 		synchronized (closed) {
 			if (!closed.get()) {
@@ -61,9 +61,9 @@ public class BlockingWebResponse implements WebResponse {
 			}
 		}
 	}
-	
+
 	// --- PUBLIC WEBRESPONSE METHODS ---
-	
+
 	/**
 	 * Sets the status code for this response. This method is used to set the
 	 * return status code when there is no error (for example, for the 200 or
@@ -110,19 +110,17 @@ public class BlockingWebResponse implements WebResponse {
 	}
 
 	/**
-	 * Completes the asynchronous operation that was started on the request.
+	 * Completes the synchronous operation that was started on the request.
 	 */
 	@Override
 	public void end() {
-		try {
-			out.close();
-		} catch (Throwable ignored) {
-		} finally {
-			synchronized (closed) {
-				closed.set(true);
-				closed.notifyAll();
+		if (closed.compareAndSet(false, true)) {
+			try {
+				out.close();
+			} catch (Throwable ignored) {
 			}
+			closed.notifyAll();
 		}
 	}
-	
+
 }

@@ -57,6 +57,20 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 	public Action install(Action action, Tree config) {
 		return new Action() {
 
+			/**
+			 * Handles request of the HTTP client.
+			 * 
+			 * @param req
+			 *            WebRequest object that contains the request the client made of
+			 *            the ApiGateway
+			 * @param rsp
+			 *            WebResponse object that contains the response the ApiGateway
+			 *            returns to the client
+			 * 
+			 * @throws Exception
+			 *             if an input or output error occurs while the ApiGateway is
+			 *             handling the HTTP request
+			 */
 			@Override
 			public Object handler(Context ctx) throws Exception {
 				long start = System.nanoTime();

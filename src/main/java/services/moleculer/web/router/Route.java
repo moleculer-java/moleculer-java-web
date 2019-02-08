@@ -60,9 +60,9 @@ public class Route {
 	protected final String[] whitelist;
 	protected final Alias[] aliases;
 
-	// --- INSTALLED MIDDLEWARES ---
+	// --- ROUTE-SPECIFIC MIDDLEWARES ---
 	
-	protected final HashSet<HttpMiddleware> checkedMiddlewares = new HashSet<>(32);
+	protected final HashSet<HttpMiddleware> routeMiddlewares = new HashSet<>(32);
 	
 	// --- CONSTRUCTOR ---
 
@@ -113,8 +113,8 @@ public class Route {
 					Mapping mapping = new Mapping(broker, httpMethod, this.path + alias.pathPattern, alias.actionName,
 							opts);
 					if (mapping.matches(httpMethod, path)) {
-						if (!checkedMiddlewares.isEmpty()) {
-							mapping.use(checkedMiddlewares);
+						if (!routeMiddlewares.isEmpty()) {
+							mapping.use(routeMiddlewares);
 						}
 						return mapping;
 					}
@@ -129,8 +129,8 @@ public class Route {
 			for (String pattern : whitelist) {
 				if (Matcher.matches(shortPath, pattern)) {
 					Mapping mapping = new Mapping(broker, httpMethod, this.path + pattern, actionName, opts);
-					if (!checkedMiddlewares.isEmpty()) {
-						mapping.use(checkedMiddlewares);
+					if (!routeMiddlewares.isEmpty()) {
+						mapping.use(routeMiddlewares);
 					}
 					return mapping;
 				}
@@ -144,8 +144,8 @@ public class Route {
 				pattern = this.path + '*';
 			}
 			Mapping mapping = new Mapping(broker, httpMethod, pattern, actionName, opts);
-			if (!checkedMiddlewares.isEmpty()) {
-				mapping.use(checkedMiddlewares);
+			if (!routeMiddlewares.isEmpty()) {
+				mapping.use(routeMiddlewares);
 			}
 			return mapping;
 		}
@@ -159,16 +159,16 @@ public class Route {
 	}
 
 	public void use(Collection<HttpMiddleware> middlewares) {
-		checkedMiddlewares.addAll(middlewares);
+		routeMiddlewares.addAll(middlewares);
 	}
 	
 	// --- START MIDDLEWARES ---
 
-	public void started(ServiceBroker broker, HashSet<HttpMiddleware> checkedMiddlewares) throws Exception {
+	public void started(ServiceBroker broker, HashSet<HttpMiddleware> globalMiddlewares) throws Exception {
 
-		// TODO Start middlewares
-		for (HttpMiddleware middleware : checkedMiddlewares) {
-			if (!this.checkedMiddlewares.contains(middleware)) {
+		// Start middlewares
+		for (HttpMiddleware middleware : routeMiddlewares) {
+			if (!globalMiddlewares.contains(middleware)) {
 				middleware.started(broker);
 			}
 		}
@@ -176,11 +176,11 @@ public class Route {
 
 	// --- STOP MIDDLEWARES ---
 
-	public void stopped(HashSet<HttpMiddleware> checkedMiddlewares) {
+	public void stopped(HashSet<HttpMiddleware> globalMiddlewares) {
 
-		// TODO Stop middlewares
-		for (HttpMiddleware middleware : checkedMiddlewares) {
-			if (this.checkedMiddlewares.contains(middleware)) {
+		// Stop middlewares
+		for (HttpMiddleware middleware : routeMiddlewares) {
+			if (!globalMiddlewares.contains(middleware)) {
 				try {
 					middleware.stopped();
 				} catch (Exception ignored) {

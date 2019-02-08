@@ -57,7 +57,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 
 	// --- INSTALLED MIDDLEWARES ---
 
-	protected HashSet<HttpMiddleware> checkedMiddlewares = new HashSet<>(32);
+	protected HashSet<HttpMiddleware> installedMiddlewares = new HashSet<>(32);
 
 	// --- CONSTRUCTOR ---
 
@@ -146,7 +146,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 
 	public void use(Collection<HttpMiddleware> middlewares) {
 		for (HttpMiddleware middleware : middlewares) {
-			if (checkedMiddlewares.add(middleware)) {
+			if (installedMiddlewares.add(middleware)) {
 				RequestProcessor processor = middleware.install(lastProcessor, config);
 				if (processor != null) {
 					lastProcessor = processor;
@@ -157,6 +157,20 @@ public class Mapping implements RequestProcessor, HttpConstants {
 	
 	// --- PROCESS (SERVLET OR NETTY) HTTP REQUEST ---
 
+	/**
+	 * Handles request of the HTTP client.
+	 * 
+	 * @param req
+	 *            WebRequest object that contains the request the client made of
+	 *            the ApiGateway
+	 * @param rsp
+	 *            WebResponse object that contains the response the ApiGateway
+	 *            returns to the client
+	 * 
+	 * @throws Exception
+	 *             if an input or output error occurs while the ApiGateway is
+	 *             handling the HTTP request
+	 */
 	@Override
 	public void service(WebRequest req, WebResponse rsp) throws Exception {
 		lastProcessor.service(req, rsp);

@@ -40,6 +40,7 @@ public interface HttpConstants {
 	public static final String ETAG = "ETag";
 	public static final String SET_COOKIE = "Set-Cookie";
 	public static final String CACHE_CONTROL = "Cache-Control";
+	public static final String LOCATION = "Location";
 
 	// --- HTTP HEADER VALUES ---
 
@@ -52,4 +53,26 @@ public interface HttpConstants {
 	public static final String CONTENT_TYPE_JSON = "application/json;charset=utf-8";
 	public static final String CONTENT_TYPE_HTML = "text/html;charset=utf-8";
 
+	// --- SPECIAL VALUES IN META ---
+	
+	/**
+	 * Status code (eg. 200, 404) of the HTTP response message.
+	 */
+	public static final String META_STATUS = "$statusCode";
+	
+	/**
+	 * Content-Type header's value of the HTTP response message.
+	 */
+	public static final String META_CONTENT_TYPE = "$responseType";
+	
+	/**
+	 * Set of response headers.
+	 */
+	public static final String META_HEADERS = "$responseHeaders";
+	
+	/**
+	 * Location in header for redirects.
+	 */
+	public static final String META_LOCATION = "$location";
+	
 }

@@ -59,7 +59,6 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 	// --- MOLECULER COMPONENTS ---
 
 	protected ServiceBroker broker;
-
 	protected ScheduledExecutorService scheduler;
 
 	// --- INTERNAL VARIABLES ---

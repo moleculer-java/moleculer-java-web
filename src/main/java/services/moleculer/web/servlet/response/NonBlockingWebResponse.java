@@ -26,6 +26,7 @@
 package services.moleculer.web.servlet.response;
 
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.servlet.AsyncContext;
 import javax.servlet.ServletOutputStream;
@@ -40,7 +41,8 @@ public class NonBlockingWebResponse implements WebResponse {
 	protected final AsyncContext async;
 	protected final HttpServletResponse rsp;
 	protected final ServletOutputStream out;
-
+	protected final AtomicBoolean closed = new AtomicBoolean();
+	
 	// --- CONSTRUCTOR ---
 	
 	public NonBlockingWebResponse(AsyncContext async, HttpServletResponse rsp) throws IOException {
@@ -63,7 +65,9 @@ public class NonBlockingWebResponse implements WebResponse {
 	 */
 	@Override
 	public void setStatus(int code) {
-		rsp.setStatus(code);
+		if (!closed.get()) {
+			rsp.setStatus(code);
+		}
 	}
 
 	/**
@@ -78,7 +82,9 @@ public class NonBlockingWebResponse implements WebResponse {
 	 */
 	@Override
 	public void setHeader(String name, String value) {
-		rsp.setHeader(name, value);
+		if (!closed.get()) {
+			rsp.setHeader(name, value);
+		}
 	}
 
 	/**
@@ -92,8 +98,10 @@ public class NonBlockingWebResponse implements WebResponse {
 	 */
 	@Override
 	public void send(byte[] bytes) throws IOException {
-		out.write(bytes);
-		out.flush();
+		if (bytes != null && bytes.length > 0 && !closed.get()) {
+			out.write(bytes);
+			out.flush();
+		}
 	}
 
 	/**
@@ -101,11 +109,13 @@ public class NonBlockingWebResponse implements WebResponse {
 	 */
 	@Override
 	public void end() {
-		try {
-			out.close();
-		} catch (Exception ignored) {
+		if (closed.compareAndSet(false, true)) {
+			try {				
+				out.close();
+			} catch (Throwable ignored) {
+			}
+			async.complete();
 		}
-		async.complete();
 	}
 
 }
