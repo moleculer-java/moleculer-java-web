@@ -56,20 +56,6 @@ public class Sample {
 	public static void main(String[] args) {
 		System.out.println("START");
 		try {
-			ServiceBroker b = new ServiceBroker();
-			b.start();
-			
-			NettyServer c = new NettyServer();
-			c.started(b);
-			
-		} catch (Exception cause) {
-			cause.printStackTrace();
-		}
-	}
-	
-	public static void main2(String[] args) {
-		System.out.println("START");
-		try {
 			ServiceBrokerConfig cfg = new ServiceBrokerConfig();
 
 			// RedisTransporter t = new RedisTransporter();
@@ -88,7 +74,7 @@ public class Sample {
 			ApiGateway gateway = new ApiGateway();
 			broker.createService(gateway);
 			
-			// http://localhost:3000/math/add?a=5&b=6
+			// http://localhost:3000/math/add?a=5&b=7
 
 			String path = "/math";
 			MappingPolicy policy = MappingPolicy.ALL;
@@ -155,12 +141,14 @@ public class Sample {
 
 						};
 					}
-					broker.getLogger().info("Middleware not installed to " + config.toString(false));
+					
+					// TODO Middleware not started (broker = null)
+					//broker.getLogger().info("Middleware not installed to " + config.toString(false));
 					return null;
 				}
 
 			});
-
+	
 		} catch (Exception cause) {
 			cause.printStackTrace();
 		}

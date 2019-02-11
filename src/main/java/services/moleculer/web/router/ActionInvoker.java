@@ -25,11 +25,11 @@
  */
 package services.moleculer.web.router;
 
-import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,9 +67,9 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 	protected final ServiceInvoker serviceInvoker;
 
 	// --- JSON SERIALIZER ---
-	
+
 	protected final TreeWriter jsonSerializer;
-	
+
 	// --- CONSTRUCTOR ---
 
 	public ActionInvoker(String actionName, String pathPattern, boolean isStatic, String pathPrefix, int[] indexes,
@@ -123,52 +123,68 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 			}
 		}
 
-		// Parse body
-		int contentLength = req.getContentLength();
-		if (contentLength > 0) {
-			if (req.isMultipart()) {
+		// Multipart request
+		if (req.isMultipart()) {
+			if (params == null) {
+				params = new Tree();
+			}
 
-				// Multipart POST request
-				if (params == null) {
-					params = new Tree();
+			// Invoke service
+			serviceInvoker.call(actionName, params, opts, req.getBody(), null).then(out -> {
+				sendResponse(rsp, out);
+			}).catchError(cause -> {
+				sendResponse(rsp, cause);
+			});
+			return;
+
+		}
+
+		// GET without body
+		int contentLength = req.getContentLength();
+		if (contentLength == 0) {
+
+			// Invoke service
+			serviceInvoker.call(actionName, params, opts, null, null).then(out -> {
+				sendResponse(rsp, out);
+			}).catchError(cause -> {
+				logger.error("Unable to invoke action!", cause);
+				sendResponse(rsp, cause);
+			});
+			return;
+		}
+
+		// POST with JSON / QueryString body
+		byte[] body = new byte[contentLength];
+		AtomicInteger pos = new AtomicInteger();
+		AtomicBoolean faulty = new AtomicBoolean();
+		final Tree urlParams = params;
+		req.getBody().onPacket((bytes, cause, close) -> {
+			if (bytes != null) {
+				System.arraycopy(bytes, 0, body, pos.getAndAdd(bytes.length), bytes.length);
+			} else if (cause != null) {
+				faulty.set(true);
+				logger.error("Unexpected error occured while receiving and parsing client request!", cause);
+				sendResponse(rsp, cause);
+			}
+			if (close && !faulty.get()) {
+
+				// Parse body
+				Tree postParams = parsePostBody(body);
+
+				// Merge with URL parameters
+				if (urlParams != null) {
+					postParams.copyFrom(urlParams, true);
 				}
 
 				// Invoke service
-				serviceInvoker.call(actionName, params, opts, req.getBody(), null).then(out -> {
+				serviceInvoker.call(actionName, postParams, opts, null, null).then(out -> {
 					sendResponse(rsp, out);
-				}).catchError(cause -> {
-					sendResponse(rsp, cause);
-				});
-
-			} else {
-
-				// JSON or QueryString POST
-				// TODO Find faster solution (without buffer)
-				final ByteArrayOutputStream buffer = new ByteArrayOutputStream(1024);
-				final Tree urlParams = params;
-				req.getBody().transferTo(buffer).then(ok -> {
-
-					// Parse body
-					Tree postParams = parsePostBody(buffer.toByteArray());
-
-					// Merge with URL parameters
-					if (urlParams != null) {
-						postParams.copyFrom(urlParams, true);
-					}
-
-					// Invoke service
-					serviceInvoker.call(actionName, postParams, opts, null, null).then(out -> {
-						sendResponse(rsp, out);
-					}).catchError(cause -> {
-						logger.error("Unable to invoke action!", cause);
-						sendResponse(rsp, cause);
-					});
-				}).catchError(cause -> {
-					logger.error("Unexpected error occured while receiving and parsing client request!", cause);
-					sendResponse(rsp, cause);
+				}).catchError(err -> {
+					logger.error("Unable to invoke action!", err);
+					sendResponse(rsp, err);
 				});
 			}
-		}
+		});
 	}
 
 	// --- PARSE BODY OF THE GET / POST REQUEST ---
@@ -223,20 +239,20 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				rsp.setStatus(307);
 				rsp.setHeader(LOCATION, value);
 			}
-			
+
 			// Status code
 			value = meta.get(META_STATUS, "");
 			if (value != null && !value.isEmpty()) {
 				rsp.setStatus(Integer.parseInt(value));
 			}
-			
+
 			// Content type
 			value = meta.get(META_CONTENT_TYPE, "");
 			if (value != null && !value.isEmpty()) {
 				rsp.setHeader(CONTENT_TYPE, value);
 				contentTypeSet = true;
 			}
-			
+
 			// Custom headers
 			Tree headers = meta.get(META_HEADERS);
 			if (headers != null) {
@@ -247,7 +263,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 					if (name != null && !name.isEmpty() && value != null && !value.isEmpty()) {
 						rsp.setHeader(name, value);
 						if (CONTENT_TYPE.equals(name)) {
-							contentTypeSet = true;			
+							contentTypeSet = true;
 						}
 					}
 				}
@@ -264,7 +280,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				rsp.send(new byte[] { '{', '}' });
 			} finally {
 				rsp.end();
-			}			
+			}
 			return;
 		}
 
@@ -290,13 +306,13 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 			});
 
 		} else {
-			
+
 			// Tree (JSON) body
 			byte[] body;
 			try {
-				
+
 				// TODO Invoke AfterCallProcessor
-				
+
 				// TODO Invoke TemplateEngine
 
 				body = jsonSerializer.toBinary(out.asObject(), null, false);
@@ -317,7 +333,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 	protected void sendResponse(WebResponse rsp, Throwable cause) {
 		try {
-			
+
 			// TODO SET HEADERS BY CAUSE TYPE
 
 		} catch (Throwable failed) {

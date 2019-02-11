@@ -36,8 +36,6 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.ManagerFactoryParameters;
@@ -69,15 +67,17 @@ import io.netty.handler.ssl.util.SimpleTrustManagerFactory;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.ThreadPerTaskExecutor;
 import services.moleculer.ServiceBroker;
+import services.moleculer.eventbus.Listener;
+import services.moleculer.eventbus.Subscribe;
 import services.moleculer.service.Service;
 import services.moleculer.web.ApiGateway;
 
 public class NettyServer extends Service {
 
 	// --- GATEWAY SERVICE ---
-	
+
 	protected ApiGateway gateway;
-	
+
 	// --- INTERNAL VARIABLES ---
 
 	protected int port = 3000;
@@ -87,11 +87,7 @@ public class NettyServer extends Service {
 	protected EventLoopGroup eventLoopGroup;
 
 	protected ChannelHandler handler;
-	
-	protected ScheduledExecutorService scheduler;
 
-	protected int tries;
-	
 	// --- SSL PROPERTIES ---
 
 	protected boolean useSSL;
@@ -115,7 +111,7 @@ public class NettyServer extends Service {
 	protected boolean openSslSessionCacheEnabled = true;
 
 	protected SslContext cachedSslContext;
-	
+
 	// --- START NETTY SERVER ---
 
 	@Override
@@ -128,10 +124,6 @@ public class NettyServer extends Service {
 					new ThreadPerTaskExecutor(new DefaultThreadFactory(NettyServer.class, Thread.MAX_PRIORITY - 1)));
 		}
 
-		// Find ApiGateway
-		scheduler = broker.getConfig().getScheduler();
-		scheduler.execute(this::initApiGateway);			
-		
 		// Create request chain
 		ServerBootstrap bootstrap = new ServerBootstrap();
 		bootstrap.group(eventLoopGroup);
@@ -160,27 +152,27 @@ public class NettyServer extends Service {
 		// Start server
 		if (address == null) {
 			bootstrap.bind(port).get();
+			logger.info("Netty Server started at \"" + (useSSL ? "https" : "http") + "://localhost:" + port + "\".");
 		} else {
 			bootstrap.bind(address, port).get();
 		}
 	}
 
 	// --- INIT GATEWAY ---
-	
-	protected void initApiGateway() {
-		gateway = getService(broker, ApiGateway.class);
+
+	@Subscribe("$services.changed")
+	public Listener evt = payload -> {
 		if (gateway == null) {
-			tries++;
-			if (tries < 50) {
-				scheduler.schedule(this::initApiGateway, 200, TimeUnit.MILLISECONDS);
-			} else {
-				logger.error("ApiGateway Service not defined!");
+			boolean localService = payload.get("localService", false);
+			if (localService) {
+				gateway = getService(broker, ApiGateway.class);
+				if (gateway != null) {
+					logger.info("ApiGateway connected to Netty Server.");
+				}
 			}
-		} else {
-			logger.info("ApiGateway connected to Netty Server.");
 		}
-	}
-	
+	};
+
 	// --- STOP NETTY SERVER ---
 
 	@Override
@@ -202,7 +194,7 @@ public class NettyServer extends Service {
 				remoteAddress.getAddress().getHostAddress(), remoteAddress.getPort());
 		return new SslHandler(sslEngine);
 	}
-	
+
 	protected synchronized SslContext getSslContext() throws Exception {
 		if (cachedSslContext == null) {
 			SslContextBuilder builder;
@@ -296,5 +288,5 @@ public class NettyServer extends Service {
 		}
 		return cachedSslContext;
 	}
-	
+
 }
