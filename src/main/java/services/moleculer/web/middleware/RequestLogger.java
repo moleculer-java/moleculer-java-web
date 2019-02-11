@@ -37,6 +37,8 @@ import services.moleculer.context.Context;
 import services.moleculer.service.Action;
 import services.moleculer.service.Name;
 import services.moleculer.web.RequestProcessor;
+import services.moleculer.web.WebRequest;
+import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 @Name("Request Logger")
@@ -46,12 +48,48 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 
 	protected static final char[] CR_LF = System.getProperty("line.separator", "\r\n").toCharArray();
 
-	// --- CREATE NEW ACTION ---
+	// --- CREATE NEW PROCESSOR ---
 
 	@Override
 	public RequestProcessor install(RequestProcessor next, Tree config) {
-		// TODO Auto-generated method stub
-		return null;
+		return new RequestProcessor() {
+
+			/**
+			 * Handles request of the HTTP client.
+			 * 
+			 * @param req
+			 *            WebRequest object that contains the request the client made of
+			 *            the ApiGateway
+			 * @param rsp
+			 *            WebResponse object that contains the response the ApiGateway
+			 *            returns to the client
+			 * 
+			 * @throws Exception
+			 *             if an input or output error occurs while the ApiGateway is
+			 *             handling the HTTP request
+			 */
+			@Override
+			public void service(WebRequest req, WebResponse rsp) throws Exception {
+
+				// Create log message
+				StringBuilder tmp = new StringBuilder(512);
+				tmp.append("======= HTTP REQUEST =======");
+				tmp.append(CR_LF);
+				tmp.append("Method:  ");
+				tmp.append(req.getMethod());
+				tmp.append(CR_LF);
+				tmp.append("Path:    ");
+				tmp.append(req.getPath());
+				tmp.append(CR_LF);
+				tmp.append("Address: ");
+				tmp.append(req.getAddress());
+				tmp.append(CR_LF);
+				
+				// Invoke next handler / action
+				next.service(req, rsp);
+				
+			}
+		};
 	}
 	
 	public Action install(Action action, Tree config) {

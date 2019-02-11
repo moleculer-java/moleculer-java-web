@@ -67,6 +67,36 @@ public class CorsHeaders extends HttpMiddleware implements HttpConstants {
 	 */
 	protected int maxAge;
 
+	// --- CONSTRUCTORS ---
+
+	public CorsHeaders() {
+	}
+
+	public CorsHeaders(String origin) {
+		setOrigin(origin);
+	}
+
+	public CorsHeaders(String origin, String methods) {
+		setOrigin(origin);
+		setMethods(methods);
+	}
+
+	public CorsHeaders(String origin, String methods, int maxAge) {
+		setOrigin(origin);
+		setMethods(methods);
+		setMaxAge(maxAge);
+	}
+
+	public CorsHeaders(String origin, String methods, String allowedHeaders, String exposedHeaders, boolean credentials,
+			int maxAge) {
+		setOrigin(origin);
+		setMethods(methods);
+		setAllowedHeaders(allowedHeaders);
+		setExposedHeaders(exposedHeaders);
+		setCredentials(credentials);
+		setMaxAge(maxAge);
+	}
+	
 	// --- CREATE NEW PROCESSOR ---
 
 	@Override

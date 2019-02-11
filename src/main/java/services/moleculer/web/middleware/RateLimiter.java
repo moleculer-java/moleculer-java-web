@@ -42,6 +42,12 @@ import services.moleculer.web.middleware.limiter.RatingStoreFactory;
 @Name("Rate Limiter")
 public class RateLimiter extends HttpMiddleware implements HttpConstants {
 
+	// --- HTTP HEADERS ---
+
+	public static final String X_HEADER_LIMIT = "X-Rate-Limit-Limit";
+	public static final String X_HEADER_REMAINING = "X-Rate-Limit-Remaining";
+	public static final String X_HEADER_RESET = "X-Rate-Limit-Reset";
+
 	// --- PROPERTIES ---
 
 	/**
@@ -157,15 +163,15 @@ public class RateLimiter extends HttpMiddleware implements HttpConstants {
 			 * Handles request of the HTTP client.
 			 * 
 			 * @param req
-			 *            WebRequest object that contains the request the client made of
-			 *            the ApiGateway
+			 *            WebRequest object that contains the request the client
+			 *            made of the ApiGateway
 			 * @param rsp
-			 *            WebResponse object that contains the response the ApiGateway
-			 *            returns to the client
+			 *            WebResponse object that contains the response the
+			 *            ApiGateway returns to the client
 			 * 
 			 * @throws Exception
-			 *             if an input or output error occurs while the ApiGateway is
-			 *             handling the HTTP request
+			 *             if an input or output error occurs while the
+			 *             ApiGateway is handling the HTTP request
 			 */
 			@Override
 			public void service(WebRequest req, WebResponse rsp) throws Exception {
@@ -183,12 +189,13 @@ public class RateLimiter extends HttpMiddleware implements HttpConstants {
 					// Reject request, the limit is reached
 					// 429 = Rate limit exceeded
 					rsp.setStatus(429);
+					rsp.setHeader(CONTENT_LENGTH, "0");
 
 					// Set outgoing headers
 					if (headers) {
-						rsp.setHeader("X-Rate-Limit-Limit", actionLimitString);
-						rsp.setHeader("X-Rate-Limit-Remaining", "0");
-						rsp.setHeader("X-Rate-Limit-Reset", windowSecString);
+						rsp.setHeader(X_HEADER_LIMIT, actionLimitString);
+						rsp.setHeader(X_HEADER_REMAINING, "0");
+						rsp.setHeader(X_HEADER_RESET, windowSecString);
 					}
 
 					// Response finished
@@ -198,9 +205,9 @@ public class RateLimiter extends HttpMiddleware implements HttpConstants {
 
 				// Set outgoing headers
 				if (headers) {
-					rsp.setHeader("X-Rate-Limit-Limit", actionLimitString);
-					rsp.setHeader("X-Rate-Limit-Remaining", Long.toString(remaining));
-					rsp.setHeader("X-Rate-Limit-Reset", windowSecString);
+					rsp.setHeader(X_HEADER_LIMIT, actionLimitString);
+					rsp.setHeader(X_HEADER_REMAINING, Long.toString(remaining));
+					rsp.setHeader(X_HEADER_RESET, windowSecString);
 				}
 
 				// Invoke next action

@@ -25,10 +25,8 @@
  */
 package services.moleculer.web.middleware;
 
-import java.net.HttpCookie;
-import java.util.List;
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
-import java.util.UUID;
 
 import io.datatree.Tree;
 import services.moleculer.service.Name;
@@ -37,29 +35,28 @@ import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
-@Name("Session Cookie Handler")
-public class SessionCookie extends HttpMiddleware implements HttpConstants {
+@Name("Redirector")
+public class Redirector extends HttpMiddleware implements HttpConstants {
 
-	// --- PROPERTIES ---
-
-	protected String cookieName = "JSESSIONID";
-
-	protected String postfix = "; Path=/";
-
+	// --- REDIRECT PATH ---
+	
+	protected int status = 307;
+	protected String location = "/";
+	
 	// --- CONSTRUCTORS ---
-
-	public SessionCookie() {
+	
+	public Redirector() {
 	}
-
-	public SessionCookie(String cookieName) {
-		setCookieName(cookieName);
+	
+	public Redirector(String location) {
+		setLocation(location);
 	}
-
-	public SessionCookie(String cookieName, String postfix) {
-		setCookieName(cookieName);
-		setPostfix(postfix);
+	
+	public Redirector(String location, int status) {
+		setLocation(location);
+		setStatus(status);
 	}
-
+	
 	// --- CREATE NEW PROCESSOR ---
 
 	@Override
@@ -82,73 +79,60 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 			 */
 			@Override
 			public void service(WebRequest req, WebResponse rsp) throws Exception {
-
-				// Get cookie's value
-				String headerValue = req.getHeader(COOKIE);
-
-				// Get sessionID
-				String sessionID = null;
-				List<HttpCookie> httpCookies = null;
-				if (headerValue != null && !headerValue.isEmpty()) {
-					httpCookies = HttpCookie.parse(headerValue);
-					for (HttpCookie httpCookie : httpCookies) {
-						if (cookieName.equals(httpCookie.getName())) {
-							sessionID = httpCookie.getValue();
-						}
-					}
+				try {
+					
+					// Create HTML body
+					StringBuilder body = new StringBuilder(512);
+					body.append("<html><head><meta http-equiv=\"Refresh\" content=\"0; url=");
+					body.append(location);					
+					body.append("\" /></head><body>This page has moved to <a href=\"");
+					body.append(location);
+					body.append("\">");
+					body.append(location);
+					body.append("</a>.</body></html>");					
+					byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
+					
+					// Send status code and "Location" header
+					rsp.setStatus(status);
+					rsp.setHeader(LOCATION, location);
+					rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_HTML);
+					rsp.setHeader(CONTENT_LENGTH, Integer.toString(bytes.length));
+					rsp.send(bytes);
+				} finally {
+					rsp.end();
 				}
-
-				// Generate new sessionID
-				if (sessionID == null || sessionID.isEmpty()) {
-					sessionID = UUID.randomUUID().toString();
-				}
-
-				// Create "Set-Cookie" header
-				String setCookieHeader;
-				StringBuilder tmp = new StringBuilder(64);
-				if (httpCookies != null) {
-					for (HttpCookie httpCookie : httpCookies) {
-						if (!cookieName.equals(httpCookie.getName())) {
-							tmp.append(httpCookie.toString());
-							tmp.append(',');
-						}
-					}
-				}
-				tmp.append(cookieName);
-				tmp.append("=\"");
-				tmp.append(sessionID);
-				tmp.append('\"');
-				if (postfix != null) {
-					tmp.append(postfix);
-				}
-				setCookieHeader = tmp.toString();
-
-				// Set outgoing cookie
-				rsp.setHeader(SET_COOKIE, setCookieHeader);
-
-				// Invoke next handler
-				next.service(req, rsp);
 			}
-
 		};
 	}
-
+	
 	// --- PROPERTY GETTERS AND SETTERS ---
 
-	public String getCookieName() {
-		return cookieName;
+	/**
+	 * @return the location
+	 */
+	public String getLocation() {
+		return location;
 	}
 
-	public void setCookieName(String cookieName) {
-		this.cookieName = Objects.requireNonNull(cookieName);
+	/**
+	 * @param location the location to set
+	 */
+	public void setLocation(String location) {
+		this.location = Objects.requireNonNull(location);
 	}
 
-	public String getPostfix() {
-		return postfix;
+	/**
+	 * @return the status
+	 */
+	public int getStatus() {
+		return status;
 	}
 
-	public void setPostfix(String path) {
-		this.postfix = path;
+	/**
+	 * @param status the status to set
+	 */
+	public void setStatus(int status) {
+		this.status = status;
 	}
-
+	
 }

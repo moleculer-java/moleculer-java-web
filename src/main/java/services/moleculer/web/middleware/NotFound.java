@@ -28,7 +28,6 @@ package services.moleculer.web.middleware;
 import java.nio.charset.StandardCharsets;
 
 import io.datatree.Tree;
-import services.moleculer.ServiceBroker;
 import services.moleculer.service.Name;
 import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
@@ -38,9 +37,31 @@ import services.moleculer.web.common.HttpConstants;
 @Name("Not Found")
 public class NotFound extends HttpMiddleware implements HttpConstants {
 
-	// --- JSON / HTML RESPONSE ---
+	// --- PROPERTIES ---
 
-	protected boolean htmlResponse;
+	/**
+	 * Use HTML or JSON response (true = HTML).
+	 */
+	protected boolean sendHtmlResponse;
+
+	/**
+	 * Template of the HTML response.
+	 */
+	protected String htmlTemplate = "<html><body><h1>404 - Not found</h1><h2>Path: {path}</h2></body></html>";
+	
+	// --- CONSTRUCTORS ---
+
+	public NotFound() {
+	}
+
+	public NotFound(boolean sendHtmlResponse) {
+		setSendHtmlResponse(sendHtmlResponse);
+	}
+
+	public NotFound(boolean sendHtmlResponse, String htmlTemplate) {
+		setSendHtmlResponse(sendHtmlResponse);
+		setHtmlTemplate(htmlTemplate);
+	}
 
 	// --- CREATE NEW PROCESSOR ---
 
@@ -71,43 +92,61 @@ public class NotFound extends HttpMiddleware implements HttpConstants {
 
 					// 404 Not Found
 					rsp.setStatus(404);
-					if (htmlResponse) {
+					byte[] bytes;
+					if (sendHtmlResponse) {
+						
+						// Response in HTML format
 						rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_HTML);
-
-						StringBuilder body = new StringBuilder(512);
-						body.append("<html><body><h1>404 - Not found</h1><h2>");
-						body.append(path);
-						body.append("</h2><hr/>");
-						body.append("Moleculer V");
-						body.append(ServiceBroker.SOFTWARE_VERSION);
-						body.append("</body></html>");
-
-						rsp.send(body.toString().getBytes(StandardCharsets.UTF_8));
+						String body = htmlTemplate.replace("{path}", path);
+						bytes = body.getBytes(StandardCharsets.UTF_8);
+						
 					} else {
+						
+						// Response in JSON format
 						rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_JSON);
-
 						Tree body = new Tree();
 						body.put("success", false);
 						body.put("message", "Not Found: " + path);
-
-						rsp.send(body.toBinary());
+						bytes = body.toBinary();
+						
 					}
+					rsp.setHeader(CONTENT_LENGTH, Integer.toString(bytes.length));
+					rsp.send(bytes);
 				} finally {
 					rsp.end();
 				}
 			}
-
 		};
 	}
 
 	// --- PROPERTY GETTERS AND SETTERS ---
 
-	public boolean isHtmlResponse() {
-		return htmlResponse;
+	/**
+	 * @return the htmlTemplate
+	 */
+	public String getHtmlTemplate() {
+		return htmlTemplate;
 	}
 
-	public void setHtmlResponse(boolean htmlResponse) {
-		this.htmlResponse = htmlResponse;
+	/**
+	 * @param htmlTemplate the htmlTemplate to set
+	 */
+	public void setHtmlTemplate(String htmlTemplate) {
+		this.htmlTemplate = htmlTemplate;
+	}
+
+	/**
+	 * @return the sendHtmlResponse
+	 */
+	public boolean isSendHtmlResponse() {
+		return sendHtmlResponse;
+	}
+
+	/**
+	 * @param sendHtmlResponse the sendHtmlResponse to set
+	 */
+	public void setSendHtmlResponse(boolean sendHtmlResponse) {
+		this.sendHtmlResponse = sendHtmlResponse;
 	}
 
 }

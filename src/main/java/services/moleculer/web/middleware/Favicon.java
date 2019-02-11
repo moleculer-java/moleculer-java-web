@@ -56,6 +56,11 @@ public class Favicon extends HttpMiddleware implements HttpConstants {
 		setIconPath(pathToIcon);
 	}
 
+	public Favicon(String pathToIcon, int maxAge) {
+		setIconPath(pathToIcon);
+		setMaxAge(maxAge);
+	}
+
 	// --- CREATE NEW PROCESSOR ---
 
 	@Override
@@ -84,13 +89,15 @@ public class Favicon extends HttpMiddleware implements HttpConstants {
 						if (maxAge > 0) {
 							rsp.setHeader(CACHE_CONTROL, "public, max-age=" + maxAge);
 						}
+						rsp.setHeader(CONTENT_LENGTH, Integer.toString(image.length));
 						rsp.send(image);
 						return;
 					} finally {
 						rsp.end();
 					}						
+				} else {
+					next.service(req, rsp);
 				}
-				next.service(req, rsp);
 			}
 
 		};
