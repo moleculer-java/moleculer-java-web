@@ -30,10 +30,9 @@ import services.moleculer.service.Name;
 import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
-import services.moleculer.web.common.HttpConstants;
 
 @Name("CORS Headers")
-public class CorsHeaders extends HttpMiddleware implements HttpConstants {
+public class CorsHeaders extends HttpMiddleware {
 
 	// --- PROPERTIES ---
 
@@ -148,7 +147,7 @@ public class CorsHeaders extends HttpMiddleware implements HttpConstants {
 					rsp.setHeader("Access-Control-Max-Age", Integer.toString(maxAge));
 				}
 				
-				// Invoke next handler
+				// Invoke next handler (eg. Moleculer Action)
 				next.service(req, rsp);
 			}
 

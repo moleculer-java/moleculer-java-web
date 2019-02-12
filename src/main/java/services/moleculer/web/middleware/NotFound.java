@@ -48,7 +48,7 @@ public class NotFound extends HttpMiddleware implements HttpConstants {
 	 * Template of the HTML response.
 	 */
 	protected String htmlTemplate = "<html><body><h1>404 - Not found</h1><h2>Path: {path}</h2></body></html>";
-	
+
 	// --- CONSTRUCTORS ---
 
 	public NotFound() {
@@ -73,15 +73,15 @@ public class NotFound extends HttpMiddleware implements HttpConstants {
 			 * Handles request of the HTTP client.
 			 * 
 			 * @param req
-			 *            WebRequest object that contains the request the client made of
-			 *            the ApiGateway
+			 *            WebRequest object that contains the request the client
+			 *            made of the ApiGateway
 			 * @param rsp
-			 *            WebResponse object that contains the response the ApiGateway
-			 *            returns to the client
+			 *            WebResponse object that contains the response the
+			 *            ApiGateway returns to the client
 			 * 
 			 * @throws Exception
-			 *             if an input or output error occurs while the ApiGateway is
-			 *             handling the HTTP request
+			 *             if an input or output error occurs while the
+			 *             ApiGateway is handling the HTTP request
 			 */
 			@Override
 			public void service(WebRequest req, WebResponse rsp) throws Exception {
@@ -90,25 +90,27 @@ public class NotFound extends HttpMiddleware implements HttpConstants {
 					// Get path
 					String path = req.getPath();
 
-					// 404 Not Found
+					// Set 404 Not Found status
 					rsp.setStatus(404);
+
+					// Send body
 					byte[] bytes;
 					if (sendHtmlResponse) {
-						
+
 						// Response in HTML format
 						rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_HTML);
 						String body = htmlTemplate.replace("{path}", path);
 						bytes = body.getBytes(StandardCharsets.UTF_8);
-						
+
 					} else {
-						
+
 						// Response in JSON format
 						rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_JSON);
 						Tree body = new Tree();
 						body.put("success", false);
 						body.put("message", "Not Found: " + path);
 						bytes = body.toBinary();
-						
+
 					}
 					rsp.setHeader(CONTENT_LENGTH, Integer.toString(bytes.length));
 					rsp.send(bytes);
@@ -129,7 +131,8 @@ public class NotFound extends HttpMiddleware implements HttpConstants {
 	}
 
 	/**
-	 * @param htmlTemplate the htmlTemplate to set
+	 * @param htmlTemplate
+	 *            the htmlTemplate to set
 	 */
 	public void setHtmlTemplate(String htmlTemplate) {
 		this.htmlTemplate = htmlTemplate;
@@ -143,7 +146,8 @@ public class NotFound extends HttpMiddleware implements HttpConstants {
 	}
 
 	/**
-	 * @param sendHtmlResponse the sendHtmlResponse to set
+	 * @param sendHtmlResponse
+	 *            the sendHtmlResponse to set
 	 */
 	public void setSendHtmlResponse(boolean sendHtmlResponse) {
 		this.sendHtmlResponse = sendHtmlResponse;

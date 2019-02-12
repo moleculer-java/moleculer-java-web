@@ -94,6 +94,7 @@ public class Sample {
 			gateway.use(new Favicon());
 			gateway.use(new SessionCookie());
 			gateway.use(new RequestLogger());
+			// gateway.use(new ResponseDeflater());
 
 			broker.createService(new Service("math") {
 
@@ -102,15 +103,9 @@ public class Sample {
 				@Cache(keys = { "a", "b" }, ttl = 30)
 				public Action add = ctx -> {
 
-					//broker.getLogger().info("Call " + ctx.params);
-					return ctx.params.get("a", 0) + ctx.params.get("b", 0);
-
-				};
-
-				@Name("test")
-				public Action test = ctx -> {
-
-					return ctx.params.get("a", 0) + ctx.params.get("b", 0);
+					int c = ctx.params.get("a", 0) + ctx.params.get("b", 0);
+					ctx.params.put("c", c);
+					return ctx.params;
 
 				};
 

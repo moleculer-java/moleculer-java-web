@@ -38,25 +38,38 @@ import services.moleculer.web.common.HttpConstants;
 @Name("Redirector")
 public class Redirector extends HttpMiddleware implements HttpConstants {
 
-	// --- REDIRECT PATH ---
-	
+	// --- PROPERTIES ---
+
+	/**
+	 * 307 = Temporary Redirect.
+	 */
 	protected int status = 307;
+
+	/**
+	 * URL of the redirection.
+	 */
 	protected String location = "/";
-	
+
+	/**
+	 * Template of the HTML response.
+	 */
+	protected String htmlTemplate = "<html><head><meta http-equiv=\"Refresh\" content=\"0; url={location}"
+			+ "\" /></head><body>This page has moved to <a href=\"{location}\">{location}</a>.</body></html>";
+
 	// --- CONSTRUCTORS ---
-	
+
 	public Redirector() {
 	}
-	
+
 	public Redirector(String location) {
 		setLocation(location);
 	}
-	
+
 	public Redirector(String location, int status) {
 		setLocation(location);
 		setStatus(status);
 	}
-	
+
 	// --- CREATE NEW PROCESSOR ---
 
 	@Override
@@ -67,45 +80,56 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 			 * Handles request of the HTTP client.
 			 * 
 			 * @param req
-			 *            WebRequest object that contains the request the client made of
-			 *            the ApiGateway
+			 *            WebRequest object that contains the request the client
+			 *            made of the ApiGateway
 			 * @param rsp
-			 *            WebResponse object that contains the response the ApiGateway
-			 *            returns to the client
+			 *            WebResponse object that contains the response the
+			 *            ApiGateway returns to the client
 			 * 
 			 * @throws Exception
-			 *             if an input or output error occurs while the ApiGateway is
-			 *             handling the HTTP request
+			 *             if an input or output error occurs while the
+			 *             ApiGateway is handling the HTTP request
 			 */
 			@Override
 			public void service(WebRequest req, WebResponse rsp) throws Exception {
 				try {
-					
+
 					// Create HTML body
-					StringBuilder body = new StringBuilder(512);
-					body.append("<html><head><meta http-equiv=\"Refresh\" content=\"0; url=");
-					body.append(location);					
-					body.append("\" /></head><body>This page has moved to <a href=\"");
-					body.append(location);
-					body.append("\">");
-					body.append(location);
-					body.append("</a>.</body></html>");					
-					byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
-					
+					String body = htmlTemplate.replace("{location}", location);
+					byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+
 					// Send status code and "Location" header
 					rsp.setStatus(status);
 					rsp.setHeader(LOCATION, location);
 					rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_HTML);
 					rsp.setHeader(CONTENT_LENGTH, Integer.toString(bytes.length));
+					
+					// Send HTML body
 					rsp.send(bytes);
+					
 				} finally {
 					rsp.end();
 				}
 			}
 		};
 	}
-	
+
 	// --- PROPERTY GETTERS AND SETTERS ---
+
+	/**
+	 * @return the htmlTemplate
+	 */
+	public String getHtmlTemplate() {
+		return htmlTemplate;
+	}
+
+	/**
+	 * @param htmlTemplate
+	 *            the htmlTemplate to set
+	 */
+	public void setHtmlTemplate(String htmlTemplate) {
+		this.htmlTemplate = htmlTemplate;
+	}
 
 	/**
 	 * @return the location
@@ -115,7 +139,8 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 	}
 
 	/**
-	 * @param location the location to set
+	 * @param location
+	 *            the location to set
 	 */
 	public void setLocation(String location) {
 		this.location = Objects.requireNonNull(location);
@@ -129,10 +154,11 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 	}
 
 	/**
-	 * @param status the status to set
+	 * @param status
+	 *            the status to set
 	 */
 	public void setStatus(int status) {
 		this.status = status;
 	}
-	
+
 }

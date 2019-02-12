@@ -41,9 +41,11 @@ public interface HttpConstants {
 	public static final String SET_COOKIE = "Set-Cookie";
 	public static final String CACHE_CONTROL = "Cache-Control";
 	public static final String LOCATION = "Location";
+	public static final String ACCEPT = "Accept";
 
 	// --- HTTP HEADER VALUES ---
 
+	public static final String GZIP = "gzip";
 	public static final String DEFLATE = "deflate";
 	public static final String KEEP_ALIVE = "keep-alive";
 	public static final String CLOSE = "close";

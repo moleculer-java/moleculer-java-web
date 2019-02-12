@@ -94,6 +94,7 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 					for (HttpCookie httpCookie : httpCookies) {
 						if (cookieName.equals(httpCookie.getName())) {
 							sessionID = httpCookie.getValue();
+							break;
 						}
 					}
 				}
@@ -104,9 +105,10 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 				}
 
 				// Create "Set-Cookie" header
-				String setCookieHeader;
-				StringBuilder tmp = new StringBuilder(64);
+				StringBuilder tmp = new StringBuilder(128);
 				if (httpCookies != null) {
+					
+					// Add other cookies
 					for (HttpCookie httpCookie : httpCookies) {
 						if (!cookieName.equals(httpCookie.getName())) {
 							tmp.append(httpCookie.toString());
@@ -114,6 +116,8 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 						}
 					}
 				}
+				
+				// Add session cookie
 				tmp.append(cookieName);
 				tmp.append("=\"");
 				tmp.append(sessionID);
@@ -121,10 +125,9 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 				if (postfix != null) {
 					tmp.append(postfix);
 				}
-				setCookieHeader = tmp.toString();
 
 				// Set outgoing cookie
-				rsp.setHeader(SET_COOKIE, setCookieHeader);
+				rsp.setHeader(SET_COOKIE, tmp.toString());
 
 				// Invoke next handler
 				next.service(req, rsp);

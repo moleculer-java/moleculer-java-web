@@ -43,19 +43,7 @@ import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 /**
- * Service to serve files from within a given root directory. Sample of usage:
- * <br>
- * <br>
- * ServiceBroker broker = new ServiceBroker();<br>
- * ApiGateway gateway = new SunGateway();<br>
- * broker.createService("gateway", gateway);<br>
- * <br>
- * gateway.use(new ServeStatic("/pages", "/path/to/www/root"));<br>
- * <br>
- * broker.start();<br>
- * <br>
- * ...then open browser, and enter the following URL:
- * "http://localhost:3000/pages/index.html"
+ * Service to serve files from within a given root directory.
  */
 @Name("Static File Provider")
 public class ServeStatic extends HttpMiddleware implements HttpConstants {
@@ -63,14 +51,14 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 	// --- URL PATH AND ROOT DIRECTORY ---
 
 	/**
-	 * URL prefix (eg. "/files")
+	 * URL prefix (eg. "/files" or "/static")
 	 */
 	protected String path;
 
 	/**
-	 * Local directory prefix (eg. "C:/content" or "/www")
+	 * Local directory prefix (eg. "C:/content" or "/www" or "/WEB-INF/static")
 	 */
-	protected String file;
+	protected String localDirectory;
 
 	// --- PROPERTIES ---
 
@@ -142,7 +130,7 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 
 	public ServeStatic(String path, String rootDirectory) {
 		this.path = formatPath(path);
-		this.file = formatPath(rootDirectory);
+		this.localDirectory = formatPath(rootDirectory);
 		if (path.indexOf('*') > -1 || path.indexOf('?') > -1) {
 			throw new IllegalArgumentException("Invalid path format (" + path
 					+ ")! Use simple path prefix, without wildcard characters, like \"/www\".");
@@ -168,15 +156,15 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 			 * Handles request of the HTTP client.
 			 * 
 			 * @param req
-			 *            WebRequest object that contains the request the client made of
-			 *            the ApiGateway
+			 *            WebRequest object that contains the request the client
+			 *            made of the ApiGateway
 			 * @param rsp
-			 *            WebResponse object that contains the response the ApiGateway
-			 *            returns to the client
+			 *            WebResponse object that contains the response the
+			 *            ApiGateway returns to the client
 			 * 
 			 * @throws Exception
-			 *             if an input or output error occurs while the ApiGateway is
-			 *             handling the HTTP request
+			 *             if an input or output error occurs while the
+			 *             ApiGateway is handling the HTTP request
 			 */
 			@Override
 			public void service(WebRequest req, WebResponse rsp) throws Exception {
@@ -185,7 +173,7 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 					// Realtive path
 					String relativePath = req.getPath();
 					if (relativePath == null || !relativePath.startsWith(path)) {
-						
+
 						// Invalid path
 						next.service(req, rsp);
 						return;
@@ -194,7 +182,7 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 					// If-None-Match header
 					String ifNoneMatch = null;
 
-					// Client supports compressed content					
+					// Client supports compressed content
 					boolean compressionSupported = false;
 					if (useETags) {
 						ifNoneMatch = req.getHeader(IF_NONE_MATCH);
@@ -208,13 +196,13 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 					relativePath = relativePath.substring(path.length());
 					if (relativePath == null || relativePath.isEmpty() || relativePath.contains("..")) {
 
-						// 404 Not Found
+						// 404 Not Found (invoke last handler)
 						next.service(req, rsp);
 						return;
 					}
 
 					// Absolute path
-					String absolutePath = file + formatPath(relativePath);
+					String absolutePath = localDirectory + formatPath(relativePath);
 
 					// Get file from cache
 					CachedFile cached = fileCache.get(relativePath);
@@ -270,9 +258,13 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 						if (ifNoneMatch != null && ifNoneMatch.equals(etag) && (reload || cached != null)) {
 
 							// 304 Not Modified
-							rsp.setStatus(304);
-							rsp.setHeader(CONTENT_TYPE, contentType);
-							rsp.end();
+							try {
+								rsp.setStatus(304);
+								rsp.setHeader(CONTENT_TYPE, contentType);								
+								rsp.setHeader(CONTENT_LENGTH, "0");
+							} finally {
+								rsp.end();
+							}
 							return;
 
 						} else {
@@ -298,6 +290,8 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 
 					} else {
 
+						// TODO check file size with getFileSize(...)
+
 						// Read all bytes of the file
 						byte[] body = readAllBytes(absolutePath);
 
@@ -309,7 +303,7 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 							cached.lastChecked = now;
 							cached.etag = etag;
 							cached.body = body;
-							if (compressAbove > 0 && body.length > compressAbove && contentType.startsWith("text/")) {
+							if (compressAbove > 0 && body.length > compressAbove && contentType.startsWith("text")) {
 								cached.compressedBody = compress(body, compressionLevel);
 								if (compressionSupported) {
 
@@ -319,7 +313,16 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 								}
 							}
 							fileCache.put(relativePath, cached);
+						} else {
+							
+							// TODO send as stream
+							
 						}
+
+						// Add "Content-Length" header
+						rsp.setHeader(CONTENT_LENGTH, Integer.toString(body.length));
+						
+						// Send bytes
 						rsp.send(body);
 					}
 
@@ -329,9 +332,11 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 					}
 
 					// Processing finished
-					rsp.end();					
+					rsp.end();
 				} catch (Exception cause) {
 					logger.warn("Unable to process request!", cause);
+					
+					// TODO Try to send error 500
 				}
 			}
 		};
@@ -827,12 +832,12 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 
 	// --- GETTERS AND SETTERS ---
 
-	public String getFile() {
-		return file;
+	public String getLocalDirectory() {
+		return localDirectory;
 	}
 
-	public void setFile(String rootDirectory) {
-		this.file = formatPath(rootDirectory);
+	public void setLocalDirectory(String wwwRootDirectory) {
+		this.localDirectory = formatPath(wwwRootDirectory);
 	}
 
 	public void setContentType(String extension, String contentType) {

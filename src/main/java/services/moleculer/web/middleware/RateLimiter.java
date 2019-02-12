@@ -188,18 +188,21 @@ public class RateLimiter extends HttpMiddleware implements HttpConstants {
 
 					// Reject request, the limit is reached
 					// 429 = Rate limit exceeded
-					rsp.setStatus(429);
-					rsp.setHeader(CONTENT_LENGTH, "0");
+					try {
+						rsp.setStatus(429);
+						rsp.setHeader(CONTENT_LENGTH, "0");
 
-					// Set outgoing headers
-					if (headers) {
-						rsp.setHeader(X_HEADER_LIMIT, actionLimitString);
-						rsp.setHeader(X_HEADER_REMAINING, "0");
-						rsp.setHeader(X_HEADER_RESET, windowSecString);
+						// Set outgoing headers
+						if (headers) {
+							rsp.setHeader(X_HEADER_LIMIT, actionLimitString);
+							rsp.setHeader(X_HEADER_REMAINING, "0");
+							rsp.setHeader(X_HEADER_RESET, windowSecString);
+						}
+					} finally {
+
+						// Response finished
+						rsp.end();
 					}
-
-					// Response finished
-					rsp.end();
 					return;
 				}
 
@@ -210,7 +213,7 @@ public class RateLimiter extends HttpMiddleware implements HttpConstants {
 					rsp.setHeader(X_HEADER_RESET, windowSecString);
 				}
 
-				// Invoke next action
+				// Invoke next handler (eg. Moleculer Action)
 				next.service(req, rsp);
 			}
 		};

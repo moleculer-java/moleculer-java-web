@@ -26,16 +26,20 @@
 package services.moleculer.web.middleware;
 
 import static services.moleculer.util.CommonUtils.formatNamoSec;
-import static services.moleculer.util.CommonUtils.formatNumber;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
-import io.datatree.Promise;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.datatree.Tree;
-import services.moleculer.context.Context;
-import services.moleculer.service.Action;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import services.moleculer.service.Name;
+import services.moleculer.stream.PacketStream;
 import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
@@ -44,10 +48,27 @@ import services.moleculer.web.common.HttpConstants;
 @Name("Request Logger")
 public class RequestLogger extends HttpMiddleware implements HttpConstants {
 
+	// --- LOGGER ---
+
+	protected static final Logger logger = LoggerFactory.getLogger(RequestLogger.class);
+
 	// --- NEW LINE ---
 
 	protected static final char[] CR_LF = System.getProperty("line.separator", "\r\n").toCharArray();
 
+	// --- PROPERTIES ---
+
+	protected int maxPrintedBytes = 512;
+
+	// --- CONSTRUCTORS ---
+
+	public RequestLogger() {
+	}
+
+	public RequestLogger(int maxPrintedBytes) {
+		setMaxPrintedBytes(maxPrintedBytes);
+	}
+	
 	// --- CREATE NEW PROCESSOR ---
 
 	@Override
@@ -58,122 +79,185 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 			 * Handles request of the HTTP client.
 			 * 
 			 * @param req
-			 *            WebRequest object that contains the request the client made of
-			 *            the ApiGateway
+			 *            WebRequest object that contains the request the client
+			 *            made of the ApiGateway
 			 * @param rsp
-			 *            WebResponse object that contains the response the ApiGateway
-			 *            returns to the client
+			 *            WebResponse object that contains the response the
+			 *            ApiGateway returns to the client
 			 * 
 			 * @throws Exception
-			 *             if an input or output error occurs while the ApiGateway is
-			 *             handling the HTTP request
+			 *             if an input or output error occurs while the
+			 *             ApiGateway is handling the HTTP request
 			 */
 			@Override
 			public void service(WebRequest req, WebResponse rsp) throws Exception {
+				StringBuilder tmp = new StringBuilder(1024);
 
-				// Create log message
-				StringBuilder tmp = new StringBuilder(512);
-				tmp.append("======= HTTP REQUEST =======");
+				// General request properties
 				tmp.append(CR_LF);
-				tmp.append("Method:  ");
+				tmp.append(CR_LF);
+				tmp.append("  ");
 				tmp.append(req.getMethod());
-				tmp.append(CR_LF);
-				tmp.append("Path:    ");
+				tmp.append(' ');
 				tmp.append(req.getPath());
-				tmp.append(CR_LF);
-				tmp.append("Address: ");
-				tmp.append(req.getAddress());
-				tmp.append(CR_LF);
+				String query = req.getQuery();
+				if (query != null && !query.isEmpty()) {
+					tmp.append('?');
+					tmp.append(query);
+				}
 				
+				// It's not known (but Servlet and Netty use HTTP1.1)
+				tmp.append(" HTTP/1.1");
+				
+				tmp.append(CR_LF);
+				Iterator<String> headers = req.getHeaders();
+				if (headers != null) {
+					String header;
+					while (headers.hasNext()) {
+						header = headers.next();
+						tmp.append("  ");
+						tmp.append(header);
+						tmp.append(": ");
+						tmp.append(req.getHeader(header));
+						tmp.append(CR_LF);
+					}
+				}
+
+				// Try to dump body
+				if (req.isMultipart()) {
+					tmp.append(CR_LF);
+					tmp.append("  <streamed body>");
+				} else if (req.getContentLength() > 0) {
+					PacketStream stream = req.getBody();
+					if (stream == null) {
+						tmp.append(CR_LF);
+						tmp.append("  <missing body>");
+					} else {
+						ByteArrayOutputStream buffer = new ByteArrayOutputStream(512);
+						try {
+							stream.transferTo(buffer).waitFor(3000);
+							printBytes(tmp, buffer.toByteArray());
+						} catch (Exception timeout) {
+							tmp.append(CR_LF);
+							tmp.append("  <read timeouted>");
+						}
+					}
+				}
+				tmp.append(CR_LF);
+
 				// Invoke next handler / action
-				next.service(req, rsp);
-				
+				final long start = System.nanoTime();
+				next.service(req, new WebResponse() {
+
+					int code = 200;
+					LinkedHashMap<String, String> headers = new LinkedHashMap<>();
+					ByteArrayOutputStream out = new ByteArrayOutputStream(512);
+
+					@Override
+					public final void setStatus(int code) {
+						rsp.setStatus(code);
+						this.code = code;
+					}
+
+					@Override
+					public final void setHeader(String name, String value) {
+						rsp.setHeader(name, value);
+						headers.put(name, value);
+					}
+
+					@Override
+					public final void send(byte[] bytes) throws IOException {
+						rsp.send(bytes);
+						if (out.size() < maxPrintedBytes) {
+							out.write(bytes);
+						}
+					}
+
+					@Override
+					public final void end() {
+						long duration = System.nanoTime() - start;
+						rsp.end();
+
+						// It's not known (but Servlet and Netty use HTTP1.1)
+						tmp.append("  HTTP/1.1 ");
+
+						// Status code and message
+						tmp.append(HttpResponseStatus.valueOf(code));
+						tmp.append(CR_LF);
+						for (Map.Entry<String, String> entry : headers.entrySet()) {
+							tmp.append("  ");
+							tmp.append(entry.getKey());
+							tmp.append(": ");
+							tmp.append(entry.getValue());
+							tmp.append(CR_LF);
+						}
+
+						// Try to dump body
+						if (out.size() > 0) {
+							printBytes(tmp, out.toByteArray());
+						}
+						
+						// Insert processing time (first line)
+						tmp.insert(0, '.');
+						tmp.insert(0, formatNamoSec(duration));
+						tmp.insert(0, " processed within ");
+
+						// Client address
+						String address = req.getAddress();
+						if (address == null || address.isEmpty()) {
+							tmp.insert(0, "<unknown host>");
+						} else {
+							tmp.insert(0, address);
+						}
+						tmp.insert(0, "Request from ");
+						
+						// Write to log
+						logger.info(tmp.toString());
+					}
+
+				});
+
 			}
 		};
 	}
-	
-	public Action install(Action action, Tree config) {
-		return new Action() {
 
-			/**
-			 * Handles request of the HTTP client.
-			 * 
-			 * @param req
-			 *            WebRequest object that contains the request the client made of
-			 *            the ApiGateway
-			 * @param rsp
-			 *            WebResponse object that contains the response the ApiGateway
-			 *            returns to the client
-			 * 
-			 * @throws Exception
-			 *             if an input or output error occurs while the ApiGateway is
-			 *             handling the HTTP request
-			 */
-			@Override
-			public Object handler(Context ctx) throws Exception {
-				long start = System.nanoTime();
-				Object result = action.handler(ctx);
-				return Promise.resolve(result).then(rsp -> {
-					long duration = System.nanoTime() - start;
-					StringBuilder tmp = new StringBuilder(512);
-					tmp.append("======= REQUEST PROCESSED IN ");
-					tmp.append(formatNamoSec(duration).toUpperCase());
-					tmp.append(" =======");
-					tmp.append(CR_LF);
-					tmp.append("Request:");
-					tmp.append(CR_LF);
-					tmp.append(ctx.params);
-					tmp.append(CR_LF);
-					tmp.append("Response:");
-					tmp.append(CR_LF);
-					if (rsp == null) {
-						tmp.append("<null>");
-					} else {
-						if (rsp.isMap() || rsp.isList()) {
-							tmp.append(rsp);
-						} else {
-							tmp.append(rsp.getMeta());
-							if (rsp.getType() == byte[].class) {
-								byte[] bytes = (byte[]) rsp.asBytes();
-								if (bytes.length == 0) {
-									tmp.append(CR_LF);
-									tmp.append("<empty body>");
-								} else {
-									tmp.append(CR_LF);
-									tmp.append('<');
-									tmp.append(formatNumber(bytes.length));
-									tmp.append(" bytes of binary response>");
-								}
-							} else {
-								tmp.append(CR_LF);
-								tmp.append(rsp);
-							}
-						}
-					}
-					logger.info(tmp.toString());
-				}).catchError(cause -> {
-					long duration = System.nanoTime() - start;
-					StringBuilder tmp = new StringBuilder(512);
-					tmp.append("======= REQUEST PROCESSED IN ");
-					tmp.append(formatNamoSec(duration).toUpperCase());
-					tmp.append(" =======");
-					tmp.append(CR_LF);
-					tmp.append("Request:");
-					tmp.append(CR_LF);
-					tmp.append(ctx.params);
-					tmp.append(CR_LF);
-					tmp.append("Response:");
-					tmp.append(CR_LF);
-					StringWriter stringWriter = new StringWriter(512);
-					PrintWriter printWriter = new PrintWriter(stringWriter, true);
-					cause.printStackTrace(printWriter);
-					tmp.append(stringWriter.toString().trim());
-					logger.error(tmp.toString());
-					return cause;
-				});
+	protected void printBytes(StringBuilder tmp, byte[] bytes) {
+		if (bytes == null || bytes.length == 0 || maxPrintedBytes < 1) {
+			return;
+		}
+		tmp.append(CR_LF);
+		tmp.append("  ");
+		byte b;
+		char c;
+		int max = Math.min(bytes.length, maxPrintedBytes);
+		for (int i = 0; i < max; i++) {
+			b = bytes[i];
+			c = (char) b;
+			if (!Character.isISOControl(c) || c == '\r' || c == '\n' || c == '\t') {
+				tmp.append(c);
+			} else {
+				tmp.append('[');
+				tmp.append(b & 0xFF);
+				tmp.append(']');
 			}
+		}
+	}
 
-		};
+	// --- PROPERTY GETTERS AND SETTERS ---
+
+	/**
+	 * @return the maxPrintedBytes
+	 */
+	public int getMaxPrintedBytes() {
+		return maxPrintedBytes;
+	}
+
+	/**
+	 * @param maxPrintedBytes
+	 *            the maxPrintedBytes to set
+	 */
+	public void setMaxPrintedBytes(int maxDumpSize) {
+		this.maxPrintedBytes = maxDumpSize;
 	}
 
 }
