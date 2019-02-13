@@ -45,6 +45,10 @@ import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
+/**
+ * Writes request and response into the log. WARNING: Using this middleware
+ * reduces the performance (however, it may be useful during development).
+ */
 @Name("Request Logger")
 public class RequestLogger extends HttpMiddleware implements HttpConstants {
 
@@ -68,7 +72,7 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 	public RequestLogger(int maxPrintedBytes) {
 		setMaxPrintedBytes(maxPrintedBytes);
 	}
-	
+
 	// --- CREATE NEW PROCESSOR ---
 
 	@Override
@@ -105,10 +109,10 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 					tmp.append('?');
 					tmp.append(query);
 				}
-				
+
 				// It's not known (but Servlet and Netty use HTTP1.1)
 				tmp.append(" HTTP/1.1");
-				
+
 				tmp.append(CR_LF);
 				Iterator<String> headers = req.getHeaders();
 				if (headers != null) {
@@ -196,7 +200,7 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 						if (out.size() > 0) {
 							printBytes(tmp, out.toByteArray());
 						}
-						
+
 						// Insert processing time (first line)
 						tmp.insert(0, '.');
 						tmp.insert(0, formatNamoSec(duration));
@@ -210,7 +214,7 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 							tmp.insert(0, address);
 						}
 						tmp.insert(0, "Request from ");
-						
+
 						// Write to log
 						logger.info(tmp.toString());
 					}

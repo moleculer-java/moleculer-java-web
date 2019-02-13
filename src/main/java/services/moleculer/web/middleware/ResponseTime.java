@@ -25,40 +25,34 @@
  */
 package services.moleculer.web.middleware;
 
-import static services.moleculer.web.common.GatewayUtils.readAllBytes;
+import java.io.IOException;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.datatree.Tree;
 import services.moleculer.service.Name;
 import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
-import services.moleculer.web.common.HttpConstants;
 
-@Name("Favicon")
-public class Favicon extends HttpMiddleware implements HttpConstants {
+/**
+ * Adds a header "X-Response-Time" to the response, containing the time taken in
+ * MILLISECONDS to process the request.
+ */
+@Name("Response Time")
+public class ResponseTime extends HttpMiddleware {
 
 	// --- PROPERTIES ---
 
-	protected String iconPath;
-	protected int maxAge;
-
-	// --- CACHED IMAGE ---
-
-	protected byte[] image;
+	protected String headerName = "X-Response-Time";
 
 	// --- CONSTRUCTORS ---
 
-	public Favicon() {
-		this("/favicon.ico");
+	public ResponseTime() {
 	}
 
-	public Favicon(String pathToIcon) {
-		setIconPath(pathToIcon);
-	}
-
-	public Favicon(String pathToIcon, int maxAge) {
-		setIconPath(pathToIcon);
-		setMaxAge(maxAge);
+	public ResponseTime(String headerName) {
+		setHeaderName(headerName);
 	}
 
 	// --- CREATE NEW PROCESSOR ---
@@ -71,59 +65,65 @@ public class Favicon extends HttpMiddleware implements HttpConstants {
 			 * Handles request of the HTTP client.
 			 * 
 			 * @param req
-			 *            WebRequest object that contains the request the client made of
-			 *            the ApiGateway
+			 *            WebRequest object that contains the request the client
+			 *            made of the ApiGateway
 			 * @param rsp
-			 *            WebResponse object that contains the response the ApiGateway
-			 *            returns to the client
+			 *            WebResponse object that contains the response the
+			 *            ApiGateway returns to the client
 			 * 
 			 * @throws Exception
-			 *             if an input or output error occurs while the ApiGateway is
-			 *             handling the HTTP request
+			 *             if an input or output error occurs while the
+			 *             ApiGateway is handling the HTTP request
 			 */
 			@Override
-			public void service(WebRequest req, WebResponse rsp) throws Exception {					
-				if ("/favicon.ico".equals(req.getPath())) {
-					try {
-						rsp.setHeader(CONTENT_TYPE, "image/x-icon");						
-						if (maxAge > 0) {
-							rsp.setHeader(CACHE_CONTROL, "public, max-age=" + maxAge);
+			public void service(WebRequest req, WebResponse rsp) throws Exception {
+
+				// First body
+				AtomicBoolean firstBody = new AtomicBoolean(true);
+
+				// Start time
+				long start = System.currentTimeMillis();
+
+				// Invoke next handler / action
+				next.service(req, new WebResponse() {
+
+					@Override
+					public void setStatus(int code) {
+						rsp.setStatus(code);
+					}
+
+					@Override
+					public void setHeader(String name, String value) {
+						rsp.setHeader(name, value);
+					}
+
+					@Override
+					public void send(byte[] bytes) throws IOException {
+						if (firstBody.compareAndSet(true, false)) {
+							long duration = System.currentTimeMillis() - start;
+							rsp.setHeader(headerName, duration + "ms");
 						}
-						rsp.setHeader(CONTENT_LENGTH, Integer.toString(image.length));
-						rsp.send(image);
-					} finally {
+						rsp.send(bytes);
+					}
+
+					@Override
+					public void end() {
 						rsp.end();
 					}
-					return;					
-				}
-				
-				// Invoke next handler / action
-				next.service(req, rsp);
-			}
 
+				});
+			}
 		};
 	}
 
 	// --- PROPERTY GETTERS AND SETTERS ---
 
-	public String getIconPath() {
-		return iconPath;
+	public String getHeaderName() {
+		return headerName;
 	}
 
-	public void setIconPath(String iconPath) {
-		this.image = readAllBytes(iconPath);
-		this.iconPath = iconPath;
-		if (image.length == 0) {
-			throw new IllegalArgumentException("File or resource not found: " + iconPath);
-		}
-	}
-
-	public int getMaxAge() {
-		return maxAge;
-	}
-
-	public void setMaxAge(int maxAge) {
-		this.maxAge = maxAge;
+	public void setHeaderName(String headerName) {
+		this.headerName = Objects.requireNonNull(headerName);
 	}
 
 }

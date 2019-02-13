@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2017 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -25,26 +25,14 @@
  */
 package services.moleculer.web.middleware;
 
-import io.datatree.Tree;
-import services.moleculer.service.Service;
-import services.moleculer.web.RequestProcessor;
+import services.moleculer.ServiceBroker;
 
 /**
- * Abstract class for all HTTP Middlewares.
+ * Common interface for authenticating users by using BASIC Authentication.
  */
-public abstract class HttpMiddleware extends Service {
+@FunctionalInterface
+public interface BasicAuthProvider {
 
-	// --- CONSTRUCTORS ---
-
-	public HttpMiddleware() {
-	}
-
-	public HttpMiddleware(String name) {
-		super(name);
-	}
+	boolean authenticate(ServiceBroker broker, String username, String password);
 	
-	// --- CREATE / INSTALL MIDDLEWARE ---
-	
-	public abstract RequestProcessor install(RequestProcessor next, Tree config);
-		
 }

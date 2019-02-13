@@ -45,6 +45,7 @@ import services.moleculer.web.middleware.RateLimiter;
 import services.moleculer.web.middleware.RequestLogger;
 import services.moleculer.web.middleware.ServeStatic;
 import services.moleculer.web.middleware.SessionCookie;
+import services.moleculer.web.middleware.XSRFToken;
 import services.moleculer.web.middleware.limiter.RateLimit;
 import services.moleculer.web.netty.NettyServer;
 import services.moleculer.web.router.Alias;
@@ -94,7 +95,9 @@ public class Sample {
 			gateway.use(new Favicon());
 			gateway.use(new SessionCookie());
 			gateway.use(new RequestLogger());
+			// gateway.use(new XSRFToken());
 			// gateway.use(new ResponseDeflater());
+			// gateway.use(new BasicAuthenticator("user", "password"));
 
 			broker.createService(new Service("math") {
 

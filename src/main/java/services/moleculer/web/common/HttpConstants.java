@@ -27,6 +27,18 @@ package services.moleculer.web.common;
 
 public interface HttpConstants {
 
+	// --- HTTP METHODS ---
+	
+	public static final String GET = "GET";
+	public static final String HEAD = "HEAD";
+	public static final String POST = "POST";
+	public static final String PUT = "PUT";
+	public static final String DELETE = "DELETE";
+	public static final String CONNECT = "CONNECT";
+	public static final String OPTIONS = "OPTIONS";
+	public static final String TRACE = "TRACE";
+	public static final String PATCH = "PATCH";
+	
 	// --- HEADER NAMES ---
 
 	public static final String X_FORWARDED_FOR = "X-Forwarded-For";
@@ -42,6 +54,8 @@ public interface HttpConstants {
 	public static final String CACHE_CONTROL = "Cache-Control";
 	public static final String LOCATION = "Location";
 	public static final String ACCEPT = "Accept";
+	public static final String AUTHORIZATION = "Authorization";
+	public static final String WWW_AUTHENTICATE = "WWW-Authenticate";
 
 	// --- HTTP HEADER VALUES ---
 

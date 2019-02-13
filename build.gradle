@@ -50,7 +50,7 @@ dependencies {
     // =============== MOLECULER ===============
 
 	// Moleculer core (required)
-	compile group: 'com.github.berkesa', name: 'moleculer-java', version: '1.0.9-SNAPSHOT'
+	compile group: 'com.github.berkesa', name: 'moleculer-java', version: '1.0.9.2-SNAPSHOT'
 	// compile group: 'com.github.berkesa', name: 'moleculer-java', version: '1.0.8'
 	
 	// Moleculer developer console (optional)

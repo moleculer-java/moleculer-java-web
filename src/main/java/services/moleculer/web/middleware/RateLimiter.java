@@ -39,6 +39,10 @@ import services.moleculer.web.middleware.limiter.MemoryStoreFactory;
 import services.moleculer.web.middleware.limiter.RatingStore;
 import services.moleculer.web.middleware.limiter.RatingStoreFactory;
 
+/**
+ * Rate Limiter limits concurrent constant requests to the HTTP calls in the
+ * application.
+ */
 @Name("Rate Limiter")
 public class RateLimiter extends HttpMiddleware implements HttpConstants {
 

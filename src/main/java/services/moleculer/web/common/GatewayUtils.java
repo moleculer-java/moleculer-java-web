@@ -89,6 +89,7 @@ public final class GatewayUtils {
 				}
 			}
 		} catch (Exception ignored) {
+			logger.debug("Unable to get file size: " + path);
 		}
 		return -1;
 	}
@@ -103,6 +104,7 @@ public final class GatewayUtils {
 				}
 			}
 		} catch (Exception ignored) {
+			logger.debug("Unable to get last modification time: " + path);
 		}
 		return jarTimestamp;
 	}
@@ -115,7 +117,7 @@ public final class GatewayUtils {
 			}
 		} catch (Exception ignored) {
 		}
-		logger.warn("Unable to load file: " + path);
+		logger.debug("Unable to load file: " + path);
 		return new byte[0];
 	}
 
@@ -153,7 +155,7 @@ public final class GatewayUtils {
 				return url;
 			}
 		} catch (Exception cause) {
-			logger.warn("Unable to open file: " + path, cause);
+			logger.debug("Unable to open file: " + path, cause);
 		}
 		return null;
 	}

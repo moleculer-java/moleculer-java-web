@@ -144,6 +144,7 @@ public class NettyWebResponse implements WebResponse {
 			}
 			header.append("\r\n");
 			ctx.write(Unpooled.wrappedBuffer(header.toString().getBytes(StandardCharsets.UTF_8)));
+			ctx.flush();
 		}	
 	}
 	

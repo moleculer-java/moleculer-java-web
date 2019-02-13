@@ -31,6 +31,9 @@ import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 
+/**
+ * Implements server side https://www.w3.org/wiki/CORS support for Moleculer.
+ */
 @Name("CORS Headers")
 public class CorsHeaders extends HttpMiddleware {
 

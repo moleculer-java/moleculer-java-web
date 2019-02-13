@@ -37,6 +37,9 @@ import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
+/**
+ * Generates Session Cookies, and sets the cookie header.
+ */
 @Name("Session Cookie Handler")
 public class SessionCookie extends HttpMiddleware implements HttpConstants {
 

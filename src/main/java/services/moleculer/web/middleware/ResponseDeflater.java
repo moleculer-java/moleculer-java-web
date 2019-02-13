@@ -44,6 +44,10 @@ import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
+/**
+ * Compresses body of response messages. WARNING: Using this middleware reduces
+ * the performance, so use it only on slow networks.
+ */
 @Name("Response Deflater")
 public class ResponseDeflater extends HttpMiddleware implements HttpConstants {
 

@@ -25,42 +25,52 @@
  */
 package services.moleculer.web.middleware;
 
+import static services.moleculer.web.common.GatewayUtils.getFileURL;
+import static services.moleculer.web.common.GatewayUtils.readAllBytes;
+
 import java.nio.charset.StandardCharsets;
 
 import io.datatree.Tree;
 import services.moleculer.service.Name;
+import services.moleculer.util.FastBuildTree;
 import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
+/**
+ * Refuses all requests with "Error 400 Not Found" message.
+ */
 @Name("Not Found")
 public class NotFound extends HttpMiddleware implements HttpConstants {
 
 	// --- PROPERTIES ---
 
 	/**
-	 * Use HTML or JSON response (true = HTML).
+	 * Template path of the HTML response.
 	 */
-	protected boolean sendHtmlResponse;
+	protected String htmlTemplatePath;
 
 	/**
 	 * Template of the HTML response.
 	 */
-	protected String htmlTemplate = "<html><body><h1>404 - Not found</h1><h2>Path: {path}</h2></body></html>";
+	protected String htmlTemplate = "<html><head><meta charset=\"utf-8\"/><title>Error 404</title><style>html{height:100%}"
+			+ "body{color:#888;margin:0}#main{display:table;width:100%;height:100vh;text-align:center}"
+			+ ".x{display:table-cell;vertical-align:middle}.x h1{font-size:50px}.x h2{font-size:25px}"
+			+ "</style></head><body><div id=\"main\"><div class=\"x\"><h1>Error 404</h1><h2>"
+			+ "This page does not exist: {path}</h2></div></div></body></html>";
 
 	// --- CONSTRUCTORS ---
 
 	public NotFound() {
 	}
 
-	public NotFound(boolean sendHtmlResponse) {
-		setSendHtmlResponse(sendHtmlResponse);
-	}
-
-	public NotFound(boolean sendHtmlResponse, String htmlTemplate) {
-		setSendHtmlResponse(sendHtmlResponse);
-		setHtmlTemplate(htmlTemplate);
+	public NotFound(String htmlTemplateOrPath) {
+		if (getFileURL(htmlTemplateOrPath) == null) {
+			setHtmlTemplate(htmlTemplateOrPath);
+		} else {
+			setHtmlTemplatePath(htmlTemplateOrPath);
+		}
 	}
 
 	// --- CREATE NEW PROCESSOR ---
@@ -93,23 +103,27 @@ public class NotFound extends HttpMiddleware implements HttpConstants {
 					// Set 404 Not Found status
 					rsp.setStatus(404);
 
+					// Detect Accept-Encoding
+					String accept = req.getHeader(ACCEPT);
+					boolean sendJSON = accept != null && accept.contains("json");
+
 					// Send body
 					byte[] bytes;
-					if (sendHtmlResponse) {
+					if (sendJSON) {
+
+						// Response in JSON format
+						rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_JSON);
+						FastBuildTree body = new FastBuildTree(2);
+						body.putUnsafe("success", false);
+						body.putUnsafe("message", "Not Found: " + path);
+						bytes = body.toBinary();
+
+					} else {
 
 						// Response in HTML format
 						rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_HTML);
 						String body = htmlTemplate.replace("{path}", path);
 						bytes = body.getBytes(StandardCharsets.UTF_8);
-
-					} else {
-
-						// Response in JSON format
-						rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_JSON);
-						Tree body = new Tree();
-						body.put("success", false);
-						body.put("message", "Not Found: " + path);
-						bytes = body.toBinary();
 
 					}
 					rsp.setHeader(CONTENT_LENGTH, Integer.toString(bytes.length));
@@ -139,18 +153,22 @@ public class NotFound extends HttpMiddleware implements HttpConstants {
 	}
 
 	/**
-	 * @return the sendHtmlResponse
+	 * @return the htmlTemplatePath
 	 */
-	public boolean isSendHtmlResponse() {
-		return sendHtmlResponse;
+	public String getHtmlTemplatePath() {
+		return htmlTemplatePath;
 	}
 
 	/**
-	 * @param sendHtmlResponse
-	 *            the sendHtmlResponse to set
+	 * @param htmlTemplatePath
+	 *            the htmlTemplatePath to set
 	 */
-	public void setSendHtmlResponse(boolean sendHtmlResponse) {
-		this.sendHtmlResponse = sendHtmlResponse;
+	public void setHtmlTemplatePath(String htmlTemplatePath) {
+		this.htmlTemplate = new String(readAllBytes(htmlTemplatePath), StandardCharsets.UTF_8);
+		if (htmlTemplate.isEmpty()) {
+			throw new IllegalArgumentException("Empty file or resource not found: " + htmlTemplatePath);
+		}
+		this.htmlTemplatePath = htmlTemplatePath;
 	}
 
 }

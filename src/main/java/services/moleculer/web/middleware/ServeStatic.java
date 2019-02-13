@@ -43,7 +43,9 @@ import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 /**
- * Service to serve files from within a given root directory.
+ * Service to serve files from within a given root directory. When a file is not
+ * found, instead of sending a 404 response. Supports content compression,
+ * automatic "Content-Type" detection, and ETAGs.
  */
 @Name("Static File Provider")
 public class ServeStatic extends HttpMiddleware implements HttpConstants {
@@ -137,7 +139,7 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 		}
 	}
 
-	// --- START HANDLER ---
+	// --- START MIDDLEWARE ---
 
 	public void started(services.moleculer.ServiceBroker broker) throws Exception {
 		super.started(broker);
@@ -260,7 +262,7 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 							// 304 Not Modified
 							try {
 								rsp.setStatus(304);
-								rsp.setHeader(CONTENT_TYPE, contentType);								
+								rsp.setHeader(CONTENT_TYPE, contentType);
 								rsp.setHeader(CONTENT_LENGTH, "0");
 							} finally {
 								rsp.end();
@@ -314,14 +316,14 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 							}
 							fileCache.put(relativePath, cached);
 						} else {
-							
+
 							// TODO send as stream
-							
+
 						}
 
 						// Add "Content-Length" header
 						rsp.setHeader(CONTENT_LENGTH, Integer.toString(body.length));
-						
+
 						// Send bytes
 						rsp.send(body);
 					}
@@ -335,7 +337,7 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 					rsp.end();
 				} catch (Exception cause) {
 					logger.warn("Unable to process request!", cause);
-					
+
 					// TODO Try to send error 500
 				}
 			}

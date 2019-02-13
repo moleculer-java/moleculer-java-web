@@ -36,6 +36,9 @@ import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 
+/**
+ * Adds custom and static HTTP-headers to the response message.
+ */
 @Name("Response Headers")
 public class ResponseHeaders extends HttpMiddleware {
 

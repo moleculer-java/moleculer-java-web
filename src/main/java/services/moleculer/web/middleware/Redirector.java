@@ -35,6 +35,9 @@ import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
+/**
+ * Redirects all requests to the specified URL / location.
+ */
 @Name("Redirector")
 public class Redirector extends HttpMiddleware implements HttpConstants {
 

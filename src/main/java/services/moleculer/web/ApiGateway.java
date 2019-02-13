@@ -26,6 +26,7 @@
 package services.moleculer.web;
 
 import static services.moleculer.util.CommonUtils.nameOf;
+import static services.moleculer.web.common.HttpConstants.CONTENT_LENGTH;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -304,6 +305,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 			logger.info("Mapping not found for request: " + path);
 		}
 		rsp.setStatus(404);
+		rsp.setHeader(CONTENT_LENGTH, "0");
 		rsp.end();
 	}
 
