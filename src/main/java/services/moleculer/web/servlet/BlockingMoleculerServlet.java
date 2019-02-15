@@ -26,6 +26,7 @@
 package services.moleculer.web.servlet;
 
 import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -71,6 +72,12 @@ public class BlockingMoleculerServlet extends AbstractMoleculerServlet {
 			BlockingWebResponse bwr = new BlockingWebResponse(rsp);
 			gateway.service(new BlockingWebRequest(broker, (HttpServletRequest) request), bwr);
 			bwr.waitFor(timeout);
+		} catch (TimeoutException timeout) {
+			try {
+				rsp.sendError(408);
+				getServletContext().log("Unexpected timeout exception occured!", timeout);
+			} catch (Throwable ignored) {
+			}				
 		} catch (Throwable cause) {
 			try {
 				if (gateway == null) {

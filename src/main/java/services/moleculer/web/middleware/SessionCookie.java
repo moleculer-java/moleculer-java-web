@@ -25,10 +25,15 @@
  */
 package services.moleculer.web.middleware;
 
+import java.lang.ref.PhantomReference;
+import java.lang.ref.SoftReference;
+import java.lang.ref.WeakReference;
 import java.net.HttpCookie;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.WeakHashMap;
 
 import io.datatree.Tree;
 import services.moleculer.service.Name;
@@ -42,12 +47,23 @@ import services.moleculer.web.common.HttpConstants;
  */
 @Name("Session Cookie Handler")
 public class SessionCookie extends HttpMiddleware implements HttpConstants {
-
+	
 	// --- PROPERTIES ---
 
+	/**
+	 * Cookie name.
+	 */
 	protected String cookieName = "JSESSIONID";
 
-	protected String postfix = "; Path=/";
+	/**
+	 * Cookie path.
+	 */
+	protected String path = "/";
+	
+	/**
+	 * Cookie timeout in SECONDS (0 = no timeout).
+	 */
+	protected long maxAge = 0;
 
 	// --- CONSTRUCTORS ---
 
@@ -60,7 +76,7 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 
 	public SessionCookie(String cookieName, String postfix) {
 		setCookieName(cookieName);
-		setPostfix(postfix);
+		setPath(postfix);
 	}
 
 	// --- CREATE NEW PROCESSOR ---
@@ -125,10 +141,19 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 				tmp.append("=\"");
 				tmp.append(sessionID);
 				tmp.append('\"');
-				if (postfix != null) {
-					tmp.append(postfix);
+				if (path != null) {
+					tmp.append(path);
 				}
 
+				HttpCookie sessionCookie = new HttpCookie(cookieName, sessionID);
+				sessionCookie.setPath(path);
+				if (maxAge > 0) {
+					sessionCookie.setMaxAge(maxAge);
+				}
+				
+				// Store sessionID in request
+				rsp.setProperty(PROPERTY_SESSION_ID, sessionID);
+				
 				// Set outgoing cookie
 				rsp.setHeader(SET_COOKIE, tmp.toString());
 
@@ -149,12 +174,12 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 		this.cookieName = Objects.requireNonNull(cookieName);
 	}
 
-	public String getPostfix() {
-		return postfix;
+	public String getPath() {
+		return path;
 	}
 
-	public void setPostfix(String path) {
-		this.postfix = path;
+	public void setPath(String path) {
+		this.path = path;
 	}
 
 }

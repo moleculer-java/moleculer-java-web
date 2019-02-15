@@ -164,11 +164,21 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 					}
 
 					@Override
+					public final int getStatus() {
+						return rsp.getStatus();
+					}
+					
+					@Override
 					public final void setHeader(String name, String value) {
 						rsp.setHeader(name, value);
 						headers.put(name, value);
 					}
 
+					@Override
+					public final String getHeader(String name) {
+						return headers.get(name);
+					}
+					
 					@Override
 					public final void send(byte[] bytes) throws IOException {
 						rsp.send(bytes);
@@ -178,9 +188,9 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 					}
 
 					@Override
-					public final void end() {
+					public final boolean end() {
 						long duration = System.nanoTime() - start;
-						rsp.end();
+						boolean ok = rsp.end();
 
 						// It's not known (but Servlet and Netty use HTTP1.1)
 						tmp.append("  HTTP/1.1 ");
@@ -217,6 +227,17 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 
 						// Write to log
 						logger.info(tmp.toString());
+						return ok;
+					}
+
+					@Override
+					public final void setProperty(String name, Object value) {
+						rsp.setProperty(name, value);
+					}
+
+					@Override
+					public final Object getProperty(String name) {
+						return rsp.getProperty(name);
 					}
 
 				});

@@ -42,6 +42,13 @@ public interface WebResponse {
 	public void setStatus(int code);
 
 	/**
+	 * Gets the current status code of this response.
+	 * 
+	 * @return the status code
+	 */
+	public int getStatus();
+
+	/**
 	 * Sets a response header with the given name and value. If the header had
 	 * already been set, the new value overwrites the previous one.
 	 * 
@@ -52,6 +59,20 @@ public interface WebResponse {
 	 *            encoded according to RFC 2047
 	 */
 	public void setHeader(String name, String value);
+
+	/**
+	 * Returns the value of the specified response header as a String. If the
+	 * response did not include a header of the specified name, this method
+	 * returns null. If there are multiple headers with the same name, this
+	 * method returns the first head in the response.
+	 * 
+	 * @param name
+	 *            name a String specifying the header name
+	 * 
+	 * @return a String containing the value of the response header, or null if
+	 *         the response does not have a header of that name
+	 */
+	public String getHeader(String name);
 
 	/**
 	 * Writes b.length bytes of body from the specified byte array to the output
@@ -66,7 +87,35 @@ public interface WebResponse {
 
 	/**
 	 * Completes the asynchronous operation that was started on the request.
+	 * 
+	 * @return first call of this method returns with true
 	 */
-	public void end();
+	public boolean end();
+
+	// --- CUSTOM PROPERTIES ---
+
+	/**
+	 * Associates the specified value with the specified "name" in this
+	 * WebResponse. If the WebResponse previously contained a mapping for the
+	 * "name", the old value is replaced.
+	 * 
+	 * @param name
+	 *            a "name" with which the specified value is to be associated
+	 * @param value
+	 *            value to be associated with the specified "name"
+	 */
+	public void setProperty(String name, Object value);
+
+	/**
+	 * Returns the value to which the specified "name" is mapped, or null if
+	 * this WebResponse contains no mapping for the "name".
+	 * 
+	 * @param name
+	 *            the "name" whose associated value is to be returned
+	 * 
+	 * @return the value to which the specified "name" is mapped, or null if
+	 *         this WebResponse contains no mapping for the "name"
+	 */
+	public Object getProperty(String name);
 
 }

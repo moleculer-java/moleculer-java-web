@@ -69,6 +69,11 @@ public interface HttpConstants {
 	public static final String CONTENT_TYPE_JSON = "application/json;charset=utf-8";
 	public static final String CONTENT_TYPE_HTML = "text/html;charset=utf-8";
 
+	// --- PROPERTY NAMES ---
+	
+	public static final String PROPERTY_SESSION_ID = "sid";
+	public static final String PROPERTY_COOKIES = "cookies";
+	
 	// --- SPECIAL VALUES IN META ---
 	
 	/**

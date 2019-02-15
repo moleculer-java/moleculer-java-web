@@ -1,66 +1,34 @@
-/**
- * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
- * <br>
- * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
- * Based on Moleculer Framework for NodeJS [https://moleculer.services].
- * <br><br>
- * Permission is hereby granted, free of charge, to any person obtaining
- * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including
- * without limitation the rights to use, copy, modify, merge, publish,
- * distribute, sublicense, and/or sell copies of the Software, and to
- * permit persons to whom the Software is furnished to do so, subject to
- * the following conditions:<br>
- * <br>
- * The above copyright notice and this permission notice shall be
- * included in all copies or substantial portions of the Software.<br>
- * <br>
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
- * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
- * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
- * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
-package services.moleculer.web.netty;
+package services.moleculer.web.servlet.response;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.HttpResponseStatus;
+import javax.servlet.ServletOutputStream;
+import javax.servlet.http.HttpServletResponse;
+
 import services.moleculer.web.WebResponse;
 
-public class NettyWebResponse implements WebResponse {
+public abstract class AbstractWebResponse implements WebResponse {
 
-	// --- REQUEST PROPERTIES ----
+	// --- RESPONSE VARIABLES ---
 
-	protected final ChannelHandlerContext ctx;
-	protected final NettyWebRequest req;
+	protected final HttpServletResponse rsp;	
+	protected final ServletOutputStream out;
+	protected final AtomicBoolean closed = new AtomicBoolean();
 
 	/**
 	 * Custom properties (for inter-middleware communication).
 	 */
 	protected HashMap<String, Object> properties;
 
-	// --- RESPONSE VARIABLES ---
-
-	protected int code = 200;
-	protected HashMap<String, String> headers;
-	protected AtomicBoolean first = new AtomicBoolean(true);
-
 	// --- CONSTRUCTOR ---
 
-	public NettyWebResponse(ChannelHandlerContext ctx, NettyWebRequest req) {
-		this.ctx = ctx;
-		this.req = req;
+	protected AbstractWebResponse(HttpServletResponse rsp) throws IOException {
+		this.rsp = rsp;
+		this.out = (ServletOutputStream) rsp.getOutputStream();
 	}
-
+	
 	// --- PUBLIC WEBRESPONSE METHODS ---
 
 	/**
@@ -75,7 +43,7 @@ public class NettyWebResponse implements WebResponse {
 	 */
 	@Override
 	public void setStatus(int code) {
-		this.code = code;
+		rsp.setStatus(code);
 	}
 
 	/**
@@ -85,7 +53,7 @@ public class NettyWebResponse implements WebResponse {
 	 */
 	@Override
 	public int getStatus() {
-		return code;
+		return rsp.getStatus();
 	}
 
 	/**
@@ -100,10 +68,7 @@ public class NettyWebResponse implements WebResponse {
 	 */
 	@Override
 	public void setHeader(String name, String value) {
-		if (headers == null) {
-			headers = new HashMap<>();
-		}
-		headers.put(name, value);
+		rsp.setHeader(name, value);
 	}
 
 	/**
@@ -120,10 +85,7 @@ public class NettyWebResponse implements WebResponse {
 	 */
 	@Override
 	public String getHeader(String name) {
-		if (headers == null) {
-			return null;
-		}
-		return headers.get(name);
+		return rsp.getHeader(name);
 	}
 
 	/**
@@ -136,57 +98,28 @@ public class NettyWebResponse implements WebResponse {
 	 *             if an I/O error occurs
 	 */
 	@Override
-	public void send(byte[] bytes) {
-		if (bytes != null && bytes.length > 0) {
-			sendHeaders();
-			ctx.write(Unpooled.wrappedBuffer(bytes));
-			ctx.flush();
-		}
+	public void send(byte[] bytes) throws IOException {
+		out.write(bytes);
+		out.flush();
 	}
-
+	
 	/**
-	 * Completes the asynchronous operation that was started on the request.
+	 * Completes the synchronous operation that was started on the request.
 	 * 
 	 * @return return true, if any resources are released
 	 */
 	@Override
 	public boolean end() {
-		sendHeaders();
-		if (req.parser != null) {
+		if (closed.compareAndSet(false, true)) {
 			try {
-				req.parser.close();
-			} catch (Exception ignored) {
+				out.close();
+			} catch (Throwable ignored) {
 			}
-			req.parser = null;
 			return true;
 		}
 		return false;
 	}
-
-	protected void sendHeaders() {
-		if (first.compareAndSet(true, false)) {
-			StringBuilder header = new StringBuilder();
-			if (code == 200) {
-				header.append("HTTP/1.1 200 Ok\r\n");
-			} else {
-				header.append("HTTP/1.1 ");
-				header.append(HttpResponseStatus.valueOf(code));
-				header.append("\r\n");
-			}
-			if (headers != null) {
-				for (Map.Entry<String, String> entry : headers.entrySet()) {
-					header.append(entry.getKey());
-					header.append(": ");
-					header.append(entry.getValue());
-					header.append("\r\n");
-				}
-			}
-			header.append("\r\n");
-			ctx.write(Unpooled.wrappedBuffer(header.toString().getBytes(StandardCharsets.UTF_8)));
-			ctx.flush();
-		}
-	}
-
+	
 	// --- CUSTOM PROPERTIES ---
 
 	/**
@@ -224,5 +157,5 @@ public class NettyWebResponse implements WebResponse {
 		}
 		return properties.get(name);
 	}
-
+	
 }

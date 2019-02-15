@@ -119,6 +119,11 @@ public class ResponseDeflater extends HttpMiddleware implements HttpConstants {
 					}
 
 					@Override
+					public final int getStatus() {
+						return rsp.getStatus();
+					}
+					
+					@Override
 					public final void setHeader(String name, String value) {
 						rsp.setHeader(name, value);
 						if (compressionSupported && !alreadyCompressed.get()) {
@@ -136,6 +141,11 @@ public class ResponseDeflater extends HttpMiddleware implements HttpConstants {
 					}
 
 					@Override
+					public final String getHeader(String name) {
+						return rsp.getHeader(name);
+					}
+					
+					@Override
 					public final void send(byte[] bytes) throws IOException {
 						if (compressionSupported && !alreadyCompressed.get()) {
 
@@ -150,7 +160,8 @@ public class ResponseDeflater extends HttpMiddleware implements HttpConstants {
 					}
 
 					@Override
-					public final void end() {
+					public final boolean end() {
+						boolean ok;
 						try {
 							if (compressionSupported && !alreadyCompressed.get()) {
 
@@ -165,8 +176,19 @@ public class ResponseDeflater extends HttpMiddleware implements HttpConstants {
 						} catch (IOException cause) {
 							logger.error("Unable to send compressed content!", cause);
 						} finally {
-							rsp.end();
+							ok = rsp.end();
 						}
+						return ok;
+					}
+
+					@Override
+					public final void setProperty(String name, Object value) {
+						rsp.setProperty(name, value);
+					}
+
+					@Override
+					public final Object getProperty(String name) {
+						return rsp.getProperty(name);
 					}
 
 				});

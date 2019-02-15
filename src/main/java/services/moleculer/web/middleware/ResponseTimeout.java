@@ -179,26 +179,46 @@ public class ResponseTimeout extends HttpMiddleware implements HttpConstants {
 				next.service(req, new WebResponse() {
 
 					@Override
-					public void setStatus(int code) {
+					public final void setStatus(int code) {
 						rsp.setStatus(code);
 					}
 
 					@Override
-					public void setHeader(String name, String value) {
+					public final int getStatus() {
+						return rsp.getStatus();
+					}
+					
+					@Override
+					public final void setHeader(String name, String value) {
 						rsp.setHeader(name, value);
 					}
 
 					@Override
-					public void send(byte[] bytes) throws IOException {
+					public final String getHeader(String name) {
+						return rsp.getHeader(name);
+					}
+					
+					@Override
+					public final void send(byte[] bytes) throws IOException {
 						rsp.send(bytes);
 					}
 
 					@Override
-					public void end() {
-						rsp.end();
+					public final boolean end() {
 						if (future != null) {
 							future.cancel(false);
 						}
+						return rsp.end();
+					}
+
+					@Override
+					public final void setProperty(String name, Object value) {
+						rsp.setProperty(name, value);
+					}
+
+					@Override
+					public final Object getProperty(String name) {
+						return rsp.getProperty(name);
 					}
 
 				});
