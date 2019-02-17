@@ -25,10 +25,14 @@
  */
 package services.moleculer.web.middleware;
 
+import static services.moleculer.web.common.GatewayUtils.getCookieValue;
+import static services.moleculer.web.common.GatewayUtils.setCookie;
+
+import java.net.HttpCookie;
+import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
-import java.util.Objects;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -45,7 +49,7 @@ import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 /**
- * This middleware adds  "X-XSRF-TOKEN" header to responses.
+ * This middleware adds "X-XSRF-TOKEN" header to responses.
  */
 @Name("XSRF Token")
 public class XSRFToken extends HttpMiddleware implements HttpConstants {
@@ -56,9 +60,35 @@ public class XSRFToken extends HttpMiddleware implements HttpConstants {
 
 	// --- PROPERTIES ---
 
+	/**
+	 * Name of the HTTP-header.
+	 */
 	protected String headerName = "X-XSRF-TOKEN";
+
+	/**
+	 * Name of the HTTP-cookie.
+	 */
+	protected String cookieName = "XSRF-TOKEN";
+
+	/**
+	 * Secret.
+	 */
 	protected String secret = Long.toHexString(Math.abs(System.nanoTime()));
-	protected long timeout = 3600000;
+
+	/**
+	 * Cookie path.
+	 */
+	protected String path = "/";
+
+	/**
+	 * Cookie / token timeout in SECONDS.
+	 */
+	protected long maxAge = 1800;
+
+	/**
+	 * Enable XSRF-TOKEN cookie.
+	 */
+	protected boolean enableCookie = true;
 
 	// --- THREAD-SAFE GENERATORS / VALIDATORS ---
 
@@ -69,14 +99,8 @@ public class XSRFToken extends HttpMiddleware implements HttpConstants {
 	public XSRFToken() {
 	}
 
-	public XSRFToken(long timeoutMillis) {
-		setTimeout(timeoutMillis);
-	}
-
-	public XSRFToken(long timeoutMillis, String headerName, String secret) {
-		setTimeout(timeoutMillis);
-		setHeaderName(headerName);
-		setSecret(secret);
+	public XSRFToken(long maxAge) {
+		setMaxAge(maxAge);
 	}
 
 	// --- TOKEN GENERATOR / VALIDATOR ---
@@ -86,16 +110,16 @@ public class XSRFToken extends HttpMiddleware implements HttpConstants {
 		// --- THREAD VARIABLES ---
 
 		protected final long timeout;
-		protected final Mac mac;
+		protected final Mac sha256;
 		protected final SecureRandom rnd;
 		protected final byte[] salt;
 
 		// --- CONSTRUCTOR ---
 
-		protected TokenHandler(String secret, long timeout) throws NoSuchAlgorithmException, InvalidKeyException {
-			this.timeout = timeout;
-			mac = Mac.getInstance("HmacSHA256");
-			mac.init(new SecretKeySpec(secret.getBytes(), "HmacSHA256"));
+		protected TokenHandler(String secret, long maxAge) throws NoSuchAlgorithmException, InvalidKeyException {
+			timeout = maxAge * 1000L;
+			sha256 = Mac.getInstance("HmacSHA256");
+			sha256.init(new SecretKeySpec(secret.getBytes(), "HmacSHA256"));
 			rnd = new SecureRandom();
 			salt = new byte[32];
 		}
@@ -105,7 +129,7 @@ public class XSRFToken extends HttpMiddleware implements HttpConstants {
 		protected String nextToken() throws NoSuchAlgorithmException {
 			rnd.nextBytes(salt);
 			String prefix = BASE64.encode(salt) + "." + Long.toString(System.currentTimeMillis());
-			String hash = BASE64.encode(mac.doFinal(prefix.getBytes()));
+			String hash = BASE64.encode(sha256.doFinal(prefix.getBytes(StandardCharsets.US_ASCII)));
 			return prefix + "." + hash;
 		}
 
@@ -127,7 +151,7 @@ public class XSRFToken extends HttpMiddleware implements HttpConstants {
 
 				// Create prefix and hash
 				String prefix = parts[0] + "." + parts[1];
-				String hash = BASE64.encode(mac.doFinal(prefix.getBytes()));
+				String hash = BASE64.encode(sha256.doFinal(prefix.getBytes(StandardCharsets.US_ASCII)));
 
 				// Check hash
 				if (!hash.equals(parts[2])) {
@@ -148,7 +172,7 @@ public class XSRFToken extends HttpMiddleware implements HttpConstants {
 	protected TokenHandler getThreadHandler() throws InvalidKeyException, NoSuchAlgorithmException {
 		TokenHandler handler = tokenHandlers.get();
 		if (handler == null) {
-			handler = new TokenHandler(secret, timeout);
+			handler = new TokenHandler(secret, maxAge);
 			tokenHandlers.set(handler);
 		}
 		return handler;
@@ -179,20 +203,16 @@ public class XSRFToken extends HttpMiddleware implements HttpConstants {
 
 				// Switch by method
 				switch (req.getMethod()) {
-				case GET:
-
-					// Set token and continue processing...
-					String token = getThreadHandler().nextToken();
-					rsp.setHeader(headerName, token);
-					break;
-
 				case POST:
 				case PUT:
 				case DELETE:
 				case PATCH:
 
 					// Validate mandatory token
-					token = req.getHeader(headerName);
+					String token = req.getHeader(headerName);
+					if ((token == null || token.isEmpty()) && enableCookie) {
+						token = getCookieValue(req, rsp, cookieName);
+					}
 					if (!getThreadHandler().isValid(token)) {
 
 						// Invalid token!
@@ -205,6 +225,20 @@ public class XSRFToken extends HttpMiddleware implements HttpConstants {
 						return;
 					}
 					break;
+
+				case GET:
+
+					// Generate new token and continue processing...
+					token = getThreadHandler().nextToken();
+					rsp.setHeader(headerName, token);
+					if (enableCookie) {
+						HttpCookie cookie = new HttpCookie(cookieName, token);
+						cookie.setPath(path);
+						cookie.setMaxAge(maxAge);
+						setCookie(req, rsp, cookie);
+					}
+					break;
+
 				default:
 					break;
 				}
@@ -217,28 +251,94 @@ public class XSRFToken extends HttpMiddleware implements HttpConstants {
 
 	// --- PROPERTY GETTERS AND SETTERS ---
 
+	/**
+	 * @return the cookieName
+	 */
+	public String getCookieName() {
+		return cookieName;
+	}
+
+	/**
+	 * @param cookieName
+	 *            the cookieName to set
+	 */
+	public void setCookieName(String cookieName) {
+		this.cookieName = cookieName;
+	}
+
+	/**
+	 * @return the path
+	 */
+	public String getPath() {
+		return path;
+	}
+
+	/**
+	 * @param path
+	 *            the path to set
+	 */
+	public void setPath(String path) {
+		this.path = path;
+	}
+
+	/**
+	 * @return the maxAge
+	 */
+	public long getMaxAge() {
+		return maxAge;
+	}
+
+	/**
+	 * @param maxAge
+	 *            the maxAge to set
+	 */
+	public void setMaxAge(long maxAge) {
+		this.maxAge = maxAge;
+	}
+
+	/**
+	 * @return the headerName
+	 */
 	public String getHeaderName() {
 		return headerName;
 	}
 
+	/**
+	 * @param headerName
+	 *            the headerName to set
+	 */
 	public void setHeaderName(String headerName) {
-		this.headerName = Objects.requireNonNull(headerName);
+		this.headerName = headerName;
 	}
 
+	/**
+	 * @return the secret
+	 */
 	public String getSecret() {
 		return secret;
 	}
 
+	/**
+	 * @param secret
+	 *            the secret to set
+	 */
 	public void setSecret(String secret) {
-		this.secret = Objects.requireNonNull(secret);
+		this.secret = secret;
 	}
 
-	public long getTimeout() {
-		return timeout;
+	/**
+	 * @return the enableCookie
+	 */
+	public boolean isEnableCookie() {
+		return enableCookie;
 	}
 
-	public void setTimeout(long timeoutMillis) {
-		this.timeout = timeoutMillis;
+	/**
+	 * @param enableCookie
+	 *            the enableCookie to set
+	 */
+	public void setEnableCookie(boolean enableCookie) {
+		this.enableCookie = enableCookie;
 	}
 
 }

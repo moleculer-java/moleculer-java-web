@@ -28,8 +28,11 @@ package services.moleculer.web.common;
 import static services.moleculer.util.CommonUtils.readFully;
 
 import java.io.File;
+import java.net.HttpCookie;
 import java.net.URI;
 import java.net.URL;
+import java.util.HashMap;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,13 +42,21 @@ import io.datatree.dom.Cache;
 import services.moleculer.ServiceBroker;
 import services.moleculer.service.Service;
 import services.moleculer.service.ServiceRegistry;
+import services.moleculer.web.WebRequest;
+import services.moleculer.web.WebResponse;
 import services.moleculer.web.middleware.ServeStatic;
 
-public final class GatewayUtils {
+public final class GatewayUtils implements HttpConstants {
 
 	// --- LOGGER ---
 
 	private static final Logger logger = LoggerFactory.getLogger(GatewayUtils.class);
+
+	// --- CACHES ---
+	
+	protected static final Cache<String, URL> urlCache = new Cache<>(2048);
+
+	protected static final long jarTimestamp = System.currentTimeMillis();
 
 	// --- FIND SERVICE BY CLASS ---
 
@@ -65,11 +76,73 @@ public final class GatewayUtils {
 		return null;
 	}
 
+	// --- COOKIE HANDLERS ---
+
+	public static final String getCookieValue(WebRequest req, WebResponse rsp, String name) {
+		HttpCookie cookie = getCookieMap(req, rsp).get(name);
+		if (cookie == null) {
+			return null;
+		}
+		return cookie.getValue();
+	}
+
+	public static final HttpCookie getCookie(WebRequest req, WebResponse rsp, String name) {
+		return getCookieMap(req, rsp).get(name);		
+	}
+
+	private static final HashMap<String, HttpCookie> getCookieMap(WebRequest req, WebResponse rsp) {
+		
+		// Get from properties
+		@SuppressWarnings("unchecked")
+		HashMap<String, HttpCookie> cookies = (HashMap<String, HttpCookie>) rsp.getProperty(PROPERTY_COOKIES);
+		if (cookies != null) {
+			return cookies;
+		}
+		
+		// Parse cookies
+		cookies = new HashMap<String, HttpCookie>();
+
+		// Get from response
+		String headerValue = req.getHeader(COOKIE);
+		if (headerValue != null) {
+			parseCookies(cookies, headerValue);
+		}
+
+		// Get from response
+		headerValue = rsp.getHeader(SET_COOKIE);
+		if (headerValue != null) {
+			parseCookies(cookies, headerValue);
+		}
+		
+		// Store cookie map
+		rsp.setProperty(PROPERTY_COOKIES, cookies);
+		return cookies;
+	}
+	
+	private static final void parseCookies(HashMap<String, HttpCookie> cookies, String headerValue) {
+		List<HttpCookie> list = HttpCookie.parse(headerValue);
+		for (HttpCookie cookie: list) {
+			cookies.put(cookie.getName(), cookie);
+		}
+	}
+	
+	public static final void setCookie(WebRequest req, WebResponse rsp, HttpCookie cookie) {
+		HashMap<String, HttpCookie> cookies = getCookieMap(req, rsp);
+		cookies.put(cookie.getName(), cookie);
+		
+		// Set new "Set-Cookie" header
+		StringBuilder tmp = new StringBuilder(128);
+		for (HttpCookie c: cookies.values()) {
+			tmp.append(c.toString()).append(',');
+		}
+		int len = tmp.length();
+		if (len > 0) {
+			tmp.setLength(len - 1);
+		}
+		rsp.setHeader(SET_COOKIE, tmp.toString());
+	}	
+	
 	// --- FILE HANDLERS ---
-
-	protected static final Cache<String, URL> urlCache = new Cache<>(2048);
-
-	protected static final long jarTimestamp = System.currentTimeMillis();
 
 	public static final boolean isReadable(String path) {
 		try {

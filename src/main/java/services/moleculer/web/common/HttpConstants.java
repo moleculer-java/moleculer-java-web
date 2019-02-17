@@ -73,6 +73,7 @@ public interface HttpConstants {
 	
 	public static final String PROPERTY_SESSION_ID = "sid";
 	public static final String PROPERTY_COOKIES = "cookies";
+	public static final String PROPERTY_USER = "user";
 	
 	// --- SPECIAL VALUES IN META ---
 	

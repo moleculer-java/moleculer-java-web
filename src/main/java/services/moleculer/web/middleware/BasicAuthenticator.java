@@ -68,7 +68,7 @@ public class BasicAuthenticator extends HttpMiddleware implements HttpConstants,
 
 	// --- LOGIN CACHE ---
 
-	protected Cache<String, Boolean> cache = new Cache<>(64);
+	protected Cache<String, String> cache = new Cache<>(64);
 
 	// --- CONSTRUCTORS ---
 
@@ -122,13 +122,13 @@ public class BasicAuthenticator extends HttpMiddleware implements HttpConstants,
 				try {
 
 					// Get from cache
-					Boolean ok = null;
+					String username = null;
 					if (maxCachedLogins > 0) {
-						ok = cache.get(authorization);
+						username = cache.get(authorization);
 					}
 
 					// Parse header
-					if (ok == null) {
+					if (username == null) {
 						String[] tokens = authorization.split(" ");
 						if (tokens.length != 2) {
 							sendUnauthorized(rsp);
@@ -136,7 +136,7 @@ public class BasicAuthenticator extends HttpMiddleware implements HttpConstants,
 						}
 						String login = new String(BASE64.decode(tokens[1]));
 						int i = login.indexOf(":");
-						String username, password;
+						String password;
 						if (i > -1) {
 							username = login.substring(0, i);
 							password = login.substring(i + 1);
@@ -144,17 +144,23 @@ public class BasicAuthenticator extends HttpMiddleware implements HttpConstants,
 							username = login;
 							password = "";
 						}
-						ok = provider.authenticate(broker, username, password);
-						if (maxCachedLogins > 0) {
-							cache.put(authorization, ok);
+						if (provider.authenticate(broker, username, password)) {
+							if (maxCachedLogins > 0) {
+								cache.put(authorization, username);
+							}							
+						} else {
+							username = null;
 						}
 					}
 
 					// Check response
-					if (!ok) {
+					if (username == null) {
 						sendUnauthorized(rsp);
 						return;
 					}
+					
+					// Store username in properties
+					rsp.setProperty(PROPERTY_USER, username);
 
 				} catch (Throwable cause) {
 					logger.error("Unable to parse \"Authorization\" header!", cause);

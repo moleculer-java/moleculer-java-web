@@ -25,15 +25,12 @@
  */
 package services.moleculer.web.middleware;
 
-import java.lang.ref.PhantomReference;
-import java.lang.ref.SoftReference;
-import java.lang.ref.WeakReference;
+import static services.moleculer.web.common.GatewayUtils.getCookieValue;
+import static services.moleculer.web.common.GatewayUtils.setCookie;
+
 import java.net.HttpCookie;
-import java.util.Hashtable;
-import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.WeakHashMap;
 
 import io.datatree.Tree;
 import services.moleculer.service.Name;
@@ -102,60 +99,24 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 			@Override
 			public void service(WebRequest req, WebResponse rsp) throws Exception {
 
-				// Get cookie's value
-				String headerValue = req.getHeader(COOKIE);
-
 				// Get sessionID
-				String sessionID = null;
-				List<HttpCookie> httpCookies = null;
-				if (headerValue != null && !headerValue.isEmpty()) {
-					httpCookies = HttpCookie.parse(headerValue);
-					for (HttpCookie httpCookie : httpCookies) {
-						if (cookieName.equals(httpCookie.getName())) {
-							sessionID = httpCookie.getValue();
-							break;
-						}
-					}
-				}
+				String sessionID = getCookieValue(req, rsp, cookieName);
 
 				// Generate new sessionID
 				if (sessionID == null || sessionID.isEmpty()) {
 					sessionID = UUID.randomUUID().toString();
-				}
-
-				// Create "Set-Cookie" header
-				StringBuilder tmp = new StringBuilder(128);
-				if (httpCookies != null) {
 					
-					// Add other cookies
-					for (HttpCookie httpCookie : httpCookies) {
-						if (!cookieName.equals(httpCookie.getName())) {
-							tmp.append(httpCookie.toString());
-							tmp.append(',');
-						}
+					// Set new cookie
+					HttpCookie cookie = new HttpCookie(cookieName, sessionID);
+					cookie.setPath(path);
+					if (maxAge > 0) {
+						cookie.setMaxAge(maxAge);
 					}
-				}
-				
-				// Add session cookie
-				tmp.append(cookieName);
-				tmp.append("=\"");
-				tmp.append(sessionID);
-				tmp.append('\"');
-				if (path != null) {
-					tmp.append(path);
+					setCookie(req, rsp, cookie);
 				}
 
-				HttpCookie sessionCookie = new HttpCookie(cookieName, sessionID);
-				sessionCookie.setPath(path);
-				if (maxAge > 0) {
-					sessionCookie.setMaxAge(maxAge);
-				}
-				
 				// Store sessionID in request
 				rsp.setProperty(PROPERTY_SESSION_ID, sessionID);
-				
-				// Set outgoing cookie
-				rsp.setHeader(SET_COOKIE, tmp.toString());
 
 				// Invoke next handler
 				next.service(req, rsp);
