@@ -25,12 +25,12 @@
  */
 package services.moleculer.web.middleware;
 
-import static services.moleculer.web.common.GatewayUtils.getCookieValue;
+import static services.moleculer.web.common.GatewayUtils.getCookie;
 import static services.moleculer.web.common.GatewayUtils.setCookie;
 
 import java.net.HttpCookie;
 import java.util.Objects;
-import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 import io.datatree.Tree;
 import services.moleculer.service.Name;
@@ -44,7 +44,7 @@ import services.moleculer.web.common.HttpConstants;
  */
 @Name("Session Cookie Handler")
 public class SessionCookie extends HttpMiddleware implements HttpConstants {
-	
+
 	// --- PROPERTIES ---
 
 	/**
@@ -56,12 +56,18 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 	 * Cookie path.
 	 */
 	protected String path = "/";
-	
+
 	/**
 	 * Cookie timeout in SECONDS (0 = no timeout).
 	 */
 	protected long maxAge = 0;
 
+	// --- VARIABLES ---
+
+	protected AtomicLong rnd = new AtomicLong(System.nanoTime());
+
+	protected AtomicLong seq = new AtomicLong();
+	
 	// --- CONSTRUCTORS ---
 
 	public SessionCookie() {
@@ -69,11 +75,6 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 
 	public SessionCookie(String cookieName) {
 		setCookieName(cookieName);
-	}
-
-	public SessionCookie(String cookieName, String postfix) {
-		setCookieName(cookieName);
-		setPath(postfix);
 	}
 
 	// --- CREATE NEW PROCESSOR ---
@@ -86,34 +87,44 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 			 * Handles request of the HTTP client.
 			 * 
 			 * @param req
-			 *            WebRequest object that contains the request the client made of
-			 *            the ApiGateway
+			 *            WebRequest object that contains the request the client
+			 *            made of the ApiGateway
 			 * @param rsp
-			 *            WebResponse object that contains the response the ApiGateway
-			 *            returns to the client
+			 *            WebResponse object that contains the response the
+			 *            ApiGateway returns to the client
 			 * 
 			 * @throws Exception
-			 *             if an input or output error occurs while the ApiGateway is
-			 *             handling the HTTP request
+			 *             if an input or output error occurs while the
+			 *             ApiGateway is handling the HTTP request
 			 */
 			@Override
 			public void service(WebRequest req, WebResponse rsp) throws Exception {
 
 				// Get sessionID
-				String sessionID = getCookieValue(req, rsp, cookieName);
+				HttpCookie cookie = getCookie(req, rsp, cookieName);
 
-				// Generate new sessionID
-				if (sessionID == null || sessionID.isEmpty()) {
-					sessionID = UUID.randomUUID().toString();
-					
+				// Has cookie?
+				String sessionID;
+				if (cookie == null) {
+
+					// Generate new sessionID
+					sessionID = nextID();
+
 					// Set new cookie
-					HttpCookie cookie = new HttpCookie(cookieName, sessionID);
+					cookie = new HttpCookie(cookieName, sessionID);
 					cookie.setPath(path);
 					if (maxAge > 0) {
 						cookie.setMaxAge(maxAge);
 					}
-					setCookie(req, rsp, cookie);
+
+				} else {
+
+					// Get the value
+					sessionID = cookie.getValue();
 				}
+
+				// Write cookie into response
+				setCookie(req, rsp, cookie);
 
 				// Store sessionID in request
 				rsp.setProperty(PROPERTY_SESSION_ID, sessionID);
@@ -123,6 +134,25 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 			}
 
 		};
+	}
+
+	// --- SESSION-ID GENERATOR ---
+
+	protected String nextID() {
+
+		// Generate pseudo random long (XORShift is the fastest random method)
+		long start;
+		long next;
+		do {
+			start = rnd.get();
+			next = start + 1;
+			next ^= (next << 21);
+			next ^= (next >>> 35);
+			next ^= (next << 4);
+		} while (!rnd.compareAndSet(start, next));
+
+		// Add sequence prefix
+		return Long.toString(seq.incrementAndGet(), 36) + '|' + Long.toString(next, 36);
 	}
 
 	// --- PROPERTY GETTERS AND SETTERS ---
