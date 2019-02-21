@@ -109,6 +109,23 @@ dependencies {
 	// https://mvnrepository.com/artifact/org.synchronoss.cloud/nio-multipart-parser
 	compile group: 'org.synchronoss.cloud', name: 'nio-multipart-parser', version: '1.1.0'
 
+	// ========== TEMPLATE ENGINES =============
+	
+	// --- FREEMAKER ENGINE ---
+	
+	// https://mvnrepository.com/artifact/org.freemarker/freemarker
+	compile group: 'org.freemarker', name: 'freemarker', version: '2.3.28'
+	
+	// --- JADE ---
+	
+	// https://mvnrepository.com/artifact/de.neuland-bfi/jade4j
+	compile group: 'de.neuland-bfi', name: 'jade4j', version: '1.2.7'
+
+	// --- MUSTACHE ---
+		
+	// https://mvnrepository.com/artifact/com.github.spullara.mustache.java/compiler
+	compile group: 'com.github.spullara.mustache.java', name: 'compiler', version: '0.9.6'
+
 }
 
 nexus {
