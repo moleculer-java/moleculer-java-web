@@ -28,15 +28,16 @@ package services.moleculer.web.template;
 import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.ConcurrentHashMap;
 
-import com.github.mustachejava.DefaultMustacheFactory;
-import com.github.mustachejava.Mustache;
-
+import freemarker.cache.NullCacheStorage;
+import freemarker.cache.StrongCacheStorage;
+import freemarker.template.Configuration;
+import freemarker.template.Version;
 import io.datatree.Tree;
-import services.moleculer.web.template.mustache.MustacheLoader;
+import services.moleculer.web.template.freemaker.FreeMakerLoader;
+import services.moleculer.web.template.freemaker.FreeMakerTreeWrapper;
 
-public class MustacheTemplateEngine implements TemplateEngine {
+public class FreeMakerEngine extends Configuration implements TemplateEngine {
 
 	// --- VARIABLES ---
 
@@ -44,70 +45,47 @@ public class MustacheTemplateEngine implements TemplateEngine {
 
 	protected int writeBufferSize = 2048;
 
-	protected DefaultMustacheFactory sharedFactory;
-
-	protected MustacheLoader loader = new MustacheLoader();
-
-	protected ConcurrentHashMap<String, Mustache> eternalCache = new ConcurrentHashMap<>(512, 0.75f, 128);
+	protected FreeMakerLoader loader = new FreeMakerLoader();
 
 	protected Charset charset = StandardCharsets.UTF_8;
 
 	// --- CONSTRUCTOR ---
 
-	public MustacheTemplateEngine() {
-		sharedFactory = new DefaultMustacheFactory(loader);
+	public FreeMakerEngine() {
+		this(DEFAULT_INCOMPATIBLE_IMPROVEMENTS);
+	}
+
+	public FreeMakerEngine(Version incompatibleImprovements) {
+		super(incompatibleImprovements);
+		setObjectWrapper(new FreeMakerTreeWrapper());
+		setTemplateLoader(loader);
+		setReloadable(false);
+		setLocalizedLookup(false);
+		setEncoding(getLocale(), "UTF-8");
 	}
 
 	// --- TRANSFORM JSON TO HTML ---
 
 	@Override
 	public byte[] transform(String templatePath, Tree data) throws Exception {
-		Mustache template = null;
-		if (reloadable) {
-
-			// Slow method (it disables internal cache of
-			// DefaultMustacheFactory)
-			DefaultMustacheFactory pageFactory = new DefaultMustacheFactory(loader);
-			template = pageFactory.compile(templatePath);
-
-		} else {
-
-			// Fast method (all templates are cached)
-			template = eternalCache.get(templatePath);
-			if (template == null) {
-				template = sharedFactory.compile(templatePath);
-				if (template != null) {
-					eternalCache.put(templatePath, template);
-				}
-			}
-
-		}
 		StringWriter out = new StringWriter(writeBufferSize);
-		template.execute(out, data.asObject());
+		getTemplate(templatePath).process(data, out);
 		return out.toString().getBytes(charset);
-	}
-
-	// --- ROOT PATH OF TEMPLATES ---
-
-	@Override
-	public void setTemplatePath(String templatePath) {
-		loader.setTemplatePath(templatePath);
-	}
-
-	public String getTemplatePath() {
-		return loader.getTemplatePath();
 	}
 
 	// --- CHARACTER ENCODING OF TEMPLATES ---
 
 	public Charset getCharset() {
+		charset = Charset.forName(getEncoding(getLocale()));
 		return charset;
 	}
 
 	@Override
 	public void setCharset(Charset charset) {
-		this.charset = charset;
-		loader.setCharset(charset);
+		if (!this.charset.equals(charset)) {
+			setEncoding(getLocale(), charset.name());
+			this.charset = charset;
+		}
 	}
 
 	// --- ENABLE / DISABLE RELOADING ---
@@ -120,10 +98,25 @@ public class MustacheTemplateEngine implements TemplateEngine {
 		if (this.reloadable != reloadable) {
 			this.reloadable = reloadable;
 			if (reloadable) {
-				eternalCache.clear();
+				setCacheStorage(new NullCacheStorage());
+			} else {
+				setCacheStorage(new StrongCacheStorage());
 			}
 		}
 	}
+
+	// --- ROOT PATH OF TEMPLATES ---
+
+	public String getTemplatePath() {
+		return loader.getTemplatePath();
+	}
+
+	@Override
+	public void setTemplatePath(String templatePath) {
+		loader.setTemplatePath(templatePath);
+	}
+
+	// --- INITIAL SIZE OF WRITE BUFFER ---
 
 	public int getWriteBufferSize() {
 		return writeBufferSize;

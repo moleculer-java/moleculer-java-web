@@ -25,45 +25,38 @@
  */
 package services.moleculer.web.template.freemaker;
 
+import freemarker.template.TemplateModel;
 import freemarker.template.TemplateModelException;
-import freemarker.template.TemplateNodeModel;
 import freemarker.template.TemplateSequenceModel;
 import io.datatree.Tree;
 
-public class FreemakerTreeModel extends FreemakerAbstractModel implements TemplateNodeModel {
+public class FreeMakerTreeSequenceModel extends FreeMakerAbstractModel implements TemplateSequenceModel {
+
+	// --- WRAPPED SEQUENCE ---
+
+	protected Tree[] children;
 
 	// --- CONSTRUCTOR ---
 
-	protected FreemakerTreeModel(Tree node) {
+	public FreeMakerTreeSequenceModel(Tree node) {
 		super(node);
+		Tree[] children = new Tree[node.size()];
+		int i = 0;
+		for (Tree child : node) {
+			children[i++] = child;
+		}
 	}
 
-	// --- NODE MODEL IMPLEMENTATION ---
+	// --- SEQUENCE MODEL IMPLEMENTATION ---
 
 	@Override
-	public String getNodeNamespace() throws TemplateModelException {
-		return null;
-	}
-
-	@Override
-	public String getNodeName() throws TemplateModelException {
-		return node.getName();
-	}
-
-	@Override
-	public String getNodeType() throws TemplateModelException {
-		return node.getName();
+	public int size() throws TemplateModelException {
+		return children.length;
 	}
 
 	@Override
-	public TemplateNodeModel getParentNode() throws TemplateModelException {
-		Tree parent = node.getParent();
-		return parent == null ? null : new FreemakerTreeModel(parent);
+	public TemplateModel get(int index) throws TemplateModelException {
+		return nodeToModel(children[index]);
 	}
-
-	@Override
-	public TemplateSequenceModel getChildNodes() throws TemplateModelException {
-		return new FreemakerTreeSequenceModel(node);
-	}
-
+	
 }

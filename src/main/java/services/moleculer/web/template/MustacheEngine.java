@@ -30,16 +30,13 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ConcurrentHashMap;
 
-import freemarker.cache.NullCacheStorage;
-import freemarker.cache.StrongCacheStorage;
-import freemarker.template.Configuration;
-import freemarker.template.Template;
-import freemarker.template.Version;
-import io.datatree.Tree;
-import services.moleculer.web.template.freemaker.FreemakerLoader;
-import services.moleculer.web.template.freemaker.FreemakerTreeWrapper;
+import com.github.mustachejava.DefaultMustacheFactory;
+import com.github.mustachejava.Mustache;
 
-public class FreemakerTemplateEngine extends Configuration implements TemplateEngine {
+import io.datatree.Tree;
+import services.moleculer.web.template.mustache.MustacheLoader;
+
+public class MustacheEngine implements TemplateEngine {
 
 	// --- VARIABLES ---
 
@@ -47,72 +44,70 @@ public class FreemakerTemplateEngine extends Configuration implements TemplateEn
 
 	protected int writeBufferSize = 2048;
 
-	protected ConcurrentHashMap<String, Template> eternalCache = new ConcurrentHashMap<>(512, 0.75f,
-			128);
+	protected DefaultMustacheFactory sharedFactory;
 
-	protected FreemakerLoader loader = new FreemakerLoader();
+	protected MustacheLoader loader = new MustacheLoader();
+
+	protected ConcurrentHashMap<String, Mustache> eternalCache = new ConcurrentHashMap<>(512, 0.75f, 128);
 
 	protected Charset charset = StandardCharsets.UTF_8;
 
 	// --- CONSTRUCTOR ---
 
-	public FreemakerTemplateEngine() {
-		this(DEFAULT_INCOMPATIBLE_IMPROVEMENTS);
-	}
-
-	public FreemakerTemplateEngine(Version incompatibleImprovements) {
-		super(incompatibleImprovements);
-
-		// Set Tree property wrapper
-		setObjectWrapper(new FreemakerTreeWrapper());
-
-		// Set template loader
-		setTemplateLoader(loader);
-
-		// Disable internal cache by default
-		setReloadable(false);
-
-		// Disable localized lookups by default
-		setLocalizedLookup(false);
-
-		// Set the default encoding to UTF-8
-		setEncoding(getLocale(), "UTF-8");
+	public MustacheEngine() {
+		sharedFactory = new DefaultMustacheFactory(loader);
 	}
 
 	// --- TRANSFORM JSON TO HTML ---
 
 	@Override
 	public byte[] transform(String templatePath, Tree data) throws Exception {
-		Template template = null;
+		Mustache template = null;
 		if (reloadable) {
-			template = getTemplate(templatePath);
+
+			// Slow method (it disables internal cache of
+			// DefaultMustacheFactory)
+			DefaultMustacheFactory pageFactory = new DefaultMustacheFactory(loader);
+			template = pageFactory.compile(templatePath);
+
 		} else {
+
+			// Fast method (all templates are cached)
 			template = eternalCache.get(templatePath);
 			if (template == null) {
-				template = getTemplate(templatePath);
+				template = sharedFactory.compile(templatePath);
 				if (template != null) {
 					eternalCache.put(templatePath, template);
 				}
-			}			
+			}
+
 		}
 		StringWriter out = new StringWriter(writeBufferSize);
-		template.process(data, out);
+		template.execute(out, data.asObject());
 		return out.toString().getBytes(charset);
+	}
+
+	// --- ROOT PATH OF TEMPLATES ---
+
+	@Override
+	public void setTemplatePath(String templatePath) {
+		loader.setTemplatePath(templatePath);
+	}
+
+	public String getTemplatePath() {
+		return loader.getTemplatePath();
 	}
 
 	// --- CHARACTER ENCODING OF TEMPLATES ---
 
 	public Charset getCharset() {
-		charset = Charset.forName(getEncoding(getLocale()));
 		return charset;
 	}
 
 	@Override
 	public void setCharset(Charset charset) {
-		if (!this.charset.equals(charset)) {
-			setEncoding(getLocale(), charset.name());
-			this.charset = charset;
-		}
+		this.charset = charset;
+		loader.setCharset(charset);
 	}
 
 	// --- ENABLE / DISABLE RELOADING ---
@@ -126,25 +121,9 @@ public class FreemakerTemplateEngine extends Configuration implements TemplateEn
 			this.reloadable = reloadable;
 			if (reloadable) {
 				eternalCache.clear();
-				setCacheStorage(new NullCacheStorage());
-			} else {
-				setCacheStorage(new StrongCacheStorage());
 			}
 		}
 	}
-
-	// --- ROOT PATH OF TEMPLATES ---
-
-	public String getTemplatePath() {
-		return loader.getTemplatePath();
-	}
-
-	@Override
-	public void setTemplatePath(String templatePath) {
-		loader.setTemplatePath(templatePath);
-	}
-
-	// --- INITIAL SIZE OF WRITE BUFFER ---
 
 	public int getWriteBufferSize() {
 		return writeBufferSize;

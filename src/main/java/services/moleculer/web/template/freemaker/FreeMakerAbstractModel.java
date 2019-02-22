@@ -36,7 +36,7 @@ import freemarker.template.TemplateNumberModel;
 import freemarker.template.TemplateScalarModel;
 import io.datatree.Tree;
 
-public class FreemakerAbstractModel implements TemplateHashModel {
+public class FreeMakerAbstractModel implements TemplateHashModel {
 
 	// --- WRAPPED DATA STRUCTURE ---
 
@@ -44,7 +44,7 @@ public class FreemakerAbstractModel implements TemplateHashModel {
 
 	// --- CONSTRUCTOR ---
 
-	protected FreemakerAbstractModel(Tree node) {
+	protected FreeMakerAbstractModel(Tree node) {
 		this.node = node;
 	}
 
@@ -67,10 +67,10 @@ public class FreemakerAbstractModel implements TemplateHashModel {
 			return null;
 		}
 		if (node.isMap()) {
-			return new FreemakerTreeModel(node);
+			return new FreeMakerTreeModel(node);
 		}
 		if (node.isEnumeration()) {
-			return new FreemakerTreeSequenceModel(node);
+			return new FreeMakerTreeSequenceModel(node);
 		}
 		Object value = node.asObject();
 		if (value instanceof Boolean) {

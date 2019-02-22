@@ -1,5 +1,4 @@
 /**
-/**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
  * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
@@ -24,17 +23,32 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package services.moleculer.web.template.freemaker;
+package services.moleculer.web.template.thymeleaf;
 
-import freemarker.template.ObjectWrapper;
-import freemarker.template.TemplateModel;
-import io.datatree.Tree;
+import static services.moleculer.web.common.GatewayUtils.readAllBytes;
 
-public class FreemakerTreeWrapper implements ObjectWrapper {
+import java.util.Map;
+
+import org.thymeleaf.IEngineConfiguration;
+import org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver;
+import org.thymeleaf.templateresource.ITemplateResource;
+import org.thymeleaf.templateresource.StringTemplateResource;
+
+public class ThymeleafLoader extends AbstractConfigurableTemplateResolver {
 
 	@Override
-	public TemplateModel wrap(Object obj) {
-		return new FreemakerTreeModel((Tree) obj);
+	protected ITemplateResource computeTemplateResource(IEngineConfiguration configuration, String ownerTemplate,
+			String template, String resourceName, String characterEncoding,
+			Map<String, Object> templateResolutionAttributes) {
+		String path = template.replace('\\', '/');
+		byte[] bytes = readAllBytes(path);
+		String source;
+		try {
+			source = new String(bytes, characterEncoding);
+		} catch (Exception cause) {
+			source = String.valueOf(cause);
+		}
+		return new StringTemplateResource(source);
 	}
-	
+
 }

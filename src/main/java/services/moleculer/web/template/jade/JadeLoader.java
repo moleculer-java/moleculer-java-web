@@ -37,7 +37,7 @@ import java.nio.charset.StandardCharsets;
 
 import de.neuland.jade4j.template.TemplateLoader;
 
-public class JadeTemplateLoader implements TemplateLoader {
+public class JadeLoader implements TemplateLoader {
 
 	// --- VARIABLES ---
 

@@ -34,9 +34,9 @@ import java.util.Map;
 import de.neuland.jade4j.JadeConfiguration;
 import de.neuland.jade4j.template.JadeTemplate;
 import io.datatree.Tree;
-import services.moleculer.web.template.jade.JadeTemplateLoader;
+import services.moleculer.web.template.jade.JadeLoader;
 
-public class JadeTemplateEngine extends JadeConfiguration implements TemplateEngine {
+public class JadeEngine extends JadeConfiguration implements TemplateEngine {
 
 	// --- VARIABLES ---
 	
@@ -44,11 +44,11 @@ public class JadeTemplateEngine extends JadeConfiguration implements TemplateEng
 	
 	protected int writeBufferSize = 2048;
 	
-	protected JadeTemplateLoader loader = new JadeTemplateLoader();
+	protected JadeLoader loader = new JadeLoader();
 	
 	// --- CONSTRUCTOR ---
 	
-	public JadeTemplateEngine() {
+	public JadeEngine() {
 		super();
 
 		// Set template loader

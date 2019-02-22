@@ -111,7 +111,7 @@ dependencies {
 
 	// ========== TEMPLATE ENGINES =============
 	
-	// --- FREEMAKER ENGINE ---
+	// --- FREEMAKER ---
 	
 	// https://mvnrepository.com/artifact/org.freemarker/freemarker
 	compile group: 'org.freemarker', name: 'freemarker', version: '2.3.28'
@@ -125,6 +125,11 @@ dependencies {
 		
 	// https://mvnrepository.com/artifact/com.github.spullara.mustache.java/compiler
 	compile group: 'com.github.spullara.mustache.java', name: 'compiler', version: '0.9.6'
+
+	// --- THYMELEAF ---
+	
+	// https://mvnrepository.com/artifact/org.thymeleaf/thymeleaf
+	compile group: 'org.thymeleaf', name: 'thymeleaf', version: '3.0.11.RELEASE'
 
 }
 

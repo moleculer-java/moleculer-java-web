@@ -35,7 +35,7 @@ import java.io.StringReader;
 
 import freemarker.cache.TemplateLoader;
 
-public class FreemakerLoader implements TemplateLoader {
+public class FreeMakerLoader implements TemplateLoader {
 
 	// --- VARIABLES ---
 	

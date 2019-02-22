@@ -273,17 +273,6 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 			rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_JSON);
 		}
 
-		// Empty body
-		if (out == null || out.isEmpty()) {
-			try {
-				rsp.setHeader(CONTENT_LENGTH, "2");
-				rsp.send(new byte[] { '{', '}' });
-			} finally {
-				rsp.end();
-			}
-			return;
-		}
-
 		// Send body
 		Object object = out.asObject();
 		if (object != null && object instanceof PacketStream) {
@@ -315,6 +304,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 				// TODO Invoke TemplateEngine
 
+				// TODO out can be null!
 				body = jsonSerializer.toBinary(out.asObject(), null, false);
 			} catch (Throwable cause) {
 				sendResponse(rsp, cause);

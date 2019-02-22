@@ -1,4 +1,5 @@
 /**
+/**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
  * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
@@ -25,38 +26,15 @@
  */
 package services.moleculer.web.template.freemaker;
 
+import freemarker.template.ObjectWrapper;
 import freemarker.template.TemplateModel;
-import freemarker.template.TemplateModelException;
-import freemarker.template.TemplateSequenceModel;
 import io.datatree.Tree;
 
-public class FreemakerTreeSequenceModel extends FreemakerAbstractModel implements TemplateSequenceModel {
-
-	// --- WRAPPED SEQUENCE ---
-
-	protected Tree[] children;
-
-	// --- CONSTRUCTOR ---
-
-	public FreemakerTreeSequenceModel(Tree node) {
-		super(node);
-		Tree[] children = new Tree[node.size()];
-		int i = 0;
-		for (Tree child : node) {
-			children[i++] = child;
-		}
-	}
-
-	// --- SEQUENCE MODEL IMPLEMENTATION ---
+public class FreeMakerTreeWrapper implements ObjectWrapper {
 
 	@Override
-	public int size() throws TemplateModelException {
-		return children.length;
-	}
-
-	@Override
-	public TemplateModel get(int index) throws TemplateModelException {
-		return nodeToModel(children[index]);
+	public TemplateModel wrap(Object obj) {
+		return new FreeMakerTreeModel((Tree) obj);
 	}
 	
 }
