@@ -131,6 +131,16 @@ dependencies {
 	// https://mvnrepository.com/artifact/org.thymeleaf/thymeleaf
 	compile group: 'org.thymeleaf', name: 'thymeleaf', version: '3.0.11.RELEASE'
 
+	// --- HTTL ---
+	
+	// https://mvnrepository.com/artifact/com.github.httl/httl
+	compile group: 'com.github.httl', name: 'httl', version: '1.0.11'
+
+	// --- PEBBLE ---
+	
+	// https://mvnrepository.com/artifact/com.mitchellbosecke/pebble
+	compile group: 'com.mitchellbosecke', name: 'pebble', version: '2.4.0'
+
 }
 
 nexus {

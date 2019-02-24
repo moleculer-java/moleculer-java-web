@@ -25,6 +25,10 @@
  */
 package services.moleculer.web.template;
 
+import static services.moleculer.web.common.GatewayUtils.readAllBytes;
+
+import java.io.Reader;
+import java.io.StringReader;
 import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -32,9 +36,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.github.mustachejava.DefaultMustacheFactory;
 import com.github.mustachejava.Mustache;
+import com.github.mustachejava.MustacheResolver;
 
 import io.datatree.Tree;
-import services.moleculer.web.template.mustache.MustacheLoader;
 
 public class MustacheEngine implements TemplateEngine {
 
@@ -82,6 +86,8 @@ public class MustacheEngine implements TemplateEngine {
 			}
 
 		}
+		
+		// Render template
 		StringWriter out = new StringWriter(writeBufferSize);
 		template.execute(out, data.asObject());
 		return out.toString().getBytes(charset);
@@ -133,4 +139,48 @@ public class MustacheEngine implements TemplateEngine {
 		this.writeBufferSize = writeBufferSize;
 	}
 
+	// --- LOADER CLASS ---
+	
+	protected static class MustacheLoader implements MustacheResolver {
+
+		// --- VARIABLES ---
+
+		protected Charset charset = StandardCharsets.UTF_8;
+		
+		protected String templatePath = "";
+		
+		// --- LOADER METHOD ---
+		
+		@Override
+		public Reader getReader(String name) {
+			String path = templatePath + '/' + name.replace('\\', '/');
+			byte[] bytes = readAllBytes(path);
+			String template = new String(bytes, charset);
+			return new StringReader(template);
+		}
+
+		// --- GETTERS / SETTERS ---
+
+		protected Charset getCharset() {
+			return charset;
+		}
+
+		protected void setCharset(Charset charset) {
+			this.charset = charset;
+		}
+		
+		protected void setTemplatePath(String templatePath) {
+			templatePath = templatePath.replace('\\', '/');
+			while (templatePath.endsWith("/")) {
+				templatePath = templatePath.substring(0, templatePath.length() - 1);
+			}
+			this.templatePath = templatePath;
+		}
+
+		protected String getTemplatePath() {
+			return templatePath;
+		}
+		
+	}
+	
 }

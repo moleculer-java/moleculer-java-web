@@ -25,16 +25,25 @@
  */
 package services.moleculer.web.template;
 
+import static services.moleculer.web.common.GatewayUtils.readAllBytes;
+
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
+import org.thymeleaf.IEngineConfiguration;
 import org.thymeleaf.cache.StandardCacheManager;
+import org.thymeleaf.context.IContext;
 import org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver;
+import org.thymeleaf.templateresource.ITemplateResource;
+import org.thymeleaf.templateresource.StringTemplateResource;
 import org.thymeleaf.util.FastStringWriter;
 
 import io.datatree.Tree;
-import services.moleculer.web.template.thymeleaf.ThymeleafLoader;
-import services.moleculer.web.template.thymeleaf.TreeContext;
 
 public class ThymeleafEngine extends org.thymeleaf.TemplateEngine implements TemplateEngine {
 
@@ -70,6 +79,8 @@ public class ThymeleafEngine extends org.thymeleaf.TemplateEngine implements Tem
 	
 	@Override
 	public byte[] transform(String templatePath, Tree data) throws Exception {
+		
+		// Render template
 		FastStringWriter writer = new FastStringWriter(writeBufferSize);
 		process(templatePath, new TreeContext(data), writer);
 		return writer.toString().getBytes(charset);
@@ -118,4 +129,95 @@ public class ThymeleafEngine extends org.thymeleaf.TemplateEngine implements Tem
 		this.loader = loader;
 	}
 
+	// --- LOADER CLASS ---
+	
+	protected static class ThymeleafLoader extends AbstractConfigurableTemplateResolver {
+
+		@Override
+		protected ITemplateResource computeTemplateResource(IEngineConfiguration configuration, String ownerTemplate,
+				String template, String resourceName, String characterEncoding,
+				Map<String, Object> templateResolutionAttributes) {
+			String path = template.replace('\\', '/');
+			byte[] bytes = readAllBytes(path);
+			String source;
+			try {
+				source = new String(bytes, characterEncoding);
+			} catch (Exception cause) {
+				source = String.valueOf(cause);
+			}
+			return new StringTemplateResource(source);
+		}
+
+	}
+	
+	// --- CONTEXT CLASS ---
+	
+	protected static class TreeContext implements IContext {
+
+		// --- VARIABLES ---
+		
+		protected final Tree data;
+		
+		protected Set<String> cachedVariableNames;
+		
+		// --- CONSTRUCTOR ---
+		
+		protected TreeContext(Tree data) {
+			this.data = data;
+		}
+		
+		// --- CONTEXT IMPLEMENTATION ---
+		
+		@Override
+		public Locale getLocale() {
+			Tree meta = data.getMeta(false);
+			if (meta != null) {
+				Tree locale = meta.get("$locale");
+				if (locale != null) {
+					return new Locale(locale.asString());
+				}
+			}
+			return Locale.getDefault();
+		}
+
+		@Override
+		public boolean containsVariable(String name) {
+			return getVariableNames().contains(name);
+		}
+
+		@Override
+		public Set<String> getVariableNames() {
+			if (cachedVariableNames == null) {
+				Set<String> set = new HashSet<>(); 
+				collectVariables(set, data);
+				cachedVariableNames = Collections.unmodifiableSet(set);
+			}
+			return cachedVariableNames;
+		}
+
+		@Override
+		public Object getVariable(String name) {
+			Tree child = data.get(name);
+			if (child == null) {
+				return null;
+			}
+			return child.asObject();
+		}
+
+		// --- UTILITIES ---
+		
+		protected void collectVariables(Set<String> set, Tree root) {
+			if (root != null) {
+				for (Tree child: root) {
+					if (child.isStructure()) {
+						collectVariables(set, child);
+					} else {
+						set.add(child.getPath());
+					}
+				}
+			}
+		}
+		
+	}
+	
 }
