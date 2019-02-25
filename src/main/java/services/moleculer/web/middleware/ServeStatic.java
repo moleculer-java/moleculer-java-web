@@ -27,16 +27,21 @@ package services.moleculer.web.middleware;
 
 import static services.moleculer.util.CommonUtils.compress;
 import static services.moleculer.util.CommonUtils.formatPath;
+import static services.moleculer.web.common.GatewayUtils.getFileSize;
+import static services.moleculer.web.common.GatewayUtils.getFileURL;
 import static services.moleculer.web.common.GatewayUtils.getLastModifiedTime;
 import static services.moleculer.web.common.GatewayUtils.isReadable;
 import static services.moleculer.web.common.GatewayUtils.readAllBytes;
+import static services.moleculer.web.common.GatewayUtils.sendError;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.zip.Deflater;
 
 import io.datatree.Tree;
 import io.datatree.dom.Cache;
 import services.moleculer.service.Name;
+import services.moleculer.stream.PacketStream;
 import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
@@ -131,8 +136,8 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 	}
 
 	public ServeStatic(String path, String rootDirectory) {
-		this.path = formatPath(path);
-		this.localDirectory = formatPath(rootDirectory);
+		this.path = formatPath(path.replace('\\', '/'));
+		setLocalDirectory(rootDirectory);
 		if (path.indexOf('*') > -1 || path.indexOf('?') > -1) {
 			throw new IllegalArgumentException("Invalid path format (" + path
 					+ ")! Use simple path prefix, without wildcard characters, like \"/www\".");
@@ -275,9 +280,8 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 							rsp.setHeader(ETAG, etag);
 						}
 					}
-
+					
 					// Set body
-					boolean compressed = false;
 					if (cached != null && (!reload || (cached.etag != null && cached.etag.equals(etag)))) {
 
 						// Set cached content
@@ -286,19 +290,20 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 						} else {
 
 							// Client supports compressed content
+							rsp.setHeader(CONTENT_ENCODING, DEFLATE);
 							rsp.send(cached.compressedBody);
-							compressed = true;
 						}
 
 					} else {
 
-						// TODO check file size with getFileSize(...)
-
-						// Read all bytes of the file
-						byte[] body = readAllBytes(absolutePath);
+						// Get file size
+						long size = getFileSize(absolutePath);
 
 						// Check file size
-						if (body.length <= maxCachedFileSize) {
+						if (size <= maxCachedFileSize) {
+
+							// Read all bytes of the file
+							byte[] body = readAllBytes(absolutePath);
 
 							// Store in cache
 							cached = new CachedFile();
@@ -310,35 +315,60 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 								if (compressionSupported) {
 
 									// Client supports compressed content
+									rsp.setHeader(CONTENT_ENCODING, DEFLATE);
 									body = cached.compressedBody;
-									compressed = true;
 								}
 							}
 							fileCache.put(relativePath, cached);
+							
+							// Add "Content-Length" header
+							rsp.setHeader(CONTENT_LENGTH, Integer.toString(body.length));
+
+							// Send bytes
+							rsp.send(body);
+
 						} else {
+							
+							// Add "Content-Length" header
+							if (size > -1) {
+								rsp.setHeader(CONTENT_LENGTH, Long.toString(size));
+							} else {
+								rsp.setHeader(TRANSFER_ENCODING, CHUNKED);
+							}
 
-							// TODO send as stream
-
+							// Create stream
+							PacketStream stream = broker.createStream();
+							stream.onPacket((bytes, cause, close) -> {
+								if (bytes != null) {
+									if (size > -1) {
+										rsp.send(bytes);
+									} else {
+										rsp.send(Integer.toString(bytes.length).getBytes(StandardCharsets.US_ASCII));
+										rsp.send("\r\n".getBytes(StandardCharsets.US_ASCII));
+										rsp.send(bytes);
+										rsp.send("\r\n".getBytes(StandardCharsets.US_ASCII));
+									}
+								}
+								if (close) {
+									if (size == -1) {
+										rsp.send("0\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
+									}
+									rsp.end();
+								}
+							});
+							
+							// Transfer data
+							stream.transferFrom(getFileURL(absolutePath).openStream());
+							return;
 						}
-
-						// Add "Content-Length" header
-						rsp.setHeader(CONTENT_LENGTH, Integer.toString(body.length));
-
-						// Send bytes
-						rsp.send(body);
-					}
-
-					// Add "Content-Encoding" header
-					if (compressed) {
-						rsp.setHeader(CONTENT_ENCODING, DEFLATE);
 					}
 
 					// Processing finished
 					rsp.end();
+					
 				} catch (Exception cause) {
+					sendError(rsp, cause);
 					logger.warn("Unable to process request!", cause);
-
-					// TODO Try to send error 500
 				}
 			}
 		};
@@ -839,7 +869,13 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 	}
 
 	public void setLocalDirectory(String wwwRootDirectory) {
-		this.localDirectory = formatPath(wwwRootDirectory);
+		String path = wwwRootDirectory.replace('\\', '/');
+		if (path.indexOf(':') == -1) {
+			path = formatPath(path);
+		} else if (path.endsWith("/")) {
+			path = path.substring(0, path.length() - 1);
+		}
+		this.localDirectory = path;
 	}
 
 	public void setContentType(String extension, String contentType) {

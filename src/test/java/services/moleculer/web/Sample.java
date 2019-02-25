@@ -25,8 +25,6 @@
  */
 package services.moleculer.web;
 
-import java.util.concurrent.TimeUnit;
-
 import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
 import services.moleculer.cacher.Cache;
@@ -37,7 +35,6 @@ import services.moleculer.eventbus.Listener;
 import services.moleculer.eventbus.Subscribe;
 import services.moleculer.service.Action;
 import services.moleculer.service.Middleware;
-import services.moleculer.service.Name;
 import services.moleculer.service.Service;
 import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.middleware.Favicon;
@@ -45,11 +42,12 @@ import services.moleculer.web.middleware.RateLimiter;
 import services.moleculer.web.middleware.RequestLogger;
 import services.moleculer.web.middleware.ServeStatic;
 import services.moleculer.web.middleware.SessionCookie;
-import services.moleculer.web.middleware.limiter.RateLimit;
 import services.moleculer.web.netty.NettyServer;
 import services.moleculer.web.router.Alias;
 import services.moleculer.web.router.MappingPolicy;
 import services.moleculer.web.router.Route;
+import services.moleculer.web.template.PebbleEngine;
+import services.moleculer.web.template.TemplateEngine;
 
 public class Sample {
 
@@ -73,24 +71,31 @@ public class Sample {
 
 			ApiGateway gateway = new ApiGateway();
 			broker.createService(gateway);
-			
+
+			TemplateEngine te = new PebbleEngine();
+			te.setTemplatePath("/");
+			te.setReloadable(false);
+			gateway.setTemplateEngine(te);
+
 			// http://localhost:3000/math/add?a=5&b=7
 
 			String path = "/math";
 			MappingPolicy policy = MappingPolicy.ALL;
 			CallOptions.Options opts = CallOptions.retryCount(3);
 			String[] whitelist = {};
-			Alias[] aliases = new Alias[1];
+			Alias[] aliases = new Alias[2];
 			aliases[0] = new Alias(Alias.ALL, "/add", "math.add");
+			aliases[1] = new Alias(Alias.ALL, "/html", "math.html");
 			
-			Route r = new Route(broker, path, policy, opts, whitelist, aliases);
+			Route r = new Route(broker, path, policy, opts, whitelist, aliases, te);
+
 			r.use(new CorsHeaders());
 			RateLimiter rl = new RateLimiter(10, false);
 			rl.setHeaders(false);
 			r.use(rl);
-			gateway.setRoutes(new Route[]{r});
+			gateway.setRoutes(new Route[] { r });
 
-			gateway.use(new ServeStatic("/pages", "c:/temp"));
+			gateway.use(new ServeStatic("/pages", "c:/Program Files/apache-cassandra-3.11.0/doc/html/"));
 			gateway.use(new Favicon());
 			gateway.use(new SessionCookie());
 			gateway.use(new RequestLogger());
@@ -100,8 +105,6 @@ public class Sample {
 
 			broker.createService(new Service("math") {
 
-				@Name("add")
-				@RateLimit(value = 10, window = 1, unit = TimeUnit.MINUTES)
 				@Cache(keys = { "a", "b" }, ttl = 30)
 				public Action add = ctx -> {
 
@@ -114,6 +117,28 @@ public class Sample {
 				@Subscribe("foo.*")
 				public Listener listener = payload -> {
 					System.out.println("Received: " + payload);
+				};
+
+				@SuppressWarnings("unused")
+				public Action html = ctx -> {
+					
+					Tree rsp = new Tree();
+					rsp.put("a", 1);
+					rsp.put("b", true);
+					rsp.put("c", "xyz");
+					
+					Tree table = rsp.putList("table");
+					for (int i = 0; i < 10; i++) {
+						Tree row = table.addMap();
+						row.put("first", "12345");
+						row.put("second", i % 2 == 0);
+						row.put("third", i);
+					}
+					
+					rsp.getMeta().put("$template", "templates/test");
+					
+					return rsp;
+
 				};
 
 			});
@@ -138,14 +163,15 @@ public class Sample {
 
 						};
 					}
-					
+
 					// TODO Middleware not started (broker = null)
-					//broker.getLogger().info("Middleware not installed to " + config.toString(false));
+					// broker.getLogger().info("Middleware not installed to " +
+					// config.toString(false));
 					return null;
 				}
 
 			});
-	
+
 		} catch (Exception cause) {
 			cause.printStackTrace();
 		}

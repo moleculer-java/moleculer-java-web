@@ -39,6 +39,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import services.moleculer.ServiceBroker;
+import services.moleculer.context.CallOptions;
 import services.moleculer.service.Service;
 import services.moleculer.web.middleware.HttpMiddleware;
 import services.moleculer.web.middleware.NotFound;
@@ -46,6 +47,7 @@ import services.moleculer.web.router.Alias;
 import services.moleculer.web.router.Mapping;
 import services.moleculer.web.router.MappingPolicy;
 import services.moleculer.web.router.Route;
+import services.moleculer.web.template.TemplateEngine;
 
 public class ApiGateway extends Service implements RequestProcessor {
 
@@ -92,6 +94,13 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 */
 	protected HashSet<HttpMiddleware> globalMiddlewares = new HashSet<>(32);
 
+	// --- TEMPLATE ENGINE ---
+
+	/**
+	 * HTML template engine.
+	 */
+	protected TemplateEngine templateEngine;
+
 	// --- LOCKS ---
 
 	protected final Lock readLock;
@@ -120,7 +129,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	@Override
 	public void started(ServiceBroker broker) throws Exception {
 		super.started(broker);
-		
+
 		// Static mappings
 		staticMappings = new LinkedHashMap<String, Mapping>((cachedRoutes + 1) * 2) {
 
@@ -142,7 +151,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 				logger.info(nameOf(middleware, true) + " global middleware started.");
 			}
 		}
-		
+
 		// Start routes (annd route-specific middlewares)
 		for (Route route : routes) {
 			route.started(broker, globalMiddlewares);
@@ -152,7 +161,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 		}
 
 		// Set last route (ServeStatic, "404 Not Found", etc.)
-		lastRoute = new Route(broker, "", MappingPolicy.ALL, null, null, null);
+		lastRoute = new Route(broker, "", MappingPolicy.ALL, null, null, null, templateEngine);
 		lastRoute.use(lastMiddleware);
 	}
 
@@ -175,10 +184,10 @@ public class ApiGateway extends Service implements RequestProcessor {
 				logger.warn("Unable to stop middleware!");
 			}
 		}
-		
+
 		// Stop routes (and route-specific middlewares)
 		for (Route route : routes) {
-			route.stopped(globalMiddlewares);				
+			route.stopped(globalMiddlewares);
 		}
 		setRoutes(new Route[0]);
 
@@ -353,6 +362,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 *            list of services (eg. "service1,service2,service3")
 	 * @param middlewares
 	 *            optional middlewares (eg. CorsHeaders)
+	 *            
 	 * @return route the new route
 	 */
 	public Route addRoute(String path, String serviceList, HttpMiddleware... middlewares) {
@@ -366,7 +376,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 		}
 		String[] whiteList = new String[list.size()];
 		list.toArray(whiteList);
-		Route route = new Route(broker, path, MappingPolicy.RESTRICT, null, whiteList, null);
+		Route route = new Route(broker, path, MappingPolicy.RESTRICT, null, whiteList, null, templateEngine);
 		if (middlewares != null && middlewares.length > 0) {
 			route.use(middlewares);
 		}
@@ -386,11 +396,12 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 *            name of action (eg. "math.add")
 	 * @param middlewares
 	 *            optional middlewares (eg. CorsHeaders)
+	 *            
 	 * @return route the new route
 	 */
 	public Route addRoute(String httpMethod, String path, String actionName, HttpMiddleware... middlewares) {
 		Alias alias = new Alias(httpMethod, path, actionName);
-		Route route = new Route(broker, "", MappingPolicy.RESTRICT, null, null, new Alias[] { alias });
+		Route route = new Route(broker, "", MappingPolicy.RESTRICT, null, null, new Alias[] { alias }, templateEngine);
 		if (middlewares != null && middlewares.length > 0) {
 			route.use(middlewares);
 		}
@@ -398,10 +409,33 @@ public class ApiGateway extends Service implements RequestProcessor {
 	}
 
 	/**
+	 * Define a route.
+	 * 
+	 * @param path
+	 *            path of the action (eg. "numbers/add" creates an endpoint on
+	 *            "http://host:port/numbers/add")
+	 * @param mappingPolicy
+	 *            MappingPolicy of this Route
+	 * @param opts
+	 *            CallOptions of this Route (timeout, retry count, nodeID)
+	 * @param whitelist
+	 *            optional whitelist
+	 * @param aliases
+	 *            optional aliases
+	 * 
+	 * @return route the new route
+	 */
+	public Route addRoute(String path, MappingPolicy mappingPolicy, CallOptions.Options opts, String[] whitelist,
+			Alias[] aliases) {
+		return addRoute(new Route(broker, path, mappingPolicy, opts, whitelist, aliases, templateEngine));
+	}
+
+	/**
 	 * Adds a route to the list of routes.
 	 *
 	 * @param route
 	 *            the new route
+	 *            
 	 * @return route the new route
 	 */
 	public Route addRoute(Route route) {
@@ -462,6 +496,14 @@ public class ApiGateway extends Service implements RequestProcessor {
 
 	public void setDebug(boolean debug) {
 		this.debug = debug;
+	}
+
+	public TemplateEngine getTemplateEngine() {
+		return templateEngine;
+	}
+
+	public void setTemplateEngine(TemplateEngine templateEngine) {
+		this.templateEngine = templateEngine;
 	}
 
 }

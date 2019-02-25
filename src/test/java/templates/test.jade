@@ -1,0 +1,13 @@
+doctype html
+html
+  body
+    include header
+    p A: #{a}
+    p B: #{b}
+    p C: #{c}
+    table
+      for row in table
+        tr
+          td #{row.first}
+          td #{row.second}
+          td #{row.third}

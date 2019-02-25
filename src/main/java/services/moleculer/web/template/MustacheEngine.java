@@ -32,7 +32,6 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.ConcurrentHashMap;
 
 import com.github.mustachejava.DefaultMustacheFactory;
 import com.github.mustachejava.Mustache;
@@ -48,72 +47,57 @@ public class MustacheEngine implements TemplateEngine {
 
 	protected int writeBufferSize = 2048;
 
-	protected DefaultMustacheFactory sharedFactory;
+	protected DefaultMustacheFactory mustache;
 
 	protected MustacheLoader loader = new MustacheLoader();
-
-	protected ConcurrentHashMap<String, Mustache> eternalCache = new ConcurrentHashMap<>(512, 0.75f, 128);
-
-	protected Charset charset = StandardCharsets.UTF_8;
 
 	// --- CONSTRUCTOR ---
 
 	public MustacheEngine() {
-		sharedFactory = new DefaultMustacheFactory(loader);
+		mustache = new DefaultMustacheFactory(loader);
 	}
 
 	// --- TRANSFORM JSON TO HTML ---
 
 	@Override
 	public byte[] transform(String templatePath, Tree data) throws Exception {
-		Mustache template = null;
+
+		// Always load templates
 		if (reloadable) {
-
-			// Slow method (it disables internal cache of
-			// DefaultMustacheFactory)
-			DefaultMustacheFactory pageFactory = new DefaultMustacheFactory(loader);
-			template = pageFactory.compile(templatePath);
-
-		} else {
-
-			// Fast method (all templates are cached)
-			template = eternalCache.get(templatePath);
-			if (template == null) {
-				template = sharedFactory.compile(templatePath);
-				if (template != null) {
-					eternalCache.put(templatePath, template);
-				}
-			}
-
+			StringWriter out = new StringWriter(writeBufferSize);
+			Reader reader = loader.getReader(templatePath);
+			Mustache template = mustache.compile(reader, templatePath);
+			template.execute(out, data.asObject());
+			return out.toString().getBytes(loader.charset);
 		}
-		
-		// Render template
+
+		// Use cache
+		Mustache template = mustache.compile(templatePath);
 		StringWriter out = new StringWriter(writeBufferSize);
 		template.execute(out, data.asObject());
-		return out.toString().getBytes(charset);
+		return out.toString().getBytes(loader.charset);
 	}
 
 	// --- ROOT PATH OF TEMPLATES ---
 
 	@Override
 	public void setTemplatePath(String templatePath) {
-		loader.setTemplatePath(templatePath);
+		loader.templatePath = templatePath;
 	}
 
 	public String getTemplatePath() {
-		return loader.getTemplatePath();
+		return loader.templatePath;
 	}
 
 	// --- CHARACTER ENCODING OF TEMPLATES ---
 
 	public Charset getCharset() {
-		return charset;
+		return loader.charset;
 	}
 
 	@Override
 	public void setCharset(Charset charset) {
-		this.charset = charset;
-		loader.setCharset(charset);
+		loader.charset = charset;
 	}
 
 	// --- ENABLE / DISABLE RELOADING ---
@@ -123,13 +107,10 @@ public class MustacheEngine implements TemplateEngine {
 	}
 
 	public void setReloadable(boolean reloadable) {
-		if (this.reloadable != reloadable) {
-			this.reloadable = reloadable;
-			if (reloadable) {
-				eternalCache.clear();
-			}
-		}
+		this.reloadable = reloadable;
 	}
+
+	// --- INITIAL SIZE OF WRITE BUFFER ---
 
 	public int getWriteBufferSize() {
 		return writeBufferSize;
@@ -139,48 +120,41 @@ public class MustacheEngine implements TemplateEngine {
 		this.writeBufferSize = writeBufferSize;
 	}
 
-	// --- LOADER CLASS ---
+	// --- EXTENSION OF TEMPLATES ---
+
+	public String getExtension() {
+		return loader.extension;
+	}
+
+	public void setExtension(String extension) {
+		loader.extension = extension;
+	}
 	
+	// --- LOADER CLASS ---
+
 	protected static class MustacheLoader implements MustacheResolver {
 
 		// --- VARIABLES ---
 
 		protected Charset charset = StandardCharsets.UTF_8;
-		
+
 		protected String templatePath = "";
-		
+
+		protected String extension = "mustache";
+
 		// --- LOADER METHOD ---
-		
+
 		@Override
 		public Reader getReader(String name) {
-			String path = templatePath + '/' + name.replace('\\', '/');
+			String path = templatePath + '/' + name;
+			if (name.indexOf('.') == -1) {
+				path += '.' + extension;
+			}
 			byte[] bytes = readAllBytes(path);
 			String template = new String(bytes, charset);
 			return new StringReader(template);
 		}
 
-		// --- GETTERS / SETTERS ---
-
-		protected Charset getCharset() {
-			return charset;
-		}
-
-		protected void setCharset(Charset charset) {
-			this.charset = charset;
-		}
-		
-		protected void setTemplatePath(String templatePath) {
-			templatePath = templatePath.replace('\\', '/');
-			while (templatePath.endsWith("/")) {
-				templatePath = templatePath.substring(0, templatePath.length() - 1);
-			}
-			this.templatePath = templatePath;
-		}
-
-		protected String getTemplatePath() {
-			return templatePath;
-		}
-		
 	}
-	
+
 }

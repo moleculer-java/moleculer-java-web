@@ -170,11 +170,13 @@ public class ErrorPage extends HttpMiddleware implements HttpConstants {
 
 						// Create body
 						byte[] bytes = buffer.toByteArray();
+						String stack = "[absent]";
 						String message = null;
 						try {
 							if (bytes[0] == '{' || bytes[0] == '[') {
 								Tree t = new Tree(bytes);
 								message = t.get("message", (String) null);
+								stack = t.get("stack", "[absent]");
 							}
 						} catch (Throwable ignored) {
 						}
@@ -341,12 +343,13 @@ public class ErrorPage extends HttpMiddleware implements HttpConstants {
 
 						// Create body
 						String body = template.replace("{status}", Integer.toString(code)).replace("{message}",
-								message);
+								message).replace("{stack}", stack);
 						bytes = body.getBytes(StandardCharsets.UTF_8);
 
 						// Set headers
 						headers.put(CONTENT_TYPE, CONTENT_TYPE_HTML);
 						headers.put(CONTENT_LENGTH, Integer.toString(bytes.length));
+						headers.put(CACHE_CONTROL, NO_CACHE);
 
 						boolean ok;
 						try {

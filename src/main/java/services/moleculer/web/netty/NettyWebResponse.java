@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.netty.buffer.Unpooled;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import services.moleculer.web.WebResponse;
@@ -42,7 +43,8 @@ public class NettyWebResponse implements WebResponse {
 
 	protected final ChannelHandlerContext ctx;
 	protected final NettyWebRequest req;
-
+	protected final Channel channel;
+	
 	/**
 	 * Custom properties (for inter-middleware communication).
 	 */
@@ -59,6 +61,7 @@ public class NettyWebResponse implements WebResponse {
 	public NettyWebResponse(ChannelHandlerContext ctx, NettyWebRequest req) {
 		this.ctx = ctx;
 		this.req = req;
+		this.channel = ctx.channel();
 	}
 
 	// --- PUBLIC WEBRESPONSE METHODS ---
@@ -136,8 +139,11 @@ public class NettyWebResponse implements WebResponse {
 	 *             if an I/O error occurs
 	 */
 	@Override
-	public void send(byte[] bytes) {
+	public void send(byte[] bytes) throws IOException {
 		if (bytes != null && bytes.length > 0) {
+			if (!channel.isOpen()) {
+				throw new IOException("Socket closed!");
+			}
 			sendHeaders();
 			ctx.write(Unpooled.wrappedBuffer(bytes));
 			ctx.flush();

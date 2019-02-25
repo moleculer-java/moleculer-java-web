@@ -45,9 +45,16 @@ import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
+import services.moleculer.web.template.TemplateEngine;
+
+import static services.moleculer.web.common.GatewayUtils.sendError;
 
 public class ActionInvoker implements RequestProcessor, HttpConstants {
 
+	// --- CONSTANTS ---
+	
+	protected static final byte[] EMPTY_RESPONSE = "{}".getBytes(); 
+	
 	// --- LOGGER ---
 
 	protected static final Logger logger = LoggerFactory.getLogger(ActionInvoker.class);
@@ -70,10 +77,14 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 	protected final TreeWriter jsonSerializer;
 
+	// --- TEMPLATE ENGINE ---
+
+	protected final TemplateEngine templateEngine;
+
 	// --- CONSTRUCTOR ---
 
 	public ActionInvoker(String actionName, String pathPattern, boolean isStatic, String pathPrefix, int[] indexes,
-			String[] names, Options opts, ServiceInvoker serviceInvoker) {
+			String[] names, Options opts, ServiceInvoker serviceInvoker, TemplateEngine templateEngine) {
 		this.actionName = actionName;
 		this.pathPattern = pathPattern;
 		this.isStatic = isStatic;
@@ -82,6 +93,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		this.names = names;
 		this.opts = opts;
 		this.serviceInvoker = serviceInvoker;
+		this.templateEngine = templateEngine;
 		this.jsonSerializer = TreeWriterRegistry.getWriter(null);
 	}
 
@@ -103,6 +115,9 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 	 */
 	@Override
 	public void service(WebRequest req, WebResponse rsp) throws Exception {
+
+		// Disable cache
+		rsp.setHeader(CACHE_CONTROL, NO_CACHE);
 
 		// Parse URL
 		Tree params = null;
@@ -133,7 +148,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 			serviceInvoker.call(actionName, params, opts, req.getBody(), null).then(out -> {
 				sendResponse(rsp, out);
 			}).catchError(cause -> {
-				sendResponse(rsp, cause);
+				sendError(rsp, cause);
 			});
 			return;
 
@@ -148,7 +163,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				sendResponse(rsp, out);
 			}).catchError(cause -> {
 				logger.error("Unable to invoke action!", cause);
-				sendResponse(rsp, cause);
+				sendError(rsp, cause);
 			});
 			return;
 		}
@@ -164,7 +179,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 			} else if (cause != null) {
 				faulty.set(true);
 				logger.error("Unexpected error occured while receiving and parsing client request!", cause);
-				sendResponse(rsp, cause);
+				sendError(rsp, cause);
 			}
 			if (close && !faulty.get()) {
 
@@ -181,7 +196,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 					sendResponse(rsp, out);
 				}).catchError(err -> {
 					logger.error("Unable to invoke action!", err);
-					sendResponse(rsp, err);
+					sendError(rsp, err);
 				});
 			}
 		});
@@ -228,26 +243,45 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 	protected void sendResponse(WebResponse rsp, Tree out) throws Exception {
 
+		// Disable cache
+		rsp.setHeader(CACHE_CONTROL, NO_CACHE);
+		if (out == null) {
+			try {
+				rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_JSON);
+				rsp.setHeader(CONTENT_LENGTH, "2");
+				rsp.send(EMPTY_RESPONSE);
+			} finally {
+				rsp.end();
+			}
+			return;
+		}
+
 		// Set headers from "meta"
-		Tree meta = out.getMeta(false);
+		String templatePath = null;
 		boolean contentTypeSet = false;
+		Tree meta = out.getMeta(false);
 		if (meta != null) {
 
+			// Path of the HTML-template
+			if (templateEngine != null) {
+				templatePath = meta.get(META_TEMPLATE, (String) null);
+			}
+
 			// Temporary Redirect
-			String value = meta.get(META_LOCATION, "");
+			String value = meta.get(META_LOCATION, (String) null);
 			if (value != null && !value.isEmpty()) {
 				rsp.setStatus(307);
 				rsp.setHeader(LOCATION, value);
 			}
 
 			// Status code
-			value = meta.get(META_STATUS, "");
+			value = meta.get(META_STATUS, (String) null);
 			if (value != null && !value.isEmpty()) {
 				rsp.setStatus(Integer.parseInt(value));
 			}
 
 			// Content type
-			value = meta.get(META_CONTENT_TYPE, "");
+			value = meta.get(META_CONTENT_TYPE, (String) null);
 			if (value != null && !value.isEmpty()) {
 				rsp.setHeader(CONTENT_TYPE, value);
 				contentTypeSet = true;
@@ -269,13 +303,15 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				}
 			}
 		}
-		if (!contentTypeSet) {
-			rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_JSON);
-		}
 
 		// Send body
 		Object object = out.asObject();
 		if (object != null && object instanceof PacketStream) {
+
+			// Stream type?
+			if (!contentTypeSet) {
+				rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_JSON);
+			}
 
 			// Streamed response (large file, media, etc.)
 			PacketStream stream = (PacketStream) object;
@@ -286,7 +322,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				} else if (cause != null) {
 					failed.set(true);
 					logger.error("Unexpected error occured while streaming data to client!", cause);
-					sendResponse(rsp, cause);
+					sendError(rsp, cause);
 					return;
 				}
 				if (close && !failed.get()) {
@@ -302,12 +338,29 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 				// TODO Invoke AfterCallProcessor
 
-				// TODO Invoke TemplateEngine
+				if (templatePath != null && !templatePath.isEmpty()) {
 
-				// TODO out can be null!
-				body = jsonSerializer.toBinary(out.asObject(), null, false);
+					// Content-type is HTML
+					if (!contentTypeSet) {
+						rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_HTML);
+					}
+
+					// Invoke TemplateEngine
+					body = templateEngine.transform(templatePath, out);
+
+				} else {
+
+					// Content-type is JSON
+					if (!contentTypeSet) {
+						rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_JSON);
+					}
+
+					// Serialize
+					body = jsonSerializer.toBinary(out.asObject(), null, false);
+				}
 			} catch (Throwable cause) {
-				sendResponse(rsp, cause);
+				logger.error("Unable to serialize response!", cause);
+				sendError(rsp, cause);
 				return;
 			}
 			try {
@@ -316,20 +369,6 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 			} finally {
 				rsp.end();
 			}
-		}
-	}
-
-	// --- SEND ERROR RESPONSE ---
-
-	protected void sendResponse(WebResponse rsp, Throwable cause) {
-		try {
-
-			// TODO SET HEADERS BY CAUSE TYPE
-
-		} catch (Throwable failed) {
-			logger.error("Unable to send error message to client!", failed);
-		} finally {
-			rsp.end();
 		}
 	}
 

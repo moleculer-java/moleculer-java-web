@@ -25,10 +25,9 @@
  */
 package services.moleculer.web.netty;
 
-import java.nio.charset.StandardCharsets;
+import static services.moleculer.web.common.GatewayUtils.sendError;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.HttpContent;
@@ -159,23 +158,9 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 			throw new IllegalStateException("Unknown package type: " + request);
 
 		} catch (Throwable cause) {
-
-			// Fatal error
-			if (handshaker == null) {
-				StringBuilder msg = new StringBuilder();
-				msg.append("HTTP/1.1 ");
-				if (gateway == null) {
-					msg.append("404 Not Found");
-				} else {
-					msg.append("500 Internal Server Error");
-				}
-				msg.append("\r\nContent-Length: 0\r\n");
-				msg.append("\r\n");
-				ctx.write(Unpooled.wrappedBuffer(msg.toString().getBytes(StandardCharsets.UTF_8)));
-			}
-			ctx.close();
+			sendError(new NettyWebResponse(ctx, req), cause);
 			broker.getLogger(MoleculerHandler.class).error("Unable to process request!", cause);
 		}
 	}
-	
+
 }

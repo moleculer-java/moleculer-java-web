@@ -29,8 +29,7 @@ import static services.moleculer.web.common.GatewayUtils.readAllBytes;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -52,20 +51,20 @@ public class ThymeleafEngine extends org.thymeleaf.TemplateEngine implements Tem
 	protected Charset charset = StandardCharsets.UTF_8;
 
 	protected int writeBufferSize = 2048;
-	
+
 	protected AbstractConfigurableTemplateResolver loader = new ThymeleafLoader();
 
 	// --- CONSTRUCTOR ---
-	
+
 	public ThymeleafEngine() {
-		
+
 		// Set template loader
 		setTemplateResolver(loader);
-		
+
 		// Set default properties
-		loader.setSuffix(".html");
+		loader.setSuffix(".thymeleaf");
 		loader.setCharacterEncoding(charset.name());
-		
+
 		// Use larger caches
 		StandardCacheManager cacheManager = new StandardCacheManager();
 		cacheManager.setTemplateCacheInitialSize(512);
@@ -74,12 +73,12 @@ public class ThymeleafEngine extends org.thymeleaf.TemplateEngine implements Tem
 		cacheManager.setExpressionCacheMaxSize(2048);
 		setCacheManager(cacheManager);
 	}
-	
+
 	// --- TRANSFORM JSON TO HTML ---
-	
+
 	@Override
 	public byte[] transform(String templatePath, Tree data) throws Exception {
-		
+
 		// Render template
 		FastStringWriter writer = new FastStringWriter(writeBufferSize);
 		process(templatePath, new TreeContext(data), writer);
@@ -91,7 +90,7 @@ public class ThymeleafEngine extends org.thymeleaf.TemplateEngine implements Tem
 	public String getTemplatePath() {
 		return loader.getPrefix();
 	}
-	
+
 	@Override
 	public void setTemplatePath(String templatePath) {
 		loader.setPrefix(templatePath);
@@ -113,30 +112,97 @@ public class ThymeleafEngine extends org.thymeleaf.TemplateEngine implements Tem
 	public boolean isReloadable() {
 		return !loader.isCacheable();
 	}
-	
+
 	@Override
 	public void setReloadable(boolean reloadable) {
 		loader.setCacheable(!reloadable);
 	}
 
-	// --- TEMPLATE LOADER
-	
-	public AbstractConfigurableTemplateResolver getLoader() {
-		return loader;
+	// --- EXTENSION OF TEMPLATES ---
+
+	public String getExtension() {
+		String suffix = loader.getSuffix();
+		while (suffix.startsWith(".")) {
+			suffix = suffix.substring(1);
+		}
+		return suffix;
 	}
 
-	public void setLoader(AbstractConfigurableTemplateResolver loader) {
-		this.loader = loader;
+	public void setExtension(String extension) {
+		loader.setSuffix('.' + extension);
+	}
+	
+	// --- CONTEXT CLASS ---
+
+	protected static class TreeContext implements IContext {
+
+		// --- VARIABLES ---
+
+		protected String locale;
+
+		protected HashMap<String, Object> variables = new HashMap<>();
+
+		// --- CONSTRUCTOR ---
+
+		protected TreeContext(Tree data) {
+			collectVariables(data);
+			Tree meta = data.getMeta(false);
+			if (meta != null) {
+				locale = meta.get("$locale", (String) null);
+			}
+		}
+
+		// --- CONTEXT IMPLEMENTATION ---
+
+		@Override
+		public Locale getLocale() {
+			if (locale != null) {
+				return new Locale(locale);
+			}
+			return Locale.getDefault();
+		}
+
+		@Override
+		public boolean containsVariable(String name) {
+			return variables.containsKey(name);
+		}
+
+		@Override
+		public Set<String> getVariableNames() {
+			return variables.keySet();
+		}
+
+		@Override
+		public Object getVariable(String name) {
+			return variables.get(name);
+		}
+
+		// --- UTILITIES ---
+
+		protected void collectVariables(Tree root) {
+			if (root != null) {
+				for (Tree child : root) {
+					variables.put(child.getPath(), child.asObject());
+					if (child.isMap()) {
+						collectVariables(child);
+					}
+				}
+			}
+		}
+
 	}
 
 	// --- LOADER CLASS ---
-	
+
 	protected static class ThymeleafLoader extends AbstractConfigurableTemplateResolver {
 
 		@Override
 		protected ITemplateResource computeTemplateResource(IEngineConfiguration configuration, String ownerTemplate,
 				String template, String resourceName, String characterEncoding,
 				Map<String, Object> templateResolutionAttributes) {
+			
+			// TODO owner template -> relative path
+			
 			String path = template.replace('\\', '/');
 			byte[] bytes = readAllBytes(path);
 			String source;
@@ -148,76 +214,6 @@ public class ThymeleafEngine extends org.thymeleaf.TemplateEngine implements Tem
 			return new StringTemplateResource(source);
 		}
 
-	}
-	
-	// --- CONTEXT CLASS ---
-	
-	protected static class TreeContext implements IContext {
-
-		// --- VARIABLES ---
-		
-		protected final Tree data;
-		
-		protected Set<String> cachedVariableNames;
-		
-		// --- CONSTRUCTOR ---
-		
-		protected TreeContext(Tree data) {
-			this.data = data;
-		}
-		
-		// --- CONTEXT IMPLEMENTATION ---
-		
-		@Override
-		public Locale getLocale() {
-			Tree meta = data.getMeta(false);
-			if (meta != null) {
-				Tree locale = meta.get("$locale");
-				if (locale != null) {
-					return new Locale(locale.asString());
-				}
-			}
-			return Locale.getDefault();
-		}
-
-		@Override
-		public boolean containsVariable(String name) {
-			return getVariableNames().contains(name);
-		}
-
-		@Override
-		public Set<String> getVariableNames() {
-			if (cachedVariableNames == null) {
-				Set<String> set = new HashSet<>(); 
-				collectVariables(set, data);
-				cachedVariableNames = Collections.unmodifiableSet(set);
-			}
-			return cachedVariableNames;
-		}
-
-		@Override
-		public Object getVariable(String name) {
-			Tree child = data.get(name);
-			if (child == null) {
-				return null;
-			}
-			return child.asObject();
-		}
-
-		// --- UTILITIES ---
-		
-		protected void collectVariables(Set<String> set, Tree root) {
-			if (root != null) {
-				for (Tree child: root) {
-					if (child.isStructure()) {
-						collectVariables(set, child);
-					} else {
-						set.add(child.getPath());
-					}
-				}
-			}
-		}
-		
 	}
 	
 }

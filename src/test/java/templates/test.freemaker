@@ -1,0 +1,16 @@
+<html>
+    <body>
+		<p>A: ${a}</p>
+		<p>B: ${b?string('yes', 'no')}</p>
+		<p>C: ${c}</p>
+		<table>
+			<#list table as row>
+			<tr>
+				<td>${row.first}</td>
+				<td>${row.second?string('yes', 'no')}</td>
+				<td>${row.third}</td>
+			</tr>		
+			</#list>
+		</table>
+    </body>
+</html>

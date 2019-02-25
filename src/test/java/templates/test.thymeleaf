@@ -1,0 +1,14 @@
+<html>
+    <body>
+		<p th:text="${a}">-</p>
+		<p th:text="${b}">-</p>
+		<p th:text="${c}">-</p>
+		<table>
+			<tr th:each="row : ${table}">
+				<td th:text="${row.first}">-</td>
+				<td th:text="${row.second}">-</td>
+				<td th:text="${row.third}">-</td>
+			</tr>
+		</table>
+    </body>
+</html>

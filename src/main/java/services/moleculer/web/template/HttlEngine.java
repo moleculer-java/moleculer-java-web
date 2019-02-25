@@ -29,50 +29,31 @@ import static services.moleculer.web.common.GatewayUtils.isReadable;
 import static services.moleculer.web.common.GatewayUtils.readAllBytes;
 
 import java.io.IOException;
-import java.io.StringWriter;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
 import httl.Resource;
-import httl.Template;
-import httl.spi.engines.DefaultEngine;
 import httl.spi.loaders.AbstractLoader;
 import httl.spi.loaders.resources.StringResource;
 import io.datatree.Tree;
 
-public class HttlEngine extends DefaultEngine implements TemplateEngine {
+public class HttlEngine implements TemplateEngine {
 
 	// --- VARIABLES ---
 
 	protected boolean reloadable;
 
-	protected Charset charset = StandardCharsets.UTF_8;
-
 	protected int writeBufferSize = 2048;
 
 	protected String templatePath = "";
 
+	protected HttlLoader loader = new HttlLoader();
+	
 	// --- CONSTRUCTOR ---
 
 	public HttlEngine() {
-		
-		// Set default properties
-		setPreload(false);
-		setLocalized(false);
-		setReloadable(false);
-		setLoader(new HttlLoader());
-		setTemplateSuffix(new String[] { ".httl", ".html" });
-		
-		setLogger(new httl.spi.loggers.Log4jLogger());
-		setCache(new java.util.concurrent.ConcurrentHashMap<Object, Object>());
-		setTranslator(new httl.spi.translators.CompiledTranslator());
-		setResolver(new httl.spi.resolvers.SystemResolver());
-		setTemplateParser(new httl.spi.parsers.TemplateParser());
-		
-		setMapConverter(new httl.spi.converters.BeanMapConverter());
 	}
 
 	// --- TRANSFORM JSON TO HTML ---
@@ -80,13 +61,7 @@ public class HttlEngine extends DefaultEngine implements TemplateEngine {
 	@Override
 	public byte[] transform(String templatePath, Tree data) throws Exception {
 
-		// Get template
-		Template template = getTemplate(templatePath);
-
-		// Render template
-		StringWriter out = new StringWriter(writeBufferSize);
-		template.render(data.asObject(), out);
-		return out.toString().getBytes(charset);
+		return null;
 	}
 
 	// --- ROOT PATH OF TEMPLATES ---
@@ -98,18 +73,17 @@ public class HttlEngine extends DefaultEngine implements TemplateEngine {
 	@Override
 	public void setTemplatePath(String templatePath) {
 		this.templatePath = templatePath;
-		setTemplateDirectory(templatePath);
 	}
 
 	// --- CHARACTER ENCODING OF TEMPLATES ---
 
 	public Charset getCharset() {
-		return charset;
+		return Charset.forName(loader.charset);
 	}
 
 	@Override
 	public void setCharset(Charset charset) {
-		this.charset = charset;
+		loader.charset = charset.name();
 	}
 
 	// --- INITIAL SIZE OF WRITE BUFFER ---
@@ -131,13 +105,26 @@ public class HttlEngine extends DefaultEngine implements TemplateEngine {
 	@Override
 	public void setReloadable(boolean reloadable) {
 		this.reloadable = reloadable;
-		super.setReloadable(reloadable);
 	}
 
+	// --- EXTENSION OF TEMPLATES ---
+
+	public String getExtension() {
+		return loader.extension;
+	}
+
+	public void setExtension(String extension) {
+		loader.extension = extension;
+	}
+	
 	// --- LOADER ---
 
 	protected static final class HttlLoader extends AbstractLoader {
 
+		protected String charset = "UTF-8";
+		
+		protected String extension = "httl";
+		
 		@Override
 		protected List<String> doList(String directory, String suffix) throws IOException {
 			
@@ -147,14 +134,16 @@ public class HttlEngine extends DefaultEngine implements TemplateEngine {
 
 		@Override
 		protected boolean doExists(String name, Locale locale, String path) throws IOException {
-			return isReadable(path);
+			String file = path.indexOf('.') == -1 ? path + '.' + extension : path;
+			return isReadable(file);
 		}
 
 		@Override
 		protected Resource doLoad(String name, Locale locale, String encoding, String path) throws IOException {
-			byte[] bytes = readAllBytes(path);
-			String source = new String(bytes, encoding);
-			return new StringResource(getEngine(), name, locale, encoding, source);
+			String file = path.indexOf('.') == -1 ? path + '.' + extension : path;
+			byte[] bytes = readAllBytes(file);
+			String source = new String(bytes, charset);
+			return new StringResource(getEngine(), name, locale, charset, source);
 		}
 
 	}

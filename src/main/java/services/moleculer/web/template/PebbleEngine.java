@@ -1,6 +1,9 @@
 package services.moleculer.web.template;
 
+import static services.moleculer.web.common.GatewayUtils.readAllBytes;
+
 import java.io.Reader;
+import java.io.StringReader;
 import java.io.StringWriter;
 import java.nio.charset.Charset;
 /**
@@ -44,16 +47,20 @@ public class PebbleEngine implements TemplateEngine {
 	
 	protected boolean reloadable;
 
-	protected Charset charset = StandardCharsets.UTF_8;
-	
 	protected int writeBufferSize = 2048;
 
 	protected com.mitchellbosecke.pebble.PebbleEngine engine;
 	
+	protected PebbleLoader loader = new PebbleLoader();
+	
 	// --- CONSTRUCTOR ---
 
 	public PebbleEngine() {
-		engine = new com.mitchellbosecke.pebble.PebbleEngine.Builder().build();
+		buildEngine();
+	}
+	
+	protected void buildEngine() {
+		engine = new com.mitchellbosecke.pebble.PebbleEngine.Builder().loader(loader).cacheActive(!reloadable).build();		
 	}
 	
 	// --- TRANSFORM JSON TO HTML ---
@@ -73,28 +80,29 @@ public class PebbleEngine implements TemplateEngine {
 			map.put("data", data.asObject());
 		}
 		template.evaluate(out, map);
-		return out.toString().getBytes(charset);
+		return out.toString().getBytes(loader.charset);
 	}
 
 	// --- ROOT PATH OF TEMPLATES ---
 
-	public String getTemplatePath() {
-		return null;
-	}
-
 	@Override
 	public void setTemplatePath(String templatePath) {
+		loader.templatePath = templatePath;
+	}
+
+	public String getTemplatePath() {
+		return loader.templatePath;
 	}
 
 	// --- CHARACTER ENCODING OF TEMPLATES ---
 	
 	public Charset getCharset() {
-		return charset;
+		return loader.charset;
 	}
 
 	@Override
 	public void setCharset(Charset charset) {
-		this.charset = charset;
+		loader.charset = charset;
 	}
 
 	// --- INITIAL SIZE OF WRITE BUFFER ---
@@ -115,47 +123,66 @@ public class PebbleEngine implements TemplateEngine {
 
 	@Override
 	public void setReloadable(boolean reloadable) {
-		this.reloadable = reloadable;
+		if (this.reloadable != reloadable) {
+			this.reloadable = reloadable;
+			buildEngine();
+		}
+	}
+	
+	// --- EXTENSION OF TEMPLATES ---
+
+	public String getExtension() {
+		return loader.extension;
+	}
+
+	public void setExtension(String extension) {
+		loader.extension = extension;
 	}
 	
 	// --- LOADER CLASS ---
 	
 	protected static class PebbleLoader implements Loader<String> {
     
+		protected Charset charset = StandardCharsets.UTF_8;
+		
+		protected String templatePath = "";
+
+		protected String extension = "pebble";
+		
 		@Override
 		public Reader getReader(String cacheKey) throws LoaderException {
-			// TODO Auto-generated method stub
-			return null;
+			String path = templatePath + '/' + cacheKey;
+			if (cacheKey.indexOf('.') == -1) {
+				path += '.' + extension;
+			}
+			byte[] bytes = readAllBytes(path);
+			String template = new String(bytes, charset);
+			return new StringReader(template);
 		}
 
 		@Override
 		public void setCharset(String charset) {
-			// TODO Auto-generated method stub
-			
+			this.charset = Charset.forName(charset);
 		}
 
 		@Override
 		public void setPrefix(String prefix) {
-			// TODO Auto-generated method stub
-			
 		}
 
 		@Override
 		public void setSuffix(String suffix) {
-			// TODO Auto-generated method stub
-			
 		}
 
 		@Override
 		public String resolveRelativePath(String relativePath, String anchorPath) {
-			// TODO Auto-generated method stub
-			return null;
+			
+			// TODO compute relative path
+			return relativePath;
 		}
 
 		@Override
 		public String createCacheKey(String templateName) {
-			// TODO Auto-generated method stub
-			return null;
+			return templateName;
 		}
 		
 	}

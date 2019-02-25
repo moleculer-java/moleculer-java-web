@@ -126,6 +126,7 @@ public class NotFound extends HttpMiddleware implements HttpConstants {
 						bytes = body.getBytes(StandardCharsets.UTF_8);
 
 					}
+					rsp.setHeader(CACHE_CONTROL, NO_CACHE);
 					rsp.setHeader(CONTENT_LENGTH, Integer.toString(bytes.length));
 					rsp.send(bytes);
 				} finally {

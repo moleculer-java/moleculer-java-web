@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
 import io.datatree.Tree;
 import io.datatree.dom.Cache;
 import services.moleculer.ServiceBroker;
+import services.moleculer.error.MoleculerError;
 import services.moleculer.service.Service;
 import services.moleculer.service.ServiceRegistry;
 import services.moleculer.web.WebRequest;
@@ -53,10 +54,35 @@ public final class GatewayUtils implements HttpConstants {
 	private static final Logger logger = LoggerFactory.getLogger(GatewayUtils.class);
 
 	// --- CACHES ---
-	
+
 	protected static final Cache<String, URL> urlCache = new Cache<>(2048);
 
 	protected static final long jarTimestamp = System.currentTimeMillis();
+
+	// --- ERROR HANDLER ---
+
+	public static final void sendError(WebResponse rsp, Throwable cause) {
+		try {
+			MoleculerError error;
+			if (cause instanceof MoleculerError) {
+				error = (MoleculerError) cause;
+			} else {
+				error = new MoleculerError("Unknown error occured!", cause, "unknown", false, 500, "MOLECULER_ERROR",
+						null);
+			}
+			Tree json = error.toTree();
+			byte[] body = json.toBinary();
+			rsp.setStatus(error.getCode());
+			rsp.setHeader(CACHE_CONTROL, NO_CACHE);
+			rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_JSON);
+			rsp.setHeader(CONTENT_LENGTH, Integer.toString(body.length));
+			rsp.send(body);
+		} catch (Exception ignored) {
+			logger.debug("Unable to send error response!", ignored);
+		} finally {
+			rsp.end();
+		}
+	}
 
 	// --- FIND SERVICE BY CLASS ---
 
@@ -87,18 +113,18 @@ public final class GatewayUtils implements HttpConstants {
 	}
 
 	public static final HttpCookie getCookie(WebRequest req, WebResponse rsp, String name) {
-		return getCookieMap(req, rsp).get(name);		
+		return getCookieMap(req, rsp).get(name);
 	}
 
 	private static final HashMap<String, HttpCookie> getCookieMap(WebRequest req, WebResponse rsp) {
-		
+
 		// Get from properties
 		@SuppressWarnings("unchecked")
 		HashMap<String, HttpCookie> cookies = (HashMap<String, HttpCookie>) rsp.getProperty(PROPERTY_COOKIES);
 		if (cookies != null) {
 			return cookies;
 		}
-		
+
 		// Parse cookies
 		cookies = new HashMap<String, HttpCookie>();
 
@@ -113,26 +139,26 @@ public final class GatewayUtils implements HttpConstants {
 		if (headerValue != null) {
 			parseCookies(cookies, headerValue);
 		}
-		
+
 		// Store cookie map
 		rsp.setProperty(PROPERTY_COOKIES, cookies);
 		return cookies;
 	}
-	
+
 	private static final void parseCookies(HashMap<String, HttpCookie> cookies, String headerValue) {
 		List<HttpCookie> list = HttpCookie.parse(headerValue);
-		for (HttpCookie cookie: list) {
+		for (HttpCookie cookie : list) {
 			cookies.put(cookie.getName(), cookie);
 		}
 	}
-	
+
 	public static final void setCookie(WebRequest req, WebResponse rsp, HttpCookie cookie) {
 		HashMap<String, HttpCookie> cookies = getCookieMap(req, rsp);
 		cookies.put(cookie.getName(), cookie);
-		
+
 		// Set new "Set-Cookie" header
 		StringBuilder tmp = new StringBuilder(128);
-		for (HttpCookie c: cookies.values()) {
+		for (HttpCookie c : cookies.values()) {
 			tmp.append(c.toString()).append(',');
 		}
 		int len = tmp.length();
@@ -140,8 +166,8 @@ public final class GatewayUtils implements HttpConstants {
 			tmp.setLength(len - 1);
 		}
 		rsp.setHeader(SET_COOKIE, tmp.toString());
-	}	
-	
+	}
+
 	// --- FILE HANDLERS ---
 
 	public static final boolean isReadable(String path) {

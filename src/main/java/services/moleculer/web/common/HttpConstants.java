@@ -56,6 +56,7 @@ public interface HttpConstants {
 	public static final String ACCEPT = "Accept";
 	public static final String AUTHORIZATION = "Authorization";
 	public static final String WWW_AUTHENTICATE = "WWW-Authenticate";
+	public static final String TRANSFER_ENCODING = "Transfer-Encoding";
 
 	// --- HTTP HEADER VALUES ---
 
@@ -63,7 +64,9 @@ public interface HttpConstants {
 	public static final String DEFLATE = "deflate";
 	public static final String KEEP_ALIVE = "keep-alive";
 	public static final String CLOSE = "close";
-
+	public static final String NO_CACHE = "no-store, no-cache, must-revalidate";
+	public static final String CHUNKED = "chunked";
+	
 	// --- CONTENT TYPES ---
 
 	public static final String CONTENT_TYPE_JSON = "application/json;charset=utf-8";
@@ -76,7 +79,12 @@ public interface HttpConstants {
 	public static final String PROPERTY_USER = "user";
 	
 	// --- SPECIAL VALUES IN META ---
-	
+
+	/**
+	 * Name of the HTML template.
+	 */
+	public static final String META_TEMPLATE = "$template";
+
 	/**
 	 * Status code (eg. 200, 404) of the HTTP response message.
 	 */

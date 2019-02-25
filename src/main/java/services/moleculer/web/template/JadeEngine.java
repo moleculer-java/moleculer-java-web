@@ -46,27 +46,27 @@ import io.datatree.Tree;
 public class JadeEngine extends JadeConfiguration implements TemplateEngine {
 
 	// --- VARIABLES ---
-	
-	protected Charset charset = StandardCharsets.UTF_8;
-	
+
 	protected int writeBufferSize = 2048;
-	
+
 	protected JadeLoader loader = new JadeLoader();
-	
+
 	// --- CONSTRUCTOR ---
-	
+
 	public JadeEngine() {
 		super();
 
 		// Set template loader
 		setTemplateLoader(loader);
 	}
-	
+
 	// --- TRANSFORM JSON TO HTML ---
-	
+
 	@SuppressWarnings("unchecked")
 	@Override
 	public byte[] transform(String templatePath, Tree data) throws Exception {
+		
+		// Get template
 		JadeTemplate template = getTemplate(templatePath);
 
 		// Render template
@@ -79,29 +79,29 @@ public class JadeEngine extends JadeConfiguration implements TemplateEngine {
 			map.put("data", data.asObject());
 		}
 		renderTemplate(template, map, out);
-		return out.toString().getBytes(charset);
+		return out.toString().getBytes(loader.charset);
 	}
 
 	// --- CHARACTER ENCODING OF TEMPLATES ---
-	
+
 	public Charset getCharset() {
-		return charset;
+		return loader.charset;
 	}
 
 	@Override
 	public void setCharset(Charset charset) {
-		this.charset = charset;
-		loader.setCharset(charset);
+		loader.charset = charset;
 	}
 
 	// --- ENABLE / DISABLE RELOADING ---
 
 	public boolean isReloadable() {
-		return !isCaching();
+		return loader.reloadable;
 	}
 
 	@Override
 	public void setReloadable(boolean reloadable) {
+		loader.reloadable = reloadable;
 		setCaching(!reloadable);
 	}
 
@@ -117,7 +117,7 @@ public class JadeEngine extends JadeConfiguration implements TemplateEngine {
 	}
 
 	// --- INITIAL SIZE OF WRITE BUFFER ---
-	
+
 	public int getWriteBufferSize() {
 		return writeBufferSize;
 	}
@@ -125,22 +125,40 @@ public class JadeEngine extends JadeConfiguration implements TemplateEngine {
 	public void setWriteBufferSize(int writeBufferSize) {
 		this.writeBufferSize = writeBufferSize;
 	}
-	
-	// --- LOADER CLASS ---
-	
+
+	// --- EXTENSION OF TEMPLATES ---
+
+	public String getExtension() {
+		return loader.extension;
+	}
+
+	public void setExtension(String extension) {
+		loader.extension = extension;
+	}
+
+	// --- TEMPLATE LOADER CLASS ---
+
 	protected static class JadeLoader implements TemplateLoader {
 
 		// --- VARIABLES ---
 
 		protected Charset charset = StandardCharsets.UTF_8;
-		
+
 		protected String extension = "jade";
-		
+
+		protected boolean reloadable;
+
 		// --- LOADER METHODS ---
-		
+
 		@Override
 		public long getLastModified(String name) throws IOException {
-			return getLastModifiedTime(name);
+			if (reloadable) {
+				String n = name.indexOf('.') > -1 ? name : name + '.' + extension;
+				return getLastModifiedTime(n);
+			}
+
+			// Disable disk I/O (for the max performance)
+			return 0;
 		}
 
 		@Override
@@ -153,25 +171,11 @@ public class JadeEngine extends JadeConfiguration implements TemplateEngine {
 			return new StringReader(template);
 		}
 
-		// --- GETTERS / SETTERS ---
-
-		protected Charset getCharset() {
-			return charset;
-		}
-
-		protected void setCharset(Charset charset) {
-			this.charset = charset;
-		}
-
 		@Override
 		public String getExtension() {
 			return extension;
 		}
 
-		protected void setExtension(String extension) {
-			this.extension = extension;
-		}
-		
 	}
-	
+
 }
