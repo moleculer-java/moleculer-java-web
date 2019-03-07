@@ -45,7 +45,7 @@ import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
-import services.moleculer.web.template.TemplateEngine;
+import services.moleculer.web.template.AbstractTemplateEngine;
 
 import static services.moleculer.web.common.GatewayUtils.sendError;
 
@@ -79,12 +79,12 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 	// --- TEMPLATE ENGINE ---
 
-	protected final TemplateEngine templateEngine;
+	protected final AbstractTemplateEngine abstractTemplateEngine;
 
 	// --- CONSTRUCTOR ---
 
 	public ActionInvoker(String actionName, String pathPattern, boolean isStatic, String pathPrefix, int[] indexes,
-			String[] names, Options opts, ServiceInvoker serviceInvoker, TemplateEngine templateEngine) {
+			String[] names, Options opts, ServiceInvoker serviceInvoker, AbstractTemplateEngine abstractTemplateEngine) {
 		this.actionName = actionName;
 		this.pathPattern = pathPattern;
 		this.isStatic = isStatic;
@@ -93,7 +93,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		this.names = names;
 		this.opts = opts;
 		this.serviceInvoker = serviceInvoker;
-		this.templateEngine = templateEngine;
+		this.abstractTemplateEngine = abstractTemplateEngine;
 		this.jsonSerializer = TreeWriterRegistry.getWriter(null);
 	}
 
@@ -263,7 +263,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		if (meta != null) {
 
 			// Path of the HTML-template
-			if (templateEngine != null) {
+			if (abstractTemplateEngine != null) {
 				templatePath = meta.get(META_TEMPLATE, (String) null);
 			}
 
@@ -346,7 +346,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 					}
 
 					// Invoke TemplateEngine
-					body = templateEngine.transform(templatePath, out);
+					body = abstractTemplateEngine.transform(templatePath, out);
 
 				} else {
 

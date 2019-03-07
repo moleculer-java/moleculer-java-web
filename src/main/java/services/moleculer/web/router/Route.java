@@ -41,7 +41,7 @@ import services.moleculer.ServiceBroker;
 import services.moleculer.context.CallOptions;
 import services.moleculer.eventbus.Matcher;
 import services.moleculer.web.middleware.HttpMiddleware;
-import services.moleculer.web.template.TemplateEngine;
+import services.moleculer.web.template.AbstractTemplateEngine;
 
 public class Route {
 
@@ -60,7 +60,7 @@ public class Route {
 	protected final CallOptions.Options opts;
 	protected final String[] whitelist;
 	protected final Alias[] aliases;
-	protected final TemplateEngine templateEngine;
+	protected final AbstractTemplateEngine abstractTemplateEngine;
 
 	// --- ROUTE-SPECIFIC MIDDLEWARES ---
 	
@@ -74,13 +74,13 @@ public class Route {
 	}
 	
 	public Route(ServiceBroker broker, String path, MappingPolicy mappingPolicy, CallOptions.Options opts,
-			String[] whitelist, Alias[] aliases, TemplateEngine templateEngine) {
+			String[] whitelist, Alias[] aliases, AbstractTemplateEngine abstractTemplateEngine) {
 		
 		this.broker = Objects.requireNonNull(broker);
 		this.path = formatPath(path);
 		this.mappingPolicy = mappingPolicy;
 		this.opts = opts;
-		this.templateEngine = templateEngine;
+		this.abstractTemplateEngine = abstractTemplateEngine;
 		
 		if (whitelist != null && whitelist.length > 0) {
 			for (int i = 0; i < whitelist.length; i++) {
@@ -121,7 +121,7 @@ public class Route {
 			for (Alias alias : aliases) {
 				if (Alias.ALL.equals(alias.httpMethod) || httpMethod.equals(alias.httpMethod)) {
 					Mapping mapping = new Mapping(broker, httpMethod, this.path + alias.pathPattern, alias.actionName,
-							opts, templateEngine);
+							opts, abstractTemplateEngine);
 					if (mapping.matches(httpMethod, path)) {
 						if (!routeMiddlewares.isEmpty()) {
 							mapping.use(routeMiddlewares);
@@ -138,7 +138,7 @@ public class Route {
 		if (whitelist != null && whitelist.length > 0) {
 			for (String pattern : whitelist) {
 				if (Matcher.matches(shortPath, pattern)) {
-					Mapping mapping = new Mapping(broker, httpMethod, this.path + pattern, actionName, opts, templateEngine);
+					Mapping mapping = new Mapping(broker, httpMethod, this.path + pattern, actionName, opts, abstractTemplateEngine);
 					if (!routeMiddlewares.isEmpty()) {
 						mapping.use(routeMiddlewares);
 					}
@@ -153,7 +153,7 @@ public class Route {
 			} else {
 				pattern = this.path + '*';
 			}
-			Mapping mapping = new Mapping(broker, httpMethod, pattern, actionName, opts, templateEngine);
+			Mapping mapping = new Mapping(broker, httpMethod, pattern, actionName, opts, abstractTemplateEngine);
 			if (!routeMiddlewares.isEmpty()) {
 				mapping.use(routeMiddlewares);
 			}

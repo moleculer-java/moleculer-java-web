@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2019 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -25,17 +25,14 @@
  */
 package services.moleculer.web.template;
 
-import static services.moleculer.web.common.GatewayUtils.getLastModifiedTime;
-import static services.moleculer.web.common.GatewayUtils.isReadable;
-import static services.moleculer.web.common.GatewayUtils.readAllBytes;
-
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.Locale;
+import java.util.Objects;
 
 import freemarker.cache.NullCacheStorage;
 import freemarker.cache.StrongCacheStorage;
@@ -53,101 +50,131 @@ import freemarker.template.TemplateScalarModel;
 import freemarker.template.TemplateSequenceModel;
 import freemarker.template.Version;
 import io.datatree.Tree;
+import services.moleculer.util.CheckedTree;
 
-public class FreeMakerEngine extends Configuration implements TemplateEngine {
+public class FreeMarkerEngine extends AbstractTemplateEngine {
 
 	// --- VARIABLES ---
 
-	protected boolean reloadable;
+	protected Configuration configuration;
 
-	protected int writeBufferSize = 2048;
-
-	protected FreeMakerLoader loader = new FreeMakerLoader();
-
-	protected Charset charset = StandardCharsets.UTF_8;
+	protected FreeMarkerLoader loader = new FreeMarkerLoader();
 
 	// --- CONSTRUCTOR ---
 
-	public FreeMakerEngine() {
-		this(DEFAULT_INCOMPATIBLE_IMPROVEMENTS);
+	public FreeMarkerEngine() {
+		this(Configuration.DEFAULT_INCOMPATIBLE_IMPROVEMENTS);
 	}
 
-	public FreeMakerEngine(Version incompatibleImprovements) {
-		super(incompatibleImprovements);
-		setObjectWrapper(new FreeMakerTreeWrapper());
-		setTemplateLoader(loader);
+	public FreeMarkerEngine(Version incompatibleImprovements) {
+		configuration = new Configuration(incompatibleImprovements);
+		configuration.setObjectWrapper(new FreeMarkerTreeWrapper());
+		configuration.setTemplateLoader(loader);
+		configuration.setLocalizedLookup(false);
+		configuration.setLocale(Locale.ENGLISH);
+		configuration.setEncoding(Locale.ENGLISH, "UTF-8");
 		setReloadable(false);
-		setLocalizedLookup(false);
-		setEncoding(getLocale(), "UTF-8");
 	}
 
 	// --- TRANSFORM JSON TO HTML ---
 
 	@Override
 	public byte[] transform(String templatePath, Tree data) throws Exception {
-
-		// Render template
 		StringWriter out = new StringWriter(writeBufferSize);
-		getTemplate(templatePath).process(data, out);
+		configuration.getTemplate(templatePath).process(data, out);
 		return out.toString().getBytes(charset);
 	}
 
 	// --- CHARACTER ENCODING OF TEMPLATES ---
 
-	public Charset getCharset() {
-		charset = Charset.forName(getEncoding(getLocale()));
-		return charset;
-	}
-
 	@Override
 	public void setCharset(Charset charset) {
-		if (!this.charset.equals(charset)) {
-			setEncoding(getLocale(), charset.name());
-			this.charset = charset;
-		}
+		super.setCharset(charset);
+		configuration.setEncoding(configuration.getLocale(), this.charset.name());
 	}
 
 	// --- ENABLE / DISABLE RELOADING ---
 
-	public boolean isReloadable() {
-		return reloadable;
-	}
-
 	public void setReloadable(boolean reloadable) {
 		if (this.reloadable != reloadable) {
-			this.reloadable = reloadable;
-			if (reloadable) {
-				setCacheStorage(new NullCacheStorage());
+			super.setReloadable(this.reloadable);
+			loader.reloadable = this.reloadable;
+			if (this.reloadable) {
+				configuration.setCacheStorage(new NullCacheStorage());
 			} else {
-				setCacheStorage(new StrongCacheStorage());
+				configuration.setCacheStorage(new StrongCacheStorage());
 			}
 		}
 	}
 
 	// --- ROOT PATH OF TEMPLATES ---
 
-	public String getTemplatePath() {
-		return loader.getTemplatePath();
-	}
-
 	@Override
 	public void setTemplatePath(String templatePath) {
-		loader.setTemplatePath(templatePath);
+		super.setTemplatePath(templatePath);
+		loader.templatePath = this.templatePath;
 	}
 
-	// --- INITIAL SIZE OF WRITE BUFFER ---
+	// --- DEFAULT EXTENSION ---
 
-	public int getWriteBufferSize() {
-		return writeBufferSize;
+	@Override
+	public void setDefaultExtension(String defaultExtension) {
+		super.setDefaultExtension(defaultExtension);
+		loader.extension = this.defaultExtension;
 	}
 
-	public void setWriteBufferSize(int writeBufferSize) {
-		this.writeBufferSize = writeBufferSize;
+	// --- FREEMARKER CONFIGURATION ---
+
+	public Configuration getConfiguration() {
+		return configuration;
+	}
+
+	public void setConfiguration(Configuration configuration) {
+		this.configuration = Objects.requireNonNull(configuration);
+	}
+
+	// --- LOADER CLASS ---
+
+	public static class FreeMarkerLoader implements TemplateLoader {
+
+		// --- VARIABLES ---
+
+		protected String templatePath = "";
+
+		protected String extension = "html";
+
+		protected boolean reloadable;
+
+		// --- TEMPLATE LOADER IMPLEMENTATION ---
+
+		@Override
+		public Object findTemplateSource(String name) throws IOException {
+			return getAbsolutePath(templatePath, name, extension);
+		}
+
+		@Override
+		public long getLastModified(Object templateSource) {
+			return getLastModifiedMillis(null, String.valueOf(templateSource), extension, reloadable);
+		}
+
+		@Override
+		public Reader getReader(Object templateSource, String encoding) throws IOException {
+			String template = loadResource(null, String.valueOf(templateSource), extension,
+					Charset.forName(encoding));
+			return new StringReader(template);
+		}
+
+		@Override
+		public void closeTemplateSource(Object templateSource) throws IOException {
+
+			// Nothing to do
+		}
+
 	}
 
 	// --- ABSTRACT MODEL CLASS ---
-	
-	protected static class FreeMakerAbstractModel implements TemplateHashModel {
+
+	public static class FreeMarkerAbstractModel implements TemplateHashModel {
 
 		// --- WRAPPED DATA STRUCTURE ---
 
@@ -155,7 +182,7 @@ public class FreeMakerEngine extends Configuration implements TemplateEngine {
 
 		// --- CONSTRUCTOR ---
 
-		protected FreeMakerAbstractModel(Tree node) {
+		protected FreeMarkerAbstractModel(Tree node) {
 			this.node = node;
 		}
 
@@ -178,10 +205,10 @@ public class FreeMakerEngine extends Configuration implements TemplateEngine {
 				return null;
 			}
 			if (node.isMap()) {
-				return new FreeMakerTreeModel(node);
+				return new FreeMarkerTreeModel(node);
 			}
 			if (node.isEnumeration()) {
-				return new FreeMakerTreeSequenceModel(node);
+				return new FreeMarkerTreeSequenceModel(node);
 			}
 			Object value = node.asObject();
 			if (value instanceof Boolean) {
@@ -229,71 +256,14 @@ public class FreeMakerEngine extends Configuration implements TemplateEngine {
 		}
 
 	}
-	
-	// --- LOADER CLASS ---
-	
-	protected static class FreeMakerLoader implements TemplateLoader {
-
-		// --- VARIABLES ---
-		
-		protected String templatePath = "";
-		
-		// --- TEMPLATE LOADER IMPLEMENTATION ---
-		
-		@Override
-		public Object findTemplateSource(String name) throws IOException {
-			String path = templatePath + '/' + name.replace('\\', '/');
-			if (isReadable(path)) {
-				return path;
-			}
-			return null;
-		}
-
-		@Override
-		public long getLastModified(Object templateSource) {
-			return getLastModifiedTime(String.valueOf(templateSource));
-		}
-
-		@Override
-		public Reader getReader(Object templateSource, String encoding) throws IOException {
-			String name = String.valueOf(templateSource);
-			if (!isReadable(name)) {
-				throw new IOException("File not found:" + name);
-			}
-			byte[] bytes = readAllBytes(name);
-			String template = new String(bytes, encoding);
-			return new StringReader(template);
-		}
-
-		@Override
-		public void closeTemplateSource(Object templateSource) throws IOException {
-			
-			// Nothing to do
-		}
-
-		// --- GETTERS AND SETTERS ---
-
-		protected void setTemplatePath(String templatePath) {
-			templatePath = templatePath.replace('\\', '/');
-			while (templatePath.endsWith("/")) {
-				templatePath = templatePath.substring(0, templatePath.length() - 1);
-			}
-			this.templatePath = templatePath;
-		}
-
-		protected String getTemplatePath() {
-			return templatePath;
-		}
-		
-	}
 
 	// --- TREE MODEL CLASS ---
-	
-	protected static class FreeMakerTreeModel extends FreeMakerAbstractModel implements TemplateNodeModel {
+
+	public static class FreeMarkerTreeModel extends FreeMarkerAbstractModel implements TemplateNodeModel {
 
 		// --- CONSTRUCTOR ---
 
-		protected FreeMakerTreeModel(Tree node) {
+		protected FreeMarkerTreeModel(Tree node) {
 			super(node);
 		}
 
@@ -317,19 +287,19 @@ public class FreeMakerEngine extends Configuration implements TemplateEngine {
 		@Override
 		public TemplateNodeModel getParentNode() throws TemplateModelException {
 			Tree parent = node.getParent();
-			return parent == null ? null : new FreeMakerTreeModel(parent);
+			return parent == null ? null : new FreeMarkerTreeModel(parent);
 		}
 
 		@Override
 		public TemplateSequenceModel getChildNodes() throws TemplateModelException {
-			return new FreeMakerTreeSequenceModel(node);
+			return new FreeMarkerTreeSequenceModel(node);
 		}
 
 	}
-	
+
 	// --- TREE SEQUENCE MODEL CLASS ---
-	
-	protected static class FreeMakerTreeSequenceModel extends FreeMakerAbstractModel implements TemplateSequenceModel {
+
+	public static class FreeMarkerTreeSequenceModel extends FreeMarkerAbstractModel implements TemplateSequenceModel {
 
 		// --- WRAPPED SEQUENCE ---
 
@@ -337,9 +307,9 @@ public class FreeMakerEngine extends Configuration implements TemplateEngine {
 
 		// --- CONSTRUCTOR ---
 
-		protected FreeMakerTreeSequenceModel(Tree node) {
+		protected FreeMarkerTreeSequenceModel(Tree node) {
 			super(node);
-			Tree[] children = new Tree[node.size()];
+			children = new Tree[node.size()];
 			int i = 0;
 			for (Tree child : node) {
 				children[i++] = child;
@@ -357,18 +327,27 @@ public class FreeMakerEngine extends Configuration implements TemplateEngine {
 		public TemplateModel get(int index) throws TemplateModelException {
 			return nodeToModel(children[index]);
 		}
-		
+
 	}
-	
+
 	// --- TREE WRAPPER CLASS ---
-	
-	protected static class FreeMakerTreeWrapper implements ObjectWrapper {
+
+	public static class FreeMarkerTreeWrapper implements ObjectWrapper {
 
 		@Override
 		public TemplateModel wrap(Object obj) {
-			return new FreeMakerTreeModel((Tree) obj);
+			if (obj == null) {
+				return null;
+			}
+			if (obj instanceof Tree) {
+				return new FreeMarkerTreeModel((Tree) obj);
+			}
+			if (obj instanceof TemplateModel) {
+				return (TemplateModel) obj;
+			}
+			return new FreeMarkerTreeModel(new CheckedTree(obj));			
 		}
-		
+
 	}
-	
+
 }

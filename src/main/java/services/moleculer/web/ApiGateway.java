@@ -47,7 +47,7 @@ import services.moleculer.web.router.Alias;
 import services.moleculer.web.router.Mapping;
 import services.moleculer.web.router.MappingPolicy;
 import services.moleculer.web.router.Route;
-import services.moleculer.web.template.TemplateEngine;
+import services.moleculer.web.template.AbstractTemplateEngine;
 
 public class ApiGateway extends Service implements RequestProcessor {
 
@@ -99,7 +99,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	/**
 	 * HTML template engine.
 	 */
-	protected TemplateEngine templateEngine;
+	protected AbstractTemplateEngine abstractTemplateEngine;
 
 	// --- LOCKS ---
 
@@ -161,7 +161,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 		}
 
 		// Set last route (ServeStatic, "404 Not Found", etc.)
-		lastRoute = new Route(broker, "", MappingPolicy.ALL, null, null, null, templateEngine);
+		lastRoute = new Route(broker, "", MappingPolicy.ALL, null, null, null, abstractTemplateEngine);
 		lastRoute.use(lastMiddleware);
 	}
 
@@ -376,7 +376,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 		}
 		String[] whiteList = new String[list.size()];
 		list.toArray(whiteList);
-		Route route = new Route(broker, path, MappingPolicy.RESTRICT, null, whiteList, null, templateEngine);
+		Route route = new Route(broker, path, MappingPolicy.RESTRICT, null, whiteList, null, abstractTemplateEngine);
 		if (middlewares != null && middlewares.length > 0) {
 			route.use(middlewares);
 		}
@@ -401,7 +401,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 */
 	public Route addRoute(String httpMethod, String path, String actionName, HttpMiddleware... middlewares) {
 		Alias alias = new Alias(httpMethod, path, actionName);
-		Route route = new Route(broker, "", MappingPolicy.RESTRICT, null, null, new Alias[] { alias }, templateEngine);
+		Route route = new Route(broker, "", MappingPolicy.RESTRICT, null, null, new Alias[] { alias }, abstractTemplateEngine);
 		if (middlewares != null && middlewares.length > 0) {
 			route.use(middlewares);
 		}
@@ -427,7 +427,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 */
 	public Route addRoute(String path, MappingPolicy mappingPolicy, CallOptions.Options opts, String[] whitelist,
 			Alias[] aliases) {
-		return addRoute(new Route(broker, path, mappingPolicy, opts, whitelist, aliases, templateEngine));
+		return addRoute(new Route(broker, path, mappingPolicy, opts, whitelist, aliases, abstractTemplateEngine));
 	}
 
 	/**
@@ -498,12 +498,12 @@ public class ApiGateway extends Service implements RequestProcessor {
 		this.debug = debug;
 	}
 
-	public TemplateEngine getTemplateEngine() {
-		return templateEngine;
+	public AbstractTemplateEngine getTemplateEngine() {
+		return abstractTemplateEngine;
 	}
 
-	public void setTemplateEngine(TemplateEngine templateEngine) {
-		this.templateEngine = templateEngine;
+	public void setTemplateEngine(AbstractTemplateEngine abstractTemplateEngine) {
+		this.abstractTemplateEngine = abstractTemplateEngine;
 	}
 
 }

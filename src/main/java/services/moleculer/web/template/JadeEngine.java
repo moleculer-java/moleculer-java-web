@@ -25,39 +25,35 @@
  */
 package services.moleculer.web.template;
 
-import static services.moleculer.web.common.GatewayUtils.getLastModifiedTime;
-import static services.moleculer.web.common.GatewayUtils.isReadable;
-import static services.moleculer.web.common.GatewayUtils.readAllBytes;
-
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
+import de.neuland.jade4j.Jade4J.Mode;
 import de.neuland.jade4j.JadeConfiguration;
-import de.neuland.jade4j.template.JadeTemplate;
 import de.neuland.jade4j.template.TemplateLoader;
 import io.datatree.Tree;
 
-public class JadeEngine extends JadeConfiguration implements TemplateEngine {
+public class JadeEngine extends AbstractTemplateEngine {
 
 	// --- VARIABLES ---
 
-	protected int writeBufferSize = 2048;
+	protected JadeConfiguration configuration = new JadeConfiguration();
 
 	protected JadeLoader loader = new JadeLoader();
 
 	// --- CONSTRUCTOR ---
 
 	public JadeEngine() {
-		super();
-
-		// Set template loader
-		setTemplateLoader(loader);
+		configuration.setTemplateLoader(loader);
+		configuration.setCaching(true);
+		configuration.setMode(Mode.HTML);
+		configuration.setPrettyPrint(false);
 	}
 
 	// --- TRANSFORM JSON TO HTML ---
@@ -65,86 +61,67 @@ public class JadeEngine extends JadeConfiguration implements TemplateEngine {
 	@SuppressWarnings("unchecked")
 	@Override
 	public byte[] transform(String templatePath, Tree data) throws Exception {
-		
-		// Get template
-		JadeTemplate template = getTemplate(templatePath);
-
-		// Render template
 		StringWriter out = new StringWriter(writeBufferSize);
-		Map<String, Object> map = null;
-		if (data.isMap()) {
-			map = (Map<String, Object>) data.asObject();
-		} else {
-			map = new HashMap<String, Object>();
-			map.put("data", data.asObject());
-		}
-		renderTemplate(template, map, out);
+		configuration.renderTemplate(configuration.getTemplate(templatePath), (Map<String, Object>) data.asObject(),
+				out);
 		return out.toString().getBytes(loader.charset);
-	}
-
-	// --- CHARACTER ENCODING OF TEMPLATES ---
-
-	public Charset getCharset() {
-		return loader.charset;
-	}
-
-	@Override
-	public void setCharset(Charset charset) {
-		loader.charset = charset;
 	}
 
 	// --- ENABLE / DISABLE RELOADING ---
 
-	public boolean isReloadable() {
-		return loader.reloadable;
-	}
-
 	@Override
 	public void setReloadable(boolean reloadable) {
-		loader.reloadable = reloadable;
-		setCaching(!reloadable);
+		super.setReloadable(reloadable);
+		configuration.setCaching(!this.reloadable);
+		loader.reloadable = this.reloadable;
 	}
 
 	// --- ROOT PATH OF TEMPLATES ---
 
-	public String getTemplatePath() {
-		return getBasePath();
-	}
-
 	@Override
 	public void setTemplatePath(String templatePath) {
-		setBasePath(templatePath);
+		super.setTemplatePath(templatePath);
+		configuration.setBasePath(this.templatePath);
+		loader.templatePath = this.templatePath;
 	}
 
-	// --- INITIAL SIZE OF WRITE BUFFER ---
+	// --- CHARACTER ENCODING OF TEMPLATES ---
 
-	public int getWriteBufferSize() {
-		return writeBufferSize;
+	@Override
+	public void setCharset(Charset charset) {
+		super.setCharset(charset);
+		loader.charset = this.charset;
 	}
 
-	public void setWriteBufferSize(int writeBufferSize) {
-		this.writeBufferSize = writeBufferSize;
+	// --- DEFAULT EXTENSION ---
+
+	@Override
+	public void setDefaultExtension(String defaultExtension) {
+		super.setDefaultExtension(defaultExtension);
+		loader.extension = this.defaultExtension;
 	}
 
-	// --- EXTENSION OF TEMPLATES ---
+	// --- JADE CONFIGURATION ---
 
-	public String getExtension() {
-		return loader.extension;
+	public JadeConfiguration getConfiguration() {
+		return configuration;
 	}
 
-	public void setExtension(String extension) {
-		loader.extension = extension;
+	public void setConfiguration(JadeConfiguration configuration) {
+		this.configuration = Objects.requireNonNull(configuration);
 	}
 
 	// --- TEMPLATE LOADER CLASS ---
 
-	protected static class JadeLoader implements TemplateLoader {
+	public static class JadeLoader implements TemplateLoader {
 
 		// --- VARIABLES ---
 
 		protected Charset charset = StandardCharsets.UTF_8;
 
-		protected String extension = "jade";
+		protected String templatePath = "";
+		
+		protected String extension = "html";
 
 		protected boolean reloadable;
 
@@ -152,23 +129,12 @@ public class JadeEngine extends JadeConfiguration implements TemplateEngine {
 
 		@Override
 		public long getLastModified(String name) throws IOException {
-			if (reloadable) {
-				String n = name.indexOf('.') > -1 ? name : name + '.' + extension;
-				return getLastModifiedTime(n);
-			}
-
-			// Disable disk I/O (for the max performance)
-			return 0;
+			return getLastModifiedMillis(templatePath, name, extension, reloadable);
 		}
 
 		@Override
 		public Reader getReader(String name) throws IOException {
-			if (!isReadable(name)) {
-				throw new IOException("File not found:" + name);
-			}
-			byte[] bytes = readAllBytes(name);
-			String template = new String(bytes, charset);
-			return new StringReader(template);
+			return new StringReader(loadResource(templatePath, name, extension, charset));
 		}
 
 		@Override

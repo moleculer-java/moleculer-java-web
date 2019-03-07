@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2019 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -25,55 +25,49 @@
  */
 package services.moleculer.web.template;
 
-import java.io.Reader;
-import java.io.StringReader;
-import java.io.StringWriter;
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
-import java.util.concurrent.ExecutorService;
-
-import com.github.mustachejava.DefaultMustacheFactory;
-import com.github.mustachejava.MustacheResolver;
 
 import io.datatree.Tree;
+import io.datatree.templates.ResourceLoader;
+import io.datatree.templates.TemplateEngine;
 
-public class MustacheEngine extends AbstractTemplateEngine {
+public class DataTreeEngine extends AbstractTemplateEngine {
 
 	// --- VARIABLES ---
 
-	protected boolean reloadable;
+	protected DataTreeLoader loader = new DataTreeLoader();
 
-	protected int writeBufferSize = 2048;
-
-	protected DefaultMustacheFactory factory;
-
-	protected MustacheLoader loader = new MustacheLoader();
+	protected TemplateEngine engine = new TemplateEngine();
 
 	// --- CONSTRUCTOR ---
 
-	public MustacheEngine() {
-		factory = new DefaultMustacheFactory(loader);
+	public DataTreeEngine() {
+		engine.setLoader(loader);
 	}
 
 	// --- TRANSFORM JSON TO HTML ---
 
 	@Override
 	public byte[] transform(String templatePath, Tree data) throws Exception {
-		StringWriter out = new StringWriter(writeBufferSize);
-		if (reloadable) {
+		return engine.process(templatePath, data).getBytes(charset);
+	}
 
-			// Always load templates
-			Reader reader = loader.getReader(templatePath);
-			factory.compile(reader, templatePath).execute(out, data.asObject());
+	// --- WRITE BUFFER SIZE ---
 
-		} else {
+	public void setWriteBufferSize(int writeBufferSize) {
+		super.setWriteBufferSize(writeBufferSize);
+		engine.setWriteBufferSize(this.writeBufferSize);
+	}
 
-			// Use cache
-			factory.compile(templatePath).execute(out, data.asObject());
+	// --- CHARACTER ENCODING OF TEMPLATES ---
 
-		}
-		return out.toString().getBytes(loader.charset);
+	public void setCharset(Charset charset) {
+		this.charset = charset;
+		engine.setCharset(this.charset);
+		loader.charset = this.charset;
 	}
 
 	// --- ROOT PATH OF TEMPLATES ---
@@ -84,14 +78,6 @@ public class MustacheEngine extends AbstractTemplateEngine {
 		loader.templatePath = this.templatePath;
 	}
 
-	// --- CHARACTER ENCODING OF TEMPLATES ---
-
-	@Override
-	public void setCharset(Charset charset) {
-		super.setCharset(charset);
-		loader.charset = this.charset;
-	}
-
 	// --- DEFAULT EXTENSION ---
 
 	@Override
@@ -100,29 +86,27 @@ public class MustacheEngine extends AbstractTemplateEngine {
 		loader.extension = this.defaultExtension;
 	}
 
-	// --- OPTIONAL EXECUTOR (CAN BE NULL) ---
+	// --- ENABLE / DISABLE RELOADING ---
 
 	@Override
-	public void setExecutor(ExecutorService executor) {
-		super.setExecutor(executor);
-		factory.setExecutorService(this.executor);
+	public void setReloadable(boolean reloadable) {
+		super.setReloadable(reloadable);
+		loader.reloadable = this.reloadable;
 	}
 
-	// --- MUSTACHE FACTORY ---
+	// --- DATATREE TEMPLATE ENGINE ---
 
-	public DefaultMustacheFactory getFactory() {
-		return factory;
+	public TemplateEngine getEngine() {
+		return engine;
 	}
 
-	public void setFactory(DefaultMustacheFactory factory) {
-		this.factory = Objects.requireNonNull(factory);
+	public void setEngine(TemplateEngine engine) {
+		this.engine = Objects.requireNonNull(engine);
 	}
 
-	// --- LOADER CLASS ---
+	// --- TEMPLATE LOADER ---
 
-	public static class MustacheLoader implements MustacheResolver {
-
-		// --- VARIABLES ---
+	public static class DataTreeLoader implements ResourceLoader {
 
 		protected Charset charset = StandardCharsets.UTF_8;
 
@@ -130,11 +114,16 @@ public class MustacheEngine extends AbstractTemplateEngine {
 
 		protected String extension = "html";
 
-		// --- LOADER METHOD ---
+		protected boolean reloadable;
 
 		@Override
-		public Reader getReader(String name) {
-			return new StringReader(loadResource(templatePath, name, extension, charset));
+		public String loadTemplate(String name, Charset charset) throws IOException {
+			return loadResource(templatePath, name, extension, charset);
+		}
+
+		@Override
+		public long lastModified(String name) {
+			return getLastModifiedMillis(templatePath, name, extension, reloadable);
 		}
 
 	}

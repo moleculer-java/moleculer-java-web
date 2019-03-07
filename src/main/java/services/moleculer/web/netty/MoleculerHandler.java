@@ -27,6 +27,8 @@ package services.moleculer.web.netty;
 
 import static services.moleculer.web.common.GatewayUtils.sendError;
 
+import java.util.concurrent.ExecutorService;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -47,120 +49,124 @@ import services.moleculer.web.ApiGateway;
 public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 
 	// --- CHANNEL VARIABLES ---
-	
-	protected ApiGateway gateway;
-	protected ServiceBroker broker;
+
+	protected final ApiGateway gateway;
+	protected final ServiceBroker broker;
+	protected final ExecutorService executor;
 
 	// --- PROCESSING VARIABLES ---
-	
+
 	protected volatile NettyWebRequest req;
-	
+
 	// --- WEBSOCKET VARIABLES ---
 
-	protected volatile String path;	
+	protected volatile String path;
 	protected volatile WebSocketServerHandshaker handshaker;
-	
+
 	// --- CONSTRUCTOR ---
 
 	public MoleculerHandler(ApiGateway gateway, ServiceBroker broker) {
 		this.gateway = gateway;
 		this.broker = broker;
+		this.executor = broker.getConfig().getExecutor();
 	}
-	
+
 	// --- PROCESS INCOMING HTTP REQUEST ---
 
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, Object request) throws Exception {
-		try {
-			
-			// --- HTTP MESSAGES ---
-			
-			// HTTP request -> begin
-			if (request instanceof HttpRequest) {
-				HttpRequest httpRequest = (HttpRequest) request;
-				
-				// Get URI + QueryString
-				path = httpRequest.uri();
+		executor.execute(() -> {
+			try {
 
-				// Get HTTP headers
-				HttpHeaders httpHeaders = httpRequest.headers();
+				// --- HTTP MESSAGES ---
 
-				// Upgrade to WebSocket connection
-				if (httpHeaders.contains("Upgrade")) {
-					WebSocketServerHandshakerFactory factory = new WebSocketServerHandshakerFactory(path, null,
-							true);
-					handshaker = factory.newHandshaker(httpRequest);
-					if (handshaker == null) {
-						WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel());
+				// HTTP request -> begin
+				if (request instanceof HttpRequest) {
+					HttpRequest httpRequest = (HttpRequest) request;
+
+					// Get URI + QueryString
+					path = httpRequest.uri();
+
+					// Get HTTP headers
+					HttpHeaders httpHeaders = httpRequest.headers();
+
+					// Upgrade to WebSocket connection
+					if (httpHeaders.contains("Upgrade")) {
+						WebSocketServerHandshakerFactory factory = new WebSocketServerHandshakerFactory(path, null,
+								true);
+						handshaker = factory.newHandshaker(httpRequest);
+						if (handshaker == null) {
+							WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel());
+						} else {
+							handshaker.handshake(ctx.channel(), httpRequest);
+						}
+						return;
+					}
+
+					// Normal HTTP message
+					req = new NettyWebRequest(ctx, httpRequest, httpHeaders, broker, path);
+					gateway.service(req, new NettyWebResponse(ctx, req));
+					return;
+				}
+
+				// HTTP request -> content
+				if (request instanceof HttpContent) {
+					HttpContent content = (HttpContent) request;
+					byte[] data = null;
+					ByteBuf byteBuffer = content.content();
+					if (byteBuffer == null) {
+						return;
+					}
+					int len = byteBuffer.readableBytes();
+					if (len < 1) {
+						return;
+					}
+					data = new byte[len];
+					byteBuffer.readBytes(data);
+
+					// Push data into the stream
+					if (req.parser == null) {
+						req.stream.sendData(data);
+						if (request instanceof LastHttpContent) {
+							req.stream.sendClose();
+						}
 					} else {
-						handshaker.handshake(ctx.channel(), httpRequest);
+						req.parser.write(data);
 					}
 					return;
 				}
 
-				// Normal HTTP message
-				req = new NettyWebRequest(ctx, httpRequest, httpHeaders, broker, path);
-				gateway.service(req, new NettyWebResponse(ctx, req));
-				return;
-			}
-			
-			// HTTP request -> content
-			if (request instanceof HttpContent) {
-				HttpContent content = (HttpContent) request;
-				byte[] data = null;
-				ByteBuf byteBuffer = content.content();
-				if (byteBuffer == null) {
+				// --- WEBSOCKET MESSAGES ---
+
+				// Process close/ping/continue WebSocket frames
+				if (request instanceof CloseWebSocketFrame) {
+					handshaker.close(ctx.channel(), ((CloseWebSocketFrame) request).retain());
 					return;
 				}
-				int len = byteBuffer.readableBytes();
-				if (len < 1) {
+				if (request instanceof PingWebSocketFrame) {
+					ctx.channel()
+							.writeAndFlush(new PongWebSocketFrame(((PingWebSocketFrame) request).content().retain()));
 					return;
 				}
-				data = new byte[len];
-				byteBuffer.readBytes(data);							
-				
-				// Push data into the stream
-				if (req.parser == null) {
-					req.stream.sendData(data);
-					if (request instanceof LastHttpContent) {
-						req.stream.sendClose();
-					}					
-				} else {
-					req.parser.write(data);
-				}				
-				return;
-			}
-			
-			// --- WEBSOCKET MESSAGES ---
-			
-			// Process close/ping/continue WebSocket frames
-			if (request instanceof CloseWebSocketFrame) {
-				handshaker.close(ctx.channel(), ((CloseWebSocketFrame) request).retain());
-				return;
-			}
-			if (request instanceof PingWebSocketFrame) {
-				ctx.channel()
-						.writeAndFlush(new PongWebSocketFrame(((PingWebSocketFrame) request).content().retain()));
-				return;
-			}
-			if (request instanceof ContinuationWebSocketFrame) {
-				return;
-			}
+				if (request instanceof ContinuationWebSocketFrame) {
+					return;
+				}
 
-			// Process WebSocket message frame
-			if (request instanceof WebSocketFrame) {
-				
-				// Not implemented (use REST)	
-				return;				
+				// Process WebSocket message frame
+				if (request instanceof WebSocketFrame) {
+
+					// Not implemented (use REST)
+					return;
+				}
+
+				// Unknown package type
+				throw new IllegalStateException("Unknown package type: " + request);
+
+			} catch (Throwable cause) {
+				sendError(new NettyWebResponse(ctx, req), cause);
+				broker.getLogger(MoleculerHandler.class).error("Unable to process request!", cause);
 			}
-
-			// Unknown package type
-			throw new IllegalStateException("Unknown package type: " + request);
-
-		} catch (Throwable cause) {
-			sendError(new NettyWebResponse(ctx, req), cause);
-			broker.getLogger(MoleculerHandler.class).error("Unable to process request!", cause);
-		}
+		});
 	}
 
 }

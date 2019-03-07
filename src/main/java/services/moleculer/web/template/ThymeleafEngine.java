@@ -25,16 +25,16 @@
  */
 package services.moleculer.web.template;
 
-import static services.moleculer.web.common.GatewayUtils.readAllBytes;
-
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.thymeleaf.IEngineConfiguration;
+import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.cache.StandardCacheManager;
 import org.thymeleaf.context.IContext;
 import org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver;
@@ -44,13 +44,11 @@ import org.thymeleaf.util.FastStringWriter;
 
 import io.datatree.Tree;
 
-public class ThymeleafEngine extends org.thymeleaf.TemplateEngine implements TemplateEngine {
+public class ThymeleafEngine extends AbstractTemplateEngine {
 
 	// --- VARIABLES ---
 
-	protected Charset charset = StandardCharsets.UTF_8;
-
-	protected int writeBufferSize = 2048;
+	protected TemplateEngine engine = new TemplateEngine();
 
 	protected AbstractConfigurableTemplateResolver loader = new ThymeleafLoader();
 
@@ -59,107 +57,142 @@ public class ThymeleafEngine extends org.thymeleaf.TemplateEngine implements Tem
 	public ThymeleafEngine() {
 
 		// Set template loader
-		setTemplateResolver(loader);
+		engine.setTemplateResolver(loader);
 
 		// Set default properties
-		loader.setSuffix(".thymeleaf");
+		loader.setSuffix(".html");
 		loader.setCharacterEncoding(charset.name());
 
-		// Use larger caches
-		StandardCacheManager cacheManager = new StandardCacheManager();
-		cacheManager.setTemplateCacheInitialSize(512);
-		cacheManager.setTemplateCacheMaxSize(2048);
-		cacheManager.setExpressionCacheInitialSize(512);
-		cacheManager.setExpressionCacheMaxSize(2048);
-		setCacheManager(cacheManager);
+		// Enable caching (and disable reloading)
+		setReloadable(false);
 	}
 
 	// --- TRANSFORM JSON TO HTML ---
 
 	@Override
 	public byte[] transform(String templatePath, Tree data) throws Exception {
-
-		// Render template
 		FastStringWriter writer = new FastStringWriter(writeBufferSize);
-		process(templatePath, new TreeContext(data), writer);
+		engine.process(templatePath, new TreeContext(data), writer);
 		return writer.toString().getBytes(charset);
 	}
 
 	// --- ROOT PATH OF TEMPLATES ---
 
-	public String getTemplatePath() {
-		return loader.getPrefix();
-	}
-
 	@Override
 	public void setTemplatePath(String templatePath) {
-		loader.setPrefix(templatePath);
+		super.setTemplatePath(templatePath);
+		loader.setPrefix(this.templatePath);
 	}
 
 	// --- CHARACTER ENCODING OF TEMPLATES ---
 
-	public Charset getCharset() {
-		return Charset.forName(loader.getCharacterEncoding());
-	}
-
 	@Override
 	public void setCharset(Charset charset) {
-		loader.setCharacterEncoding(charset.name());
+		super.setCharset(charset);
+		loader.setCharacterEncoding(this.charset.name());
 	}
 
 	// --- ENABLE / DISABLE RELOADING ---
 
-	public boolean isReloadable() {
-		return !loader.isCacheable();
-	}
-
 	@Override
 	public void setReloadable(boolean reloadable) {
-		loader.setCacheable(!reloadable);
-	}
-
-	// --- EXTENSION OF TEMPLATES ---
-
-	public String getExtension() {
-		String suffix = loader.getSuffix();
-		while (suffix.startsWith(".")) {
-			suffix = suffix.substring(1);
+		if (this.reloadable != reloadable) {
+			super.setReloadable(reloadable);
+			loader.setCacheable(!this.reloadable);
+			if (this.reloadable) {
+				loader.setCacheable(false);
+				engine.setCacheManager(null);
+			} else {
+				loader.setCacheable(true);
+				StandardCacheManager cacheManager = new StandardCacheManager();
+				cacheManager.setTemplateCacheInitialSize(512);
+				cacheManager.setTemplateCacheMaxSize(2048);
+				cacheManager.setExpressionCacheInitialSize(512);
+				cacheManager.setExpressionCacheMaxSize(2048);
+				engine.setCacheManager(cacheManager);
+			}
 		}
-		return suffix;
 	}
 
-	public void setExtension(String extension) {
-		loader.setSuffix('.' + extension);
+	// --- DEFAULT EXTENSION ---
+
+	@Override
+	public void setDefaultExtension(String defaultExtension) {
+		super.setDefaultExtension(defaultExtension);
+		loader.setSuffix('.' + this.defaultExtension);
 	}
-	
+
+	// --- THYMELEAF ENGINE ---
+
+	public TemplateEngine getEngine() {
+		return engine;
+	}
+
+	public void setEngine(TemplateEngine engine) {
+		this.engine = Objects.requireNonNull(engine);
+	}
+
+	// --- LOADER CLASS ---
+
+	public static class ThymeleafLoader extends AbstractConfigurableTemplateResolver {
+
+		@Override
+		protected ITemplateResource computeTemplateResource(IEngineConfiguration configuration, String ownerTemplate,
+				String template, String resourceName, String characterEncoding,
+				Map<String, Object> templateResolutionAttributes) {
+			if (ownerTemplate == null || ownerTemplate.isEmpty()) {
+				ownerTemplate = getPrefix();
+			}
+			String source = loadResource(ownerTemplate, template, getSuffix(), Charset.forName(characterEncoding));
+			return new StringTemplateResource(source);
+		}
+
+	}
+
 	// --- CONTEXT CLASS ---
 
-	protected static class TreeContext implements IContext {
+	public static class TreeContext implements IContext {
+
+		// --- LOCALE CACHE ---
+
+		protected static final ConcurrentHashMap<String, Locale> localeCache = new ConcurrentHashMap<>();
 
 		// --- VARIABLES ---
 
-		protected String locale;
+		protected final Tree data;
 
-		protected HashMap<String, Object> variables = new HashMap<>();
+		protected final HashMap<String, Object> variables = new HashMap<>();
+
+		protected Locale locale;
 
 		// --- CONSTRUCTOR ---
 
-		protected TreeContext(Tree data) {
+		public TreeContext(Tree data) {
+			this.data = data;
 			collectVariables(data);
-			Tree meta = data.getMeta(false);
-			if (meta != null) {
-				locale = meta.get("$locale", (String) null);
-			}
 		}
 
 		// --- CONTEXT IMPLEMENTATION ---
 
 		@Override
 		public Locale getLocale() {
-			if (locale != null) {
-				return new Locale(locale);
+			if (locale == null) {
+				Tree meta = data.getMeta(false);
+				if (meta != null) {
+					String loc = meta.get("$locale", (String) null);
+					if (loc != null) {
+						locale = localeCache.get(loc);
+						if (locale == null) {
+							locale = Locale.forLanguageTag(loc);
+							localeCache.put(loc, locale);
+						}
+					}
+				}
+				if (locale == null) {
+					return Locale.ENGLISH;
+				}
 			}
-			return Locale.getDefault();
+			return locale;
 		}
 
 		@Override
@@ -192,28 +225,4 @@ public class ThymeleafEngine extends org.thymeleaf.TemplateEngine implements Tem
 
 	}
 
-	// --- LOADER CLASS ---
-
-	protected static class ThymeleafLoader extends AbstractConfigurableTemplateResolver {
-
-		@Override
-		protected ITemplateResource computeTemplateResource(IEngineConfiguration configuration, String ownerTemplate,
-				String template, String resourceName, String characterEncoding,
-				Map<String, Object> templateResolutionAttributes) {
-			
-			// TODO owner template -> relative path
-			
-			String path = template.replace('\\', '/');
-			byte[] bytes = readAllBytes(path);
-			String source;
-			try {
-				source = new String(bytes, characterEncoding);
-			} catch (Exception cause) {
-				source = String.valueOf(cause);
-			}
-			return new StringTemplateResource(source);
-		}
-
-	}
-	
 }

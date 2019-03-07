@@ -39,7 +39,7 @@ import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 import services.moleculer.web.middleware.HttpMiddleware;
-import services.moleculer.web.template.TemplateEngine;
+import services.moleculer.web.template.AbstractTemplateEngine;
 
 public class Mapping implements RequestProcessor, HttpConstants {
 
@@ -51,7 +51,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 	protected final String pathPrefix;
 	protected final int hashCode;
 	protected final Tree config;
-	protected final TemplateEngine templateEngine;
+	protected final AbstractTemplateEngine abstractTemplateEngine;
 
 	// --- LAST PROCESSOR ---
 
@@ -64,10 +64,10 @@ public class Mapping implements RequestProcessor, HttpConstants {
 	// --- CONSTRUCTOR ---
 
 	public Mapping(ServiceBroker broker, String httpMethod, String pathPattern, String actionName,
-			CallOptions.Options opts, TemplateEngine templateEngine) {
+			CallOptions.Options opts, AbstractTemplateEngine abstractTemplateEngine) {
 		this.httpMethod = "ALL".equals(httpMethod) ? null : httpMethod;
 		this.actionName = Objects.requireNonNull(actionName);
-		this.templateEngine = templateEngine;
+		this.abstractTemplateEngine = abstractTemplateEngine;
 
 		// Parse "path pattern"
 		int starPos = pathPattern.indexOf('*');
@@ -125,7 +125,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 		// Set first RequestProcessor in the WebMiddleware chain
 		ServiceInvoker serviceInvoker = broker.getConfig().getServiceInvoker();
 		lastProcessor = new ActionInvoker(actionName, pathPattern, isStatic, pathPrefix, indexes, names, opts,
-				serviceInvoker, templateEngine);
+				serviceInvoker, abstractTemplateEngine);
 	}
 
 	// --- MATCH TEST ---

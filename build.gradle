@@ -110,8 +110,13 @@ dependencies {
 	compile group: 'org.synchronoss.cloud', name: 'nio-multipart-parser', version: '1.1.0'
 
 	// ========== TEMPLATE ENGINES =============
+
+	// --- DATATREE TEMPLATES ---
+
+	// https://mvnrepository.com/artifact/com.github.berkesa/datatree-templates
+	compile group: 'com.github.berkesa', name: 'datatree-templates', version: '1.1.1'
 	
-	// --- FREEMAKER ---
+	// --- FREEMARKER ---
 	
 	// https://mvnrepository.com/artifact/org.freemarker/freemarker
 	compile group: 'org.freemarker', name: 'freemarker', version: '2.3.28'
@@ -130,11 +135,6 @@ dependencies {
 	
 	// https://mvnrepository.com/artifact/org.thymeleaf/thymeleaf
 	compile group: 'org.thymeleaf', name: 'thymeleaf', version: '3.0.11.RELEASE'
-
-	// --- HTTL ---
-	
-	// https://mvnrepository.com/artifact/com.github.httl/httl
-	compile group: 'com.github.httl', name: 'httl', version: '1.0.11'
 
 	// --- PEBBLE ---
 	

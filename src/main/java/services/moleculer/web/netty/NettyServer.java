@@ -36,6 +36,7 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.concurrent.Executors;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.ManagerFactoryParameters;
@@ -64,8 +65,6 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.util.SimpleTrustManagerFactory;
-import io.netty.util.concurrent.DefaultThreadFactory;
-import io.netty.util.concurrent.ThreadPerTaskExecutor;
 import services.moleculer.ServiceBroker;
 import services.moleculer.eventbus.Listener;
 import services.moleculer.eventbus.Subscribe;
@@ -84,7 +83,7 @@ public class NettyServer extends Service {
 
 	protected String address;
 
-	protected EventLoopGroup eventLoopGroup;
+	protected EventLoopGroup singletonGroup;
 
 	protected ChannelHandler handler;
 
@@ -119,14 +118,18 @@ public class NettyServer extends Service {
 		super.started(broker);
 
 		// Worker group
-		if (eventLoopGroup == null) {
-			eventLoopGroup = new NioEventLoopGroup(3,
-					new ThreadPerTaskExecutor(new DefaultThreadFactory(NettyServer.class, Thread.MAX_PRIORITY - 1)));
+		if (singletonGroup == null) {
+			singletonGroup = new NioEventLoopGroup(1, Executors.newSingleThreadExecutor(r -> {
+				Thread t = new Thread(r , "Netty Server on port " + port);
+				t.setPriority(Thread.MAX_PRIORITY - 1);
+				return t;
+			}));
 		}
 
 		// Create request chain
 		ServerBootstrap bootstrap = new ServerBootstrap();
-		bootstrap.group(eventLoopGroup);
+		bootstrap.group(singletonGroup, singletonGroup);
+		
 		bootstrap.channel(NioServerSocketChannel.class);
 
 		// Define request chain
@@ -178,9 +181,9 @@ public class NettyServer extends Service {
 	@Override
 	public void stopped() {
 		super.stopped();
-		if (eventLoopGroup != null) {
-			eventLoopGroup.shutdownGracefully();
-			eventLoopGroup = null;
+		if (singletonGroup != null) {
+			singletonGroup.shutdownGracefully();
+			singletonGroup = null;
 		}
 		handler = null;
 	}

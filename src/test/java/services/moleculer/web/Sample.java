@@ -46,8 +46,9 @@ import services.moleculer.web.netty.NettyServer;
 import services.moleculer.web.router.Alias;
 import services.moleculer.web.router.MappingPolicy;
 import services.moleculer.web.router.Route;
+import services.moleculer.web.template.AbstractTemplateEngine;
 import services.moleculer.web.template.PebbleEngine;
-import services.moleculer.web.template.TemplateEngine;
+import services.moleculer.web.template.ThymeleafEngine;
 
 public class Sample {
 
@@ -72,9 +73,23 @@ public class Sample {
 			ApiGateway gateway = new ApiGateway();
 			broker.createService(gateway);
 
-			TemplateEngine te = new PebbleEngine();
-			te.setTemplatePath("/");
+			// AbstractTemplateEngine te = new JadeEngine();
+			// te.setDefaultExtension("jade");
+
+			// AbstractTemplateEngine te = new FreeMarkerEngine();
+			// te.setDefaultExtension("freemarker");
+
+			// AbstractTemplateEngine te = new MustacheEngine();
+			// te.setDefaultExtension("mustache");
+
+			// AbstractTemplateEngine te = new PebbleEngine();
+			// te.setDefaultExtension("pebble");
+
+			AbstractTemplateEngine te = new ThymeleafEngine();
+			te.setDefaultExtension("thymeleaf");
+
 			te.setReloadable(false);
+			te.setTemplatePath("templates");			
 			gateway.setTemplateEngine(te);
 
 			// http://localhost:3000/math/add?a=5&b=7
@@ -135,7 +150,7 @@ public class Sample {
 						row.put("third", i);
 					}
 					
-					rsp.getMeta().put("$template", "templates/test");
+					rsp.getMeta().put("$template", "test");
 					
 					return rsp;
 

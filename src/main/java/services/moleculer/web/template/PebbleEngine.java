@@ -1,15 +1,7 @@
-package services.moleculer.web.template;
-
-import static services.moleculer.web.common.GatewayUtils.readAllBytes;
-
-import java.io.Reader;
-import java.io.StringReader;
-import java.io.StringWriter;
-import java.nio.charset.Charset;
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2019 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -31,55 +23,48 @@ import java.nio.charset.Charset;
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+package services.moleculer.web.template;
+
+import java.io.Reader;
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ExecutorService;
 
 import com.mitchellbosecke.pebble.error.LoaderException;
 import com.mitchellbosecke.pebble.loader.Loader;
-import com.mitchellbosecke.pebble.template.PebbleTemplate;
 
 import io.datatree.Tree;
 
-public class PebbleEngine implements TemplateEngine {
+public class PebbleEngine extends AbstractTemplateEngine {
 
 	// --- VARIABLES ---
-	
-	protected boolean reloadable;
-
-	protected int writeBufferSize = 2048;
 
 	protected com.mitchellbosecke.pebble.PebbleEngine engine;
-	
+
 	protected PebbleLoader loader = new PebbleLoader();
-	
+
 	// --- CONSTRUCTOR ---
 
 	public PebbleEngine() {
 		buildEngine();
 	}
-	
+
 	protected void buildEngine() {
-		engine = new com.mitchellbosecke.pebble.PebbleEngine.Builder().loader(loader).cacheActive(!reloadable).build();		
+		engine = new com.mitchellbosecke.pebble.PebbleEngine.Builder().loader(loader).cacheActive(!reloadable)
+				.executorService(executor).build();
 	}
-	
+
 	// --- TRANSFORM JSON TO HTML ---
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public byte[] transform(String templatePath, Tree data) throws Exception {
-		PebbleTemplate template = engine.getTemplate(templatePath);
-
-		// Render template
 		StringWriter out = new StringWriter(writeBufferSize);
-		Map<String, Object> map = null;
-		if (data.isMap()) {
-			map = (Map<String, Object>) data.asObject();
-		} else {
-			map = new HashMap<String, Object>();
-			map.put("data", data.asObject());
-		}
-		template.evaluate(out, map);
+		engine.getTemplate(templatePath).evaluate(out, (Map<String, Object>) data.asObject());
 		return out.toString().getBytes(loader.charset);
 	}
 
@@ -87,77 +72,69 @@ public class PebbleEngine implements TemplateEngine {
 
 	@Override
 	public void setTemplatePath(String templatePath) {
-		loader.templatePath = templatePath;
-	}
-
-	public String getTemplatePath() {
-		return loader.templatePath;
+		super.setTemplatePath(templatePath);
+		loader.templatePath = this.templatePath;
 	}
 
 	// --- CHARACTER ENCODING OF TEMPLATES ---
-	
-	public Charset getCharset() {
-		return loader.charset;
-	}
 
 	@Override
 	public void setCharset(Charset charset) {
-		loader.charset = charset;
+		super.setCharset(charset);
+		loader.charset = this.charset;
 	}
 
-	// --- INITIAL SIZE OF WRITE BUFFER ---
-	
-	public int getWriteBufferSize() {
-		return writeBufferSize;
-	}
-
-	public void setWriteBufferSize(int writeBufferSize) {
-		this.writeBufferSize = writeBufferSize;
-	}
-	
 	// --- ENABLE / DISABLE RELOADING ---
-
-	public boolean isReloadable() {
-		return reloadable;
-	}
 
 	@Override
 	public void setReloadable(boolean reloadable) {
 		if (this.reloadable != reloadable) {
-			this.reloadable = reloadable;
+			super.setReloadable(reloadable);
 			buildEngine();
 		}
 	}
-	
-	// --- EXTENSION OF TEMPLATES ---
 
-	public String getExtension() {
-		return loader.extension;
+	// --- DEFAULT EXTENSION ---
+
+	@Override
+	public void setDefaultExtension(String defaultExtension) {
+		super.setDefaultExtension(defaultExtension);
+		loader.extension = this.defaultExtension;
 	}
 
-	public void setExtension(String extension) {
-		loader.extension = extension;
+	// --- OPTIONAL EXECUTOR (CAN BE NULL) ---
+
+	@Override
+	public void setExecutor(ExecutorService executor) {
+		if ((executor == null && this.executor != null) || (executor != null && !executor.equals(this.executor))) {
+			super.setExecutor(executor);
+			buildEngine();
+		}
 	}
-	
+
+	// --- PEBBLE ENGINE ---
+
+	public com.mitchellbosecke.pebble.PebbleEngine getEngine() {
+		return engine;
+	}
+
+	public void setEngine(com.mitchellbosecke.pebble.PebbleEngine engine) {
+		this.engine = Objects.requireNonNull(engine);
+	}
+
 	// --- LOADER CLASS ---
-	
-	protected static class PebbleLoader implements Loader<String> {
-    
+
+	public static class PebbleLoader implements Loader<String> {
+
 		protected Charset charset = StandardCharsets.UTF_8;
-		
+
 		protected String templatePath = "";
 
-		protected String extension = "pebble";
-		
+		protected String extension = "html";
+
 		@Override
 		public Reader getReader(String cacheKey) throws LoaderException {
-			String path = templatePath + '/' + cacheKey;
-			if (cacheKey.indexOf('.') == -1) {
-				path += '.' + extension;
-			}
-			byte[] bytes = readAllBytes(path);
-			String template = new String(bytes, charset);
-			return new StringReader(template);
+			return new StringReader(loadResource(templatePath, cacheKey, extension, charset));
 		}
 
 		@Override
@@ -167,16 +144,25 @@ public class PebbleEngine implements TemplateEngine {
 
 		@Override
 		public void setPrefix(String prefix) {
+			String path = Objects.requireNonNull(prefix);
+			path = path.replace('\\', '/');
+			while (path.endsWith("/")) {
+				path = path.substring(0, path.length() - 1);
+			}
+			this.templatePath = path;
 		}
 
 		@Override
 		public void setSuffix(String suffix) {
+			String ext = Objects.requireNonNull(suffix);
+			while (ext.startsWith(".")) {
+				ext = ext.substring(1);
+			}
+			this.extension = ext.trim();
 		}
 
 		@Override
 		public String resolveRelativePath(String relativePath, String anchorPath) {
-			
-			// TODO compute relative path
 			return relativePath;
 		}
 
@@ -184,7 +170,7 @@ public class PebbleEngine implements TemplateEngine {
 		public String createCacheKey(String templateName) {
 			return templateName;
 		}
-		
+
 	}
-	
+
 }
