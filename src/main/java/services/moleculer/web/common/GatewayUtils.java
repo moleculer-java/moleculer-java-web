@@ -67,8 +67,28 @@ public final class GatewayUtils implements HttpConstants {
 			if (cause instanceof MoleculerError) {
 				error = (MoleculerError) cause;
 			} else {
-				error = new MoleculerError("Unknown error occured!", cause, "unknown", false, 500, "MOLECULER_ERROR",
-						null);
+				Throwable err = cause;
+				if (err != null && err.getCause() != null) {
+					err = err.getCause();
+				}
+				String msg = null;
+				String type = null;
+				if (err != null) {
+					msg = err.getMessage();
+					type = err.getClass().getName();
+					int i = type.lastIndexOf('.');
+					if (i > -1) {
+						type = type.substring(i + 1);
+					}
+					type = type.replaceAll("(.)(\\p{Upper})", "$1_$2").toUpperCase();
+				}
+				if (msg == null || msg.isEmpty()) {
+					msg = "Unknown error occured!";
+				}
+				if (type == null || type.isEmpty()) {
+					type = "MOLECULER_ERROR";
+				}
+				error = new MoleculerError(msg, cause, "unknown", false, 500, type, null);
 			}
 			Tree json = error.toTree();
 			byte[] body = json.toBinary();

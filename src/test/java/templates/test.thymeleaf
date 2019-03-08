@@ -1,5 +1,6 @@
 <html>
     <body>
+		<div th:replace="header"></div>
 		<p th:text="${a}">-</p>
 		<p th:text="${b}">-</p>
 		<p th:text="${c}">-</p>

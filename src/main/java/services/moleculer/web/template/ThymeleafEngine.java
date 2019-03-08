@@ -140,10 +140,7 @@ public class ThymeleafEngine extends AbstractTemplateEngine {
 		protected ITemplateResource computeTemplateResource(IEngineConfiguration configuration, String ownerTemplate,
 				String template, String resourceName, String characterEncoding,
 				Map<String, Object> templateResolutionAttributes) {
-			if (ownerTemplate == null || ownerTemplate.isEmpty()) {
-				ownerTemplate = getPrefix();
-			}
-			String source = loadResource(ownerTemplate, template, getSuffix(), Charset.forName(characterEncoding));
+			String source = loadResource(getPrefix(), template, getSuffix(), Charset.forName(characterEncoding));
 			return new StringTemplateResource(source);
 		}
 

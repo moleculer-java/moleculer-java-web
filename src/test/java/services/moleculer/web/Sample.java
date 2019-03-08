@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2017 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2019 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -25,6 +25,8 @@
  */
 package services.moleculer.web;
 
+import java.math.BigInteger;
+
 import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
 import services.moleculer.cacher.Cache;
@@ -47,8 +49,7 @@ import services.moleculer.web.router.Alias;
 import services.moleculer.web.router.MappingPolicy;
 import services.moleculer.web.router.Route;
 import services.moleculer.web.template.AbstractTemplateEngine;
-import services.moleculer.web.template.PebbleEngine;
-import services.moleculer.web.template.ThymeleafEngine;
+import services.moleculer.web.template.FreeMarkerEngine;
 
 public class Sample {
 
@@ -76,8 +77,8 @@ public class Sample {
 			// AbstractTemplateEngine te = new JadeEngine();
 			// te.setDefaultExtension("jade");
 
-			// AbstractTemplateEngine te = new FreeMarkerEngine();
-			// te.setDefaultExtension("freemarker");
+			AbstractTemplateEngine te = new FreeMarkerEngine();
+			te.setDefaultExtension("freemarker");
 
 			// AbstractTemplateEngine te = new MustacheEngine();
 			// te.setDefaultExtension("mustache");
@@ -85,9 +86,12 @@ public class Sample {
 			// AbstractTemplateEngine te = new PebbleEngine();
 			// te.setDefaultExtension("pebble");
 
-			AbstractTemplateEngine te = new ThymeleafEngine();
-			te.setDefaultExtension("thymeleaf");
+			// AbstractTemplateEngine te = new ThymeleafEngine();
+			// te.setDefaultExtension("thymeleaf");
 
+			// AbstractTemplateEngine te = new DataTreeEngine();
+			// te.setDefaultExtension("datatree");
+			
 			te.setReloadable(false);
 			te.setTemplatePath("templates");			
 			gateway.setTemplateEngine(te);
@@ -141,6 +145,7 @@ public class Sample {
 					rsp.put("a", 1);
 					rsp.put("b", true);
 					rsp.put("c", "xyz");
+					rsp.put("d.e", new BigInteger("3210"));
 					
 					Tree table = rsp.putList("table");
 					for (int i = 0; i < 10; i++) {

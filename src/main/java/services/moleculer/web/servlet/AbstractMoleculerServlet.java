@@ -131,4 +131,14 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 		}
 	}
 	
+	// --- GETTERS ---
+
+	public ApiGateway getGateway() {
+		return gateway;
+	}
+
+	public ServiceBroker getBroker() {
+		return broker;
+	}
+
 }

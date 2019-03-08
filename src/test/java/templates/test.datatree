@@ -1,0 +1,17 @@
+<html>
+    <body>
+        #{include header}
+		<p>A: #{a}</p>
+		<p>B: #{b}</p>
+		<p>C: #{c}</p>
+		<table>
+			#{for row : table}
+			<tr>
+				<td>#{row.first}</td>
+				<td>#{row.second}</td>
+				<td>#{row.third}</td>
+			</tr>		
+			#{end}
+		</table>
+    </body>
+</html>

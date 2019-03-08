@@ -1,5 +1,6 @@
 <html>
     <body>
+    	<#include "header">
 		<p>A: ${a}</p>
 		<p>B: ${b?string('yes', 'no')}</p>
 		<p>C: ${c}</p>
