@@ -88,8 +88,13 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 		broker = ctx.getBean(ServiceBroker.class);
 
 		// Find ApiGateway
-		scheduler = broker.getConfig().getScheduler();
-		scheduler.execute(this::initApiGateway);	
+		gateway = getService(broker, ApiGateway.class);
+		if (gateway == null) {
+			scheduler = broker.getConfig().getScheduler();
+			scheduler.execute(this::initApiGateway);
+		} else {
+			getServletContext().log("ApiGateway connected to Servlet instance.");
+		}
 	}
 	
 	// --- INIT GATEWAY ---

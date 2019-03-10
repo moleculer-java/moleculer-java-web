@@ -2,13 +2,13 @@
     <body>
     	<#include "header">
 		<p>A: ${a}</p>
-		<p>B: ${b?string('yes', 'no')}</p>
+		<p>B: ${b?string('true', 'false')}</p>
 		<p>C: ${c}</p>
 		<table>
 			<#list table as row>
 			<tr>
 				<td>${row.first}</td>
-				<td>${row.second?string('yes', 'no')}</td>
+				<td>${row.second?string('true', 'false')}</td>
 				<td>${row.third}</td>
 			</tr>		
 			</#list>

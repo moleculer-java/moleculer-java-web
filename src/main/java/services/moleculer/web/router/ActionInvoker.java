@@ -132,9 +132,9 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 			// Parameters in URL (eg "/path/:id/:name")
 			params = new Tree();
-			String[] tokens = pathPattern.split("/");
+			String[] tokens = req.getPath().split("/");
 			for (int i = 0; i < indexes.length; i++) {
-				params.put(names[i], tokens[i]);
+				params.put(names[i], tokens[indexes[i]]);
 			}
 		}
 

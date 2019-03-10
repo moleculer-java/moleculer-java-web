@@ -25,14 +25,11 @@
  */
 package services.moleculer.web;
 
-import java.io.File;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 
-import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.ContentType;
-import org.apache.http.entity.mime.MultipartEntityBuilder;
+import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
 import org.apache.http.impl.nio.client.HttpAsyncClients;
 import org.junit.Test;
@@ -42,6 +39,8 @@ import junit.framework.TestCase;
 import services.moleculer.ServiceBroker;
 import services.moleculer.service.Action;
 import services.moleculer.service.Service;
+import services.moleculer.util.CommonUtils;
+import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.middleware.Favicon;
 import services.moleculer.web.middleware.SessionCookie;
 import services.moleculer.web.router.Route;
@@ -58,7 +57,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 	protected ApiGateway gw;
 	protected CloseableHttpAsyncClient cl;
 	protected Route r;
-	
+
 	@Override
 	protected void setUp() throws Exception {
 		br.createService(new Service("test") {
@@ -97,8 +96,9 @@ public abstract class AbstractTemplateTest extends TestCase {
 		});
 
 		gw.use(new Favicon());
-		r = gw.addRoute("/test", "html", new SessionCookie());
-		
+		r = gw.addRoute("GET", "/html", "test.html", new SessionCookie());
+		r = gw.addRoute("GET", "/math/add/:a/:b", "math.add", new CorsHeaders());
+
 		cl = HttpAsyncClients.createDefault();
 		cl.start();
 	}
@@ -118,82 +118,105 @@ public abstract class AbstractTemplateTest extends TestCase {
 	@Test
 	public void testDataTreeTemplateEngine() throws Exception {
 		DataTreeEngine engine = new DataTreeEngine();
-		engine.setTemplatePath("templates");	
+		engine.setTemplatePath("templates");
 		engine.setDefaultExtension("datatree");
-		
-		// TODO install engine
-		
-		// Call common template tests
-		doTemplateTests();
+		gw.setTemplateEngine(engine);
+		doTemplateTests("datatree");
 	}
 
 	@Test
 	public void testFreeMarkerTemplateEngine() throws Exception {
 		FreeMarkerEngine engine = new FreeMarkerEngine();
-		engine.setTemplatePath("templates");	
+		engine.setTemplatePath("templates");
 		engine.setDefaultExtension("freemarker");
-		
-		// Call common template tests
-		doTemplateTests();
+		gw.setTemplateEngine(engine);
+		doTemplateTests("freemarker");
 	}
 
 	@Test
 	public void testJadeTemplateEngine() throws Exception {
 		JadeEngine engine = new JadeEngine();
-		engine.setTemplatePath("templates");	
+		engine.setTemplatePath("templates");
 		engine.setDefaultExtension("jade");
-		
-		// Call common template tests
-		doTemplateTests();
+		gw.setTemplateEngine(engine);
+		doTemplateTests("jade");
 	}
 
 	@Test
 	public void testMustacheTemplateEngine() throws Exception {
 		MustacheEngine engine = new MustacheEngine();
-		engine.setTemplatePath("templates");	
+		engine.setTemplatePath("templates");
 		engine.setDefaultExtension("mustache");
-		
-		// Call common template tests
-		doTemplateTests();
+		gw.setTemplateEngine(engine);
+		doTemplateTests("mustache");
 	}
 
 	@Test
 	public void testPebbleTemplateEngine() throws Exception {
 		PebbleEngine engine = new PebbleEngine();
-		engine.setTemplatePath("templates");	
+		engine.setTemplatePath("templates");
 		engine.setDefaultExtension("pebble");
-		
-		// Call common template tests
-		doTemplateTests();
+		gw.setTemplateEngine(engine);
+		doTemplateTests("pebble");
 	}
 
 	@Test
 	public void testThymeleafTemplateEngine() throws Exception {
 		ThymeleafEngine engine = new ThymeleafEngine();
-		engine.setTemplatePath("templates");	
+		engine.setTemplatePath("templates");
 		engine.setDefaultExtension("thymeleaf");
-		
-		// Call common template tests
-		doTemplateTests();
+		gw.setTemplateEngine(engine);
+		doTemplateTests("thymeleaf");
 	}
 
-	protected void doTemplateTests() throws Exception {
+	// --- COMMON TESTS ---
 
-		//HttpGet req = new HttpGet("http://localhost:3000");
-		HttpPost req = new HttpPost("http://localhost:3000");
+	protected void doTemplateTests(String name) throws Exception {
 
-		MultipartEntityBuilder builder = MultipartEntityBuilder.create();
-	    builder.addTextBody("username", "user");
-	    builder.addTextBody("password", "pass");
-	    builder.addBinaryBody("file", new File("c:/temp/script.txt"),
-	      ContentType.TEXT_PLAIN, "test.txt");
-	 
-	    HttpEntity multipart = builder.build();
-	    req.setEntity(multipart);
+		HttpGet get = new HttpGet("http://localhost:3000/html");
+		HttpResponse rsp = cl.execute(get, null).get();
+		String header = rsp.getLastHeader("Set-Cookie").getValue();
+
+		// JSESSIONID="1|1c4xy2u8fjab3";$Path="/"
+		assertTrue(header.startsWith("JSESSIONID=\""));
+		assertTrue(header.endsWith("\";$Path=\"/\""));
+
+		assertEquals(200, rsp.getStatusLine().getStatusCode());
+		byte[] bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+		String html = new String(bytes, StandardCharsets.UTF_8);
+
+		assertTrue(html.contains("<h1>header</h1>"));
+		assertTrue(html.contains(name));
+		if ("thymeleaf".equals(name)) {
+			assertTrue(html.contains("<p>1</p>"));
+			assertTrue(html.contains("<p>true</p>"));
+			assertTrue(html.contains("<p>xyz</p>"));
+			assertTrue(html.contains("<p>3210</p>"));
+		} else {
+			assertTrue(html.contains("<p>A: 1</p>"));
+			assertTrue(html.contains("<p>B: true</p>"));
+			assertTrue(html.contains("<p>C: xyz</p>"));
+			assertTrue(html.contains("<p>D.E: 3210</p>") || html.contains("<p>D.E: 3,210</p>"));
+		}
 		
-	    HttpResponse rsp = cl.execute(req, null).get();
-	    
-	    System.out.println(rsp);
+		for (int i = 0; i < 10; i++) {
+			assertTrue(html.contains("<td>" + i + "</td>"));
+		}		
+		
+		get = new HttpGet("http://localhost:3000/math/add/1/2");
+		rsp = cl.execute(get, null).get();
+		
+		header = rsp.getLastHeader("Access-Control-Allow-Origin").getValue();
+		assertEquals("*", header);
+		header = rsp.getLastHeader("Access-Control-Allow-Methods").getValue();
+		assertEquals("GET,OPTIONS,POST,PUT,DELETE", header);
+		
+		bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+		String json = new String(bytes, StandardCharsets.UTF_8);
+		Tree t = new Tree(json);
+		assertEquals("1", t.get("a", ""));
+		assertEquals("2", t.get("b", ""));
+		assertEquals("3", t.get("c", ""));
 	}
-	
+
 }
