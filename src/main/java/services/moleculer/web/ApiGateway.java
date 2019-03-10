@@ -99,7 +99,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	/**
 	 * HTML template engine.
 	 */
-	protected AbstractTemplateEngine abstractTemplateEngine;
+	protected AbstractTemplateEngine templateEngine;
 
 	// --- LOCKS ---
 
@@ -161,7 +161,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 		}
 
 		// Set last route (ServeStatic, "404 Not Found", etc.)
-		lastRoute = new Route(broker, "", MappingPolicy.ALL, null, null, null, abstractTemplateEngine);
+		lastRoute = new Route(broker, "", MappingPolicy.ALL, null, null, null);
 		lastRoute.use(lastMiddleware);
 	}
 
@@ -362,7 +362,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 *            list of services (eg. "service1,service2,service3")
 	 * @param middlewares
 	 *            optional middlewares (eg. CorsHeaders)
-	 *            
+	 * 
 	 * @return route the new route
 	 */
 	public Route addRoute(String path, String serviceList, HttpMiddleware... middlewares) {
@@ -376,7 +376,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 		}
 		String[] whiteList = new String[list.size()];
 		list.toArray(whiteList);
-		Route route = new Route(broker, path, MappingPolicy.RESTRICT, null, whiteList, null, abstractTemplateEngine);
+		Route route = new Route(broker, path, MappingPolicy.RESTRICT, null, whiteList, null);
 		if (middlewares != null && middlewares.length > 0) {
 			route.use(middlewares);
 		}
@@ -396,12 +396,12 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 *            name of action (eg. "math.add")
 	 * @param middlewares
 	 *            optional middlewares (eg. CorsHeaders)
-	 *            
+	 * 
 	 * @return route the new route
 	 */
 	public Route addRoute(String httpMethod, String path, String actionName, HttpMiddleware... middlewares) {
 		Alias alias = new Alias(httpMethod, path, actionName);
-		Route route = new Route(broker, "", MappingPolicy.RESTRICT, null, null, new Alias[] { alias }, abstractTemplateEngine);
+		Route route = new Route(broker, "", MappingPolicy.RESTRICT, null, null, new Alias[] { alias });
 		if (middlewares != null && middlewares.length > 0) {
 			route.use(middlewares);
 		}
@@ -427,7 +427,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 */
 	public Route addRoute(String path, MappingPolicy mappingPolicy, CallOptions.Options opts, String[] whitelist,
 			Alias[] aliases) {
-		return addRoute(new Route(broker, path, mappingPolicy, opts, whitelist, aliases, abstractTemplateEngine));
+		return addRoute(new Route(broker, path, mappingPolicy, opts, whitelist, aliases));
 	}
 
 	/**
@@ -435,7 +435,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 *
 	 * @param route
 	 *            the new route
-	 *            
+	 * 
 	 * @return route the new route
 	 */
 	public Route addRoute(Route route) {
@@ -451,6 +451,9 @@ public class ApiGateway extends Service implements RequestProcessor {
 			dynamicMappings.clear();
 		} finally {
 			writeLock.unlock();
+		}
+		if (templateEngine != null && route.getTemplateEngine() == null) {
+			route.setTemplateEngine(templateEngine);
 		}
 		return route;
 	}
@@ -471,6 +474,13 @@ public class ApiGateway extends Service implements RequestProcessor {
 			dynamicMappings.clear();
 		} finally {
 			writeLock.unlock();
+		}
+		if (templateEngine != null) {
+			for (Route route : routes) {
+				if (route.getTemplateEngine() == null) {
+					route.setTemplateEngine(templateEngine);
+				}
+			}
 		}
 	}
 
@@ -499,11 +509,17 @@ public class ApiGateway extends Service implements RequestProcessor {
 	}
 
 	public AbstractTemplateEngine getTemplateEngine() {
-		return abstractTemplateEngine;
+		return templateEngine;
 	}
 
-	public void setTemplateEngine(AbstractTemplateEngine abstractTemplateEngine) {
-		this.abstractTemplateEngine = abstractTemplateEngine;
+	public void setTemplateEngine(AbstractTemplateEngine templateEngine) {
+		if (this.templateEngine != templateEngine) {
+			this.templateEngine = templateEngine;
+			for (Route route : routes) {
+				route.setTemplateEngine(templateEngine);
+			}
+			lastRoute.setTemplateEngine(templateEngine);
+		}
 	}
 
 }

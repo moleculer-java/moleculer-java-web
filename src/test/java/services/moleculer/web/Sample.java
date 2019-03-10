@@ -106,7 +106,7 @@ public class Sample {
 			aliases[0] = new Alias(Alias.ALL, "/add", "math.add");
 			aliases[1] = new Alias(Alias.ALL, "/html", "math.html");
 			
-			Route r = new Route(broker, path, policy, opts, whitelist, aliases, te);
+			Route r = new Route(broker, path, policy, opts, whitelist, aliases);
 
 			r.use(new CorsHeaders());
 			RateLimiter rl = new RateLimiter(10, false);
