@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2019 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -25,12 +25,8 @@
  */
 package services.moleculer.web;
 
-import services.moleculer.context.Context;
-import services.moleculer.web.router.Route;
+public interface WebSocketRegistry {
 
-@FunctionalInterface
-public interface BeforeCallProcessor {
-
-	void onBeforeCall(Context ctx, Route route, WebRequest req, WebResponse res);
+	public boolean send(String path, String message);
 	
 }

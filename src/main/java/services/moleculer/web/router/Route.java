@@ -26,12 +26,13 @@
 package services.moleculer.web.router;
 
 import static services.moleculer.util.CommonUtils.formatPath;
+import static services.moleculer.util.CommonUtils.nameOf;
 
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
-import java.util.Objects;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,6 +41,7 @@ import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
 import services.moleculer.context.CallOptions;
 import services.moleculer.eventbus.Matcher;
+import services.moleculer.web.CallProcessor;
 import services.moleculer.web.middleware.HttpMiddleware;
 import services.moleculer.web.template.AbstractTemplateEngine;
 
@@ -49,10 +51,6 @@ public class Route {
 
 	protected static final Logger logger = LoggerFactory.getLogger(Route.class);
 
-	// --- PARENT BROKER ---
-
-	protected final ServiceBroker broker;
-
 	// --- PROPERTIES ---
 
 	protected final String path;
@@ -60,25 +58,32 @@ public class Route {
 	protected final CallOptions.Options opts;
 	protected final String[] whitelist;
 	protected final Alias[] aliases;
-	
+
+	// --- PARENT BROKER ---
+
+	protected ServiceBroker broker;
+
+	// --- CUSTOM PRE/POST PROCESSORS ---
+
+	protected CallProcessor beforeCall;
+	protected CallProcessor afterCall;
+
 	// --- TEMPLATE ENGINE ---
-	
+
 	protected AbstractTemplateEngine templateEngine;
 
 	// --- ROUTE-SPECIFIC MIDDLEWARES ---
-	
-	protected final HashSet<HttpMiddleware> routeMiddlewares = new HashSet<>(32);
-	
+
+	protected final Set<HttpMiddleware> routeMiddlewares = new LinkedHashSet<>(32);
+
 	// --- CONSTRUCTOR ---
 
-	public Route(ServiceBroker broker, String path, MappingPolicy mappingPolicy, CallOptions.Options opts,
-			String[] whitelist, Alias[] aliases) {
-		
-		this.broker = Objects.requireNonNull(broker);
+	public Route(String path, MappingPolicy mappingPolicy, CallOptions.Options opts, String[] whitelist,
+			Alias[] aliases) {
 		this.path = formatPath(path);
 		this.mappingPolicy = mappingPolicy;
 		this.opts = opts;
-		
+
 		if (whitelist != null && whitelist.length > 0) {
 			for (int i = 0; i < whitelist.length; i++) {
 				whitelist[i] = formatPath(whitelist[i]);
@@ -118,7 +123,7 @@ public class Route {
 			for (Alias alias : aliases) {
 				if (Alias.ALL.equals(alias.httpMethod) || httpMethod.equals(alias.httpMethod)) {
 					Mapping mapping = new Mapping(broker, httpMethod, this.path + alias.pathPattern, alias.actionName,
-							opts, templateEngine);
+							opts, templateEngine, this, beforeCall, afterCall);
 					if (mapping.matches(httpMethod, path)) {
 						if (!routeMiddlewares.isEmpty()) {
 							mapping.use(routeMiddlewares);
@@ -135,7 +140,8 @@ public class Route {
 		if (whitelist != null && whitelist.length > 0) {
 			for (String pattern : whitelist) {
 				if (Matcher.matches(shortPath, pattern)) {
-					Mapping mapping = new Mapping(broker, httpMethod, this.path + pattern, actionName, opts, templateEngine);
+					Mapping mapping = new Mapping(broker, httpMethod, this.path + pattern, actionName, opts,
+							templateEngine, this, beforeCall, afterCall);
 					if (!routeMiddlewares.isEmpty()) {
 						mapping.use(routeMiddlewares);
 					}
@@ -150,7 +156,8 @@ public class Route {
 			} else {
 				pattern = this.path + '*';
 			}
-			Mapping mapping = new Mapping(broker, httpMethod, pattern, actionName, opts, templateEngine);
+			Mapping mapping = new Mapping(broker, httpMethod, pattern, actionName, opts, templateEngine, this,
+					beforeCall, afterCall);
 			if (!routeMiddlewares.isEmpty()) {
 				mapping.use(routeMiddlewares);
 			}
@@ -168,28 +175,35 @@ public class Route {
 	public void use(Collection<HttpMiddleware> middlewares) {
 		routeMiddlewares.addAll(middlewares);
 	}
-	
+
 	// --- START MIDDLEWARES ---
 
-	public void started(ServiceBroker broker, HashSet<HttpMiddleware> globalMiddlewares) throws Exception {
+	public void started(ServiceBroker broker, Set<HttpMiddleware> globalMiddlewares) throws Exception {
+
+		// Set pointer of parent broker
+		this.broker = broker;
 
 		// Start middlewares
 		for (HttpMiddleware middleware : routeMiddlewares) {
 			if (!globalMiddlewares.contains(middleware)) {
 				middleware.started(broker);
+				logger.info(nameOf(middleware, true) + " middleware started on route \"" + path + "\".");
 			}
 		}
 	}
 
 	// --- STOP MIDDLEWARES ---
 
-	public void stopped(HashSet<HttpMiddleware> globalMiddlewares) {
+	public void stopped(Set<HttpMiddleware> globalMiddlewares, boolean debug) {
 
 		// Stop middlewares
 		for (HttpMiddleware middleware : routeMiddlewares) {
 			if (!globalMiddlewares.contains(middleware)) {
 				try {
 					middleware.stopped();
+					if (debug) {
+						logger.info(nameOf(middleware, true) + " middleware stopped on route \"" + path + "\".");
+					}
 				} catch (Exception ignored) {
 					logger.warn("Unable to stop middleware!");
 				}
@@ -202,7 +216,9 @@ public class Route {
 	public Tree toTree() {
 		Tree tree = new Tree();
 		tree.put("path", path);
-		tree.putObject("whitelist", whitelist);
+		if (whitelist != null) {
+			tree.putObject("whitelist", whitelist);
+		}
 		if (opts != null) {
 			Tree o = tree.putMap("opts");
 			o.put("nodeID", opts.nodeID);
@@ -221,14 +237,72 @@ public class Route {
 		return tree;
 	}
 
-	// --- TEMPLATE ENGINE ---
-	
+	// --- PROPERTY GETTERS AND SETTERS ---
+
 	public void setTemplateEngine(AbstractTemplateEngine templateEngine) {
 		this.templateEngine = templateEngine;
 	}
 
 	public AbstractTemplateEngine getTemplateEngine() {
 		return templateEngine;
+	}
+
+	public CallProcessor getBeforeCall() {
+		return beforeCall;
+	}
+
+	public void setBeforeCall(CallProcessor beforeCall) {
+		this.beforeCall = beforeCall;
+	}
+
+	public CallProcessor getAfterCall() {
+		return afterCall;
+	}
+
+	public void setAfterCall(CallProcessor afterCall) {
+		this.afterCall = afterCall;
+	}
+
+	// --- READ-ONLY PROPERTY GETTERS ---
+	
+	public String getPath() {
+		return path;
+	}
+
+	public HttpMiddleware[] getMiddlewares() {
+		HttpMiddleware[] array = new HttpMiddleware[routeMiddlewares.size()];
+		routeMiddlewares.toArray(array);
+		return array;
+	}
+
+	public ServiceBroker getBroker() {
+		return broker;
+	}
+
+	public MappingPolicy getMappingPolicy() {
+		return mappingPolicy;
+	}
+
+	public CallOptions.Options getOpts() {
+		return opts;
+	}
+
+	public String[] getWhitelist() {
+		if (whitelist == null) {
+			return null;
+		}
+		String[] copy = new String[whitelist.length];
+		System.arraycopy(whitelist, 0, copy, 0, copy.length);
+		return copy;
+	}
+
+	public Alias[] getAliases() {
+		if (aliases == null) {
+			return null;
+		}
+		Alias[] copy = new Alias[aliases.length];
+		System.arraycopy(aliases, 0, copy, 0, copy.length);
+		return copy;
 	}
 
 }

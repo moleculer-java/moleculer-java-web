@@ -29,11 +29,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
 import services.moleculer.context.CallOptions;
 import services.moleculer.service.ServiceInvoker;
+import services.moleculer.web.CallProcessor;
 import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
@@ -51,7 +53,9 @@ public class Mapping implements RequestProcessor, HttpConstants {
 	protected final String pathPrefix;
 	protected final int hashCode;
 	protected final Tree config;
-	protected final AbstractTemplateEngine abstractTemplateEngine;
+	protected final Route route;
+	protected final CallProcessor beforeCall;
+	protected final CallProcessor afterCall;
 
 	// --- LAST PROCESSOR ---
 
@@ -59,15 +63,18 @@ public class Mapping implements RequestProcessor, HttpConstants {
 
 	// --- INSTALLED MIDDLEWARES ---
 
-	protected HashSet<HttpMiddleware> installedMiddlewares = new HashSet<>(32);
+	protected Set<HttpMiddleware> installedMiddlewares = new HashSet<>(32);
 
 	// --- CONSTRUCTOR ---
 
 	public Mapping(ServiceBroker broker, String httpMethod, String pathPattern, String actionName,
-			CallOptions.Options opts, AbstractTemplateEngine abstractTemplateEngine) {
+			CallOptions.Options opts, AbstractTemplateEngine templateEngine, Route route, CallProcessor beforeCall,
+			CallProcessor afterCall) {
 		this.httpMethod = "ALL".equals(httpMethod) ? null : httpMethod;
 		this.actionName = Objects.requireNonNull(actionName);
-		this.abstractTemplateEngine = abstractTemplateEngine;
+		this.route = route;
+		this.beforeCall = beforeCall;
+		this.afterCall = afterCall;
 
 		// Parse "path pattern"
 		int starPos = pathPattern.indexOf('*');
@@ -125,7 +132,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 		// Set first RequestProcessor in the WebMiddleware chain
 		ServiceInvoker serviceInvoker = broker.getConfig().getServiceInvoker();
 		lastProcessor = new ActionInvoker(actionName, pathPattern, isStatic, pathPrefix, indexes, names, opts,
-				serviceInvoker, abstractTemplateEngine);
+				serviceInvoker, templateEngine, route, beforeCall, afterCall);
 	}
 
 	// --- MATCH TEST ---

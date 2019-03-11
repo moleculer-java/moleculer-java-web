@@ -57,6 +57,7 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpRequestDecoder;
+import io.netty.handler.codec.http.HttpResponseEncoder;
 import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.OpenSslServerContext;
 import io.netty.handler.ssl.OpenSslServerSessionContext;
@@ -111,6 +112,10 @@ public class NettyServer extends Service {
 
 	protected SslContext cachedSslContext;
 
+	// --- WEBSOCKET REGISTRY ---
+	
+	protected NettyWebSocketRegistry nettyWebSocketRegistry;
+	
 	// --- START NETTY SERVER ---
 
 	@Override
@@ -132,6 +137,9 @@ public class NettyServer extends Service {
 		
 		bootstrap.channel(NioServerSocketChannel.class);
 
+		// Create webSocketRegistry
+		nettyWebSocketRegistry = new NettyWebSocketRegistry(broker);
+		
 		// Define request chain
 		if (handler == null) {
 			handler = new ChannelInitializer<Channel>() {
@@ -143,7 +151,11 @@ public class NettyServer extends Service {
 						p.addLast(createSslHandler(ch));
 					}
 					p.addLast(new HttpRequestDecoder());
-					p.addLast(new MoleculerHandler(gateway, broker));
+					p.addLast(new MoleculerHandler(gateway, broker, nettyWebSocketRegistry));
+					
+					// Necessary for the websocket handler,
+					// but not used
+					p.addLast(new HttpResponseEncoder());					
 				}
 
 			};

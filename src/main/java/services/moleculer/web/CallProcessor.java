@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2019 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -26,47 +26,11 @@
 package services.moleculer.web;
 
 import io.datatree.Tree;
-import services.moleculer.ServiceBroker;
-import services.moleculer.service.Action;
-import services.moleculer.service.Service;
-import services.moleculer.web.netty.NettyServer;
+import services.moleculer.web.router.Route;
 
-public class Sample {
+@FunctionalInterface
+public interface CallProcessor {
 
-	public static void main(String[] args) {
-		System.out.println("START");
-		try {
-			ServiceBroker broker = ServiceBroker.builder().build();
-
-			NettyServer server = new NettyServer();
-			broker.createService(server);
-
-			ApiGateway gateway = new ApiGateway();
-			gateway.setDebug(true);
-			broker.createService(gateway);
-
-			gateway.addServeStatic("/static", "/templates").setEnableReloading(true);
-			
-			gateway.addRoute("/test", "test.send");
-			
-			broker.createService(new Service("test") {
-
-				@SuppressWarnings("unused")
-				public Action send = ctx -> {
-					
-					Tree payload = new Tree();
-					payload.put("a", 3);
-					
-					gateway.sendWebSocket("/ws/test", payload);
-					return payload;
-				};
-
-			});
-			broker.start();
-
-		} catch (Exception cause) {
-			cause.printStackTrace();
-		}
-	}
-
+	void onCall(Route route, WebRequest req, WebResponse rsp, Tree data);
+	
 }

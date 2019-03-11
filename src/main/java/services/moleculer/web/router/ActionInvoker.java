@@ -25,6 +25,8 @@
  */
 package services.moleculer.web.router;
 
+import static services.moleculer.web.common.GatewayUtils.sendError;
+
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -41,20 +43,19 @@ import services.moleculer.context.CallOptions;
 import services.moleculer.context.CallOptions.Options;
 import services.moleculer.service.ServiceInvoker;
 import services.moleculer.stream.PacketStream;
+import services.moleculer.web.CallProcessor;
 import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 import services.moleculer.web.template.AbstractTemplateEngine;
 
-import static services.moleculer.web.common.GatewayUtils.sendError;
-
 public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 	// --- CONSTANTS ---
-	
-	protected static final byte[] EMPTY_RESPONSE = "{}".getBytes(); 
-	
+
+	protected static final byte[] EMPTY_RESPONSE = "{}".getBytes();
+
 	// --- LOGGER ---
 
 	protected static final Logger logger = LoggerFactory.getLogger(ActionInvoker.class);
@@ -69,22 +70,20 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 	protected final String[] names;
 	protected final CallOptions.Options opts;
 
-	// --- MOLECULER COMPONENTS ---
+	// --- INTERNAL OBJECTS ---
 
 	protected final ServiceInvoker serviceInvoker;
-
-	// --- JSON SERIALIZER ---
-
 	protected final TreeWriter jsonSerializer;
-
-	// --- TEMPLATE ENGINE ---
-
-	protected final AbstractTemplateEngine abstractTemplateEngine;
+	protected final AbstractTemplateEngine templateEngine;
+	protected final Route route;
+	protected final CallProcessor beforeCall;
+	protected final CallProcessor afterCall;
 
 	// --- CONSTRUCTOR ---
 
 	public ActionInvoker(String actionName, String pathPattern, boolean isStatic, String pathPrefix, int[] indexes,
-			String[] names, Options opts, ServiceInvoker serviceInvoker, AbstractTemplateEngine abstractTemplateEngine) {
+			String[] names, Options opts, ServiceInvoker serviceInvoker, AbstractTemplateEngine templateEngine,
+			Route route, CallProcessor beforeCall, CallProcessor afterCall) {
 		this.actionName = actionName;
 		this.pathPattern = pathPattern;
 		this.isStatic = isStatic;
@@ -93,8 +92,11 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		this.names = names;
 		this.opts = opts;
 		this.serviceInvoker = serviceInvoker;
-		this.abstractTemplateEngine = abstractTemplateEngine;
+		this.templateEngine = templateEngine;
 		this.jsonSerializer = TreeWriterRegistry.getWriter(null);
+		this.route = route;
+		this.beforeCall = beforeCall;
+		this.afterCall = afterCall;
 	}
 
 	// --- PROCESS (SERVLET OR NETTY) HTTP REQUEST ---
@@ -138,15 +140,21 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 			}
 		}
 
+		// Custom "before call" processor
+		// (eg. copy HTTP headers into the "params" variable)
+		if (params == null) {
+			params = new Tree();
+		}
+		if (beforeCall != null) {
+			beforeCall.onCall(route, req, rsp, params);			
+		}
+
 		// Multipart request
 		if (req.isMultipart()) {
-			if (params == null) {
-				params = new Tree();
-			}
 
 			// Invoke service
 			serviceInvoker.call(actionName, params, opts, req.getBody(), null).then(out -> {
-				sendResponse(rsp, out);
+				sendResponse(req, rsp, out);
 			}).catchError(cause -> {
 				sendError(rsp, cause);
 			});
@@ -160,7 +168,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 			// Invoke service
 			serviceInvoker.call(actionName, params, opts, null, null).then(out -> {
-				sendResponse(rsp, out);
+				sendResponse(req, rsp, out);
 			}).catchError(cause -> {
 				logger.error("Unable to invoke action!", cause);
 				sendError(rsp, cause);
@@ -193,7 +201,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 				// Invoke service
 				serviceInvoker.call(actionName, postParams, opts, null, null).then(out -> {
-					sendResponse(rsp, out);
+					sendResponse(req, rsp, out);
 				}).catchError(err -> {
 					logger.error("Unable to invoke action!", err);
 					sendError(rsp, err);
@@ -241,11 +249,17 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 	// --- SEND JSON/STREAMED RESPONSE ---
 
-	protected void sendResponse(WebResponse rsp, Tree out) throws Exception {
+	protected void sendResponse(WebRequest req, WebResponse rsp, Tree data) throws Exception {
 
+		// Invoke custom "after call" processor
+		// (eg. insert custom HTTP headers by data)
+		if (afterCall != null) {
+			afterCall.onCall(route, req, rsp, data);
+		}
+		
 		// Disable cache
 		rsp.setHeader(CACHE_CONTROL, NO_CACHE);
-		if (out == null) {
+		if (data == null) {
 			try {
 				rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_JSON);
 				rsp.setHeader(CONTENT_LENGTH, "2");
@@ -259,11 +273,11 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		// Set headers from "meta"
 		String templatePath = null;
 		boolean contentTypeSet = false;
-		Tree meta = out.getMeta(false);
+		Tree meta = data.getMeta(false);
 		if (meta != null) {
 
 			// Path of the HTML-template
-			if (abstractTemplateEngine != null) {
+			if (templateEngine != null) {
 				templatePath = meta.get(META_TEMPLATE, (String) null);
 			}
 
@@ -305,7 +319,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		}
 
 		// Send body
-		Object object = out.asObject();
+		Object object = data.asObject();
 		if (object != null && object instanceof PacketStream) {
 
 			// Stream type?
@@ -335,9 +349,6 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 			// Tree (JSON) body
 			byte[] body;
 			try {
-
-				// TODO Invoke AfterCallProcessor
-
 				if (templatePath != null && !templatePath.isEmpty()) {
 
 					// Content-type is HTML
@@ -346,7 +357,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 					}
 
 					// Invoke TemplateEngine
-					body = abstractTemplateEngine.transform(templatePath, out);
+					body = templateEngine.transform(templatePath, data);
 
 				} else {
 
@@ -356,7 +367,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 					}
 
 					// Serialize
-					body = jsonSerializer.toBinary(out.asObject(), null, false);
+					body = jsonSerializer.toBinary(data.asObject(), null, false);
 				}
 			} catch (Throwable cause) {
 				logger.error("Unable to serialize response!", cause);
@@ -371,5 +382,5 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 			}
 		}
 	}
-
+	
 }

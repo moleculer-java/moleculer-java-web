@@ -158,7 +158,7 @@ public class NettyWebResponse implements WebResponse {
 	@Override
 	public boolean end() {
 		sendHeaders();
-		if (req.parser != null) {
+		if (req != null && req.parser != null) {
 			try {
 				req.parser.close();
 			} catch (Exception ignored) {

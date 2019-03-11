@@ -30,8 +30,11 @@ import static services.moleculer.web.common.GatewayUtils.sendError;
 import java.util.concurrent.ExecutorService;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
@@ -60,14 +63,17 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 
 	// --- WEBSOCKET VARIABLES ---
 
+	protected final NettyWebSocketRegistry nettyWebSocketRegistry;
+
 	protected volatile String path;
 	protected volatile WebSocketServerHandshaker handshaker;
-
+	
 	// --- CONSTRUCTOR ---
 
-	public MoleculerHandler(ApiGateway gateway, ServiceBroker broker) {
+	public MoleculerHandler(ApiGateway gateway, ServiceBroker broker, NettyWebSocketRegistry nettyWebSocketRegistry) {
 		this.gateway = gateway;
 		this.broker = broker;
+		this.nettyWebSocketRegistry = nettyWebSocketRegistry;
 		this.executor = broker.getConfig().getExecutor();
 	}
 
@@ -98,8 +104,16 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 						if (handshaker == null) {
 							WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel());
 						} else {
-							handshaker.handshake(ctx.channel(), httpRequest);
+							DefaultFullHttpRequest req = new DefaultFullHttpRequest(httpRequest.protocolVersion(),
+									httpRequest.method(), path, Unpooled.buffer(0), httpHeaders,
+									new DefaultHttpHeaders(false));
+							
+							// TODO check access
+							
+							handshaker.handshake(ctx.channel(), req);
+							nettyWebSocketRegistry.register(path, ctx);
 						}
+						ctx.flush();
 						return;
 					}
 

@@ -30,19 +30,24 @@ import static services.moleculer.web.common.HttpConstants.CONTENT_LENGTH;
 
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.locks.Lock;
+import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 
+import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
 import services.moleculer.context.CallOptions;
+import services.moleculer.service.Action;
 import services.moleculer.service.Service;
 import services.moleculer.web.middleware.HttpMiddleware;
 import services.moleculer.web.middleware.NotFound;
+import services.moleculer.web.middleware.ServeStatic;
 import services.moleculer.web.router.Alias;
 import services.moleculer.web.router.Mapping;
 import services.moleculer.web.router.MappingPolicy;
@@ -92,7 +97,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	/**
 	 * Global middlewares.
 	 */
-	protected HashSet<HttpMiddleware> globalMiddlewares = new HashSet<>(32);
+	protected Set<HttpMiddleware> globalMiddlewares = new LinkedHashSet<>(32);
 
 	// --- TEMPLATE ENGINE ---
 
@@ -101,16 +106,35 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 */
 	protected AbstractTemplateEngine templateEngine;
 
-	// --- LOCKS ---
+	// --- WEBSOCKET REGISTRY ---
 
-	protected final Lock readLock;
-	protected final Lock writeLock;
+	/**
+	 * WebSocket registry (Netty or J2EE)
+	 */
+	protected WebSocketRegistry webSocketRegistry;
+
+	// --- CUSTOM PRE/POST PROCESSORS ---
+
+	/**
+	 * Custom message pre-processor.
+	 */
+	protected CallProcessor beforeCall;
+
+	/**
+	 * Custom message post-processor.
+	 */
+	protected CallProcessor afterCall;
+
+	// --- LOCKS FOR MAPPINGS ---
+
+	protected final ReadLock readLock;
+	protected final WriteLock writeLock;
 
 	// --- CONSTRUCTOR ---
 
 	public ApiGateway() {
 
-		// Init locks
+		// Init locks for static/dynamic mappings
 		ReentrantReadWriteLock lock = new ReentrantReadWriteLock(false);
 		readLock = lock.readLock();
 		writeLock = lock.writeLock();
@@ -147,22 +171,48 @@ public class ApiGateway extends Service implements RequestProcessor {
 		// Start global middlewares
 		for (HttpMiddleware middleware : globalMiddlewares) {
 			middleware.started(broker);
-			if (debug) {
-				logger.info(nameOf(middleware, true) + " global middleware started.");
-			}
+			logger.info(nameOf(middleware, true) + " global middleware started.");
 		}
 
-		// Start routes (annd route-specific middlewares)
+		// Start routes and route-specific middlewares
 		for (Route route : routes) {
 			route.started(broker, globalMiddlewares);
-			if (debug) {
-				logger.info("Route installed:\r\n" + route.toTree());
-			}
+			logRoute(route);
 		}
 
 		// Set last route (ServeStatic, "404 Not Found", etc.)
-		lastRoute = new Route(broker, "", MappingPolicy.ALL, null, null, null);
+		lastRoute = new Route("", MappingPolicy.ALL, null, null, null);
 		lastRoute.use(lastMiddleware);
+		logRoute(lastRoute);
+	}
+
+	protected void logRoute(Route route) {
+		StringBuilder msg = new StringBuilder(128);
+		msg.append("Route installed on path \"");
+		String path = route.getPath();
+		if (path == null || path.isEmpty()) {
+			msg.append('*');
+		} else {
+			msg.append(path);
+		}
+		msg.append("\" with");
+		HttpMiddleware[] middlewares = route.getMiddlewares();
+		if (middlewares == null || middlewares.length == 0) {
+			msg.append("out middlewares.");
+		} else if (middlewares.length == 1) {
+			msg.append(' ');
+			msg.append(nameOf(middlewares[0], true));
+			msg.append(" middleware.");
+		} else {
+			msg.append(" the following middlewares: ");
+			for (int i = 0; i < middlewares.length; i++) {
+				msg.append(nameOf(middlewares[i], true));
+				if (i < middlewares.length) {
+					msg.append(", ");
+				}
+			}
+		}
+		logger.info(msg.toString());
 	}
 
 	// --- STOP GATEWAY INSTANCE ---
@@ -178,7 +228,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 			try {
 				middleware.stopped();
 				if (debug) {
-					logger.info(nameOf(middleware, true) + " middleware stopped.");
+					logger.info(nameOf(middleware, true) + " global middleware stopped.");
 				}
 			} catch (Exception ignored) {
 				logger.warn("Unable to stop middleware!");
@@ -187,21 +237,39 @@ public class ApiGateway extends Service implements RequestProcessor {
 
 		// Stop routes (and route-specific middlewares)
 		for (Route route : routes) {
-			route.stopped(globalMiddlewares);
+			route.stopped(globalMiddlewares, debug);
 		}
 		setRoutes(new Route[0]);
 
 		// Clear middleware registry
-		writeLock.lock();
-		try {
-			globalMiddlewares.clear();
-		} finally {
-			writeLock.unlock();
-		}
+		globalMiddlewares.clear();
+
+		// Log stop
 		logger.info("ApiGateway server stopped.");
 	}
 
-	// --- PROCESS (SERVLET OR NETTY) HTTP REQUEST ---
+	// --- SEND WEBSOCKET ---
+
+	/**
+	 * Send WebSocket via Moleculer Action.
+	 */
+	public Action sendWebSocket = (ctx) -> {
+		if (ctx != null && ctx.params != null) {
+			String endpoint = ctx.params.get("endpoint", "");
+			Tree payload = ctx.params.get("payload");
+			return sendWebSocket(endpoint, payload);
+		}
+		return false;
+	};
+
+	/**
+	 * Send WebSocket directly via internal method call.
+	 */
+	public boolean sendWebSocket(String endpoint, Tree payload) {
+		return webSocketRegistry.send(endpoint, payload.toString(false));
+	}
+
+	// --- PROCESS (NETTY OR J2EE) HTTP REQUEST ---
 
 	/**
 	 * Handles request of the HTTP client.
@@ -321,43 +389,55 @@ public class ApiGateway extends Service implements RequestProcessor {
 	// --- GLOBAL MIDDLEWARES ---
 
 	public void use(HttpMiddleware... middlewares) {
+
+		// Add as List
 		use(Arrays.asList(middlewares));
 	}
 
 	public void use(Collection<HttpMiddleware> middlewares) {
-		LinkedList<HttpMiddleware> newMiddlewares = new LinkedList<>();
-		for (HttpMiddleware middleware : middlewares) {
-			if (globalMiddlewares.add(middleware)) {
-				newMiddlewares.addLast(middleware);
-			}
-		}
-		if (!newMiddlewares.isEmpty()) {
-			readLock.lock();
-			try {
-				if (staticMappings != null) {
-					for (Mapping mapping : staticMappings.values()) {
-						mapping.use(newMiddlewares);
-					}
-				}
-				for (Mapping mapping : dynamicMappings) {
-					mapping.use(newMiddlewares);
-				}
-			} finally {
-				readLock.unlock();
-			}
+
+		// Has ApiGateway Started?
+		checkStarted();
+
+		// Add to global middlewares
+		globalMiddlewares.addAll(middlewares);
+	}
+
+	protected void checkStarted() {
+		if (broker != null) {
+			throw new IllegalStateException("ApiGateway has already been started, no longer can be modified!");
 		}
 	}
 
-	// --- ADD ROUTE ---
+	// --- SIMPLE ROUTE CREATION METHODS ---
+
+	public ServeStatic addServeStatic(String path, String rootDirectory, HttpMiddleware... middlewares) {
+		Route route = new Route(path, MappingPolicy.ALL, null, null, null);
+
+		// Last middleware in this route
+		route.use(new NotFound());
+
+		// First is ServeStatic
+		ServeStatic handler = new ServeStatic(path, rootDirectory);
+		route.use(handler);
+		if (middlewares != null && middlewares.length > 0) {
+			route.use(middlewares);
+		}
+
+		// Create route
+		addRoute(route);
+
+		// Return ServeStatic handler (eg. to call "setReloadable" method)
+		return handler;
+	}
+
+	// --- CREATING ROUTES ---
 
 	/**
-	 * Define a route for a list of Services with the specified path prefix (eg.
-	 * if the path is "/rest-services" and service list is "service1", the
+	 * Define a route for a list of Services. Eg. in the "service1" the
 	 * service's "func" action will available on
-	 * "http://host:port/rest-services/service1/func").
+	 * "http://host:port/service1/func").
 	 *
-	 * @param path
-	 *            path prefix for all enumerated services (eg. "/rest-services")
 	 * @param serviceList
 	 *            list of services (eg. "service1,service2,service3")
 	 * @param middlewares
@@ -365,7 +445,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 * 
 	 * @return route the new route
 	 */
-	public Route addRoute(String path, String serviceList, HttpMiddleware... middlewares) {
+	public Route addRoute(String serviceList, HttpMiddleware... middlewares) {
 		String[] serviceNames = serviceList.split(",");
 		LinkedList<String> list = new LinkedList<>();
 		for (String serviceName : serviceNames) {
@@ -376,11 +456,29 @@ public class ApiGateway extends Service implements RequestProcessor {
 		}
 		String[] whiteList = new String[list.size()];
 		list.toArray(whiteList);
-		Route route = new Route(broker, path, MappingPolicy.RESTRICT, null, whiteList, null);
+		Route route = new Route("", MappingPolicy.RESTRICT, null, whiteList, null);
 		if (middlewares != null && middlewares.length > 0) {
 			route.use(middlewares);
 		}
 		return addRoute(route);
+	}
+
+	/**
+	 * Define a route to a "restful" action. The action will available on the
+	 * specified path.
+	 *
+	 * @param path
+	 *            path of the action (eg. "numbers/add/:a/:b" creates an
+	 *            endpoint on "http://host:port/numbers/add/1/2")
+	 * @param actionName
+	 *            name of action (eg. "math.add")
+	 * @param middlewares
+	 *            optional middlewares (eg. CorsHeaders)
+	 * 
+	 * @return route the new route
+	 */
+	public Route addRoute(String path, String actionName, HttpMiddleware... middlewares) {
+		return addRoute("GET", path, actionName, middlewares);
 	}
 
 	/**
@@ -401,7 +499,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 */
 	public Route addRoute(String httpMethod, String path, String actionName, HttpMiddleware... middlewares) {
 		Alias alias = new Alias(httpMethod, path, actionName);
-		Route route = new Route(broker, "", MappingPolicy.RESTRICT, null, null, new Alias[] { alias });
+		Route route = new Route("", MappingPolicy.RESTRICT, null, null, new Alias[] { alias });
 		if (middlewares != null && middlewares.length > 0) {
 			route.use(middlewares);
 		}
@@ -427,7 +525,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 */
 	public Route addRoute(String path, MappingPolicy mappingPolicy, CallOptions.Options opts, String[] whitelist,
 			Alias[] aliases) {
-		return addRoute(new Route(broker, path, mappingPolicy, opts, whitelist, aliases));
+		return addRoute(new Route(path, mappingPolicy, opts, whitelist, aliases));
 	}
 
 	/**
@@ -439,48 +537,53 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 * @return route the new route
 	 */
 	public Route addRoute(Route route) {
-		writeLock.lock();
-		try {
-			Route[] copy = new Route[routes.length + 1];
-			System.arraycopy(routes, 0, copy, 0, routes.length);
-			copy[routes.length] = route;
-			routes = copy;
-			if (staticMappings != null) {
-				staticMappings.clear();
-			}
-			dynamicMappings.clear();
-		} finally {
-			writeLock.unlock();
-		}
+
+		// Has ApiGateway Started?
+		checkStarted();
+
+		// Set Template Engine
 		if (templateEngine != null && route.getTemplateEngine() == null) {
 			route.setTemplateEngine(templateEngine);
 		}
+
+		// Set "beforeCall" hook
+		if (beforeCall != null && route.getBeforeCall() == null) {
+			route.setBeforeCall(beforeCall);
+		}
+
+		// Set "afterCall" hook
+		if (afterCall != null && route.getAfterCall() == null) {
+			route.setAfterCall(afterCall);
+		}
+
+		// Add the new route to array of Routes
+		Route[] copy = new Route[routes.length + 1];
+		System.arraycopy(routes, 0, copy, 0, routes.length);
+		copy[routes.length] = route;
+		routes = copy;
+
+		// Return route
 		return route;
 	}
 
 	// --- PROPERTY GETTERS AND SETTERS ---
 
 	public Route[] getRoutes() {
-		return routes;
+
+		Route[] copy = new Route[routes.length];
+		System.arraycopy(routes, 0, copy, 0, copy.length);
+		return copy;
 	}
 
 	public void setRoutes(Route[] routes) {
-		this.routes = Objects.requireNonNull(routes);
-		writeLock.lock();
-		try {
-			if (staticMappings != null) {
-				staticMappings.clear();
-			}
-			dynamicMappings.clear();
-		} finally {
-			writeLock.unlock();
-		}
-		if (templateEngine != null) {
-			for (Route route : routes) {
-				if (route.getTemplateEngine() == null) {
-					route.setTemplateEngine(templateEngine);
-				}
-			}
+
+		// Has ApiGateway Started?
+		checkStarted();
+
+		Route[] newRoutes = Objects.requireNonNull(routes);
+		this.routes = new Route[0];
+		for (Route route : newRoutes) {
+			addRoute(route);
 		}
 	}
 
@@ -497,6 +600,11 @@ public class ApiGateway extends Service implements RequestProcessor {
 	}
 
 	public void setLastMiddleware(HttpMiddleware lastMiddleware) {
+
+		// Has ApiGateway Started?
+		checkStarted();
+
+		// Set last middleware
 		this.lastMiddleware = lastMiddleware;
 	}
 
@@ -513,12 +621,58 @@ public class ApiGateway extends Service implements RequestProcessor {
 	}
 
 	public void setTemplateEngine(AbstractTemplateEngine templateEngine) {
-		if (this.templateEngine != templateEngine) {
-			this.templateEngine = templateEngine;
-			for (Route route : routes) {
+
+		// Has ApiGateway Started?
+		checkStarted();
+
+		// Set Template Engine
+		this.templateEngine = templateEngine;
+
+		// Set Template Engine on all Routes
+		for (Route route : routes) {
+			if (templateEngine == null || route.getTemplateEngine() == null) {
 				route.setTemplateEngine(templateEngine);
 			}
-			lastRoute.setTemplateEngine(templateEngine);
+		}
+	}
+
+	public CallProcessor getBeforeCall() {
+		return beforeCall;
+	}
+
+	public void setBeforeCall(CallProcessor beforeCall) {
+
+		// Has ApiGateway Started?
+		checkStarted();
+
+		// Set method
+		this.beforeCall = beforeCall;
+
+		// Set "beforeCall" hook on all Routes
+		for (Route route : routes) {
+			if (beforeCall == null || route.getBeforeCall() == null) {
+				route.setBeforeCall(beforeCall);
+			}
+		}
+	}
+
+	public CallProcessor getAfterCall() {
+		return afterCall;
+	}
+
+	public void setAfterCall(CallProcessor afterCall) {
+
+		// Has ApiGateway Started?
+		checkStarted();
+
+		// Set method
+		this.afterCall = afterCall;
+
+		// Set "afterCall" hook on all Routes
+		for (Route route : routes) {
+			if (afterCall == null || route.getAfterCall() == null) {
+				route.setAfterCall(afterCall);
+			}
 		}
 	}
 

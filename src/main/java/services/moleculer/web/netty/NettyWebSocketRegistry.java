@@ -23,15 +23,38 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package services.moleculer.web;
+package services.moleculer.web.netty;
 
-import io.datatree.Promise;
-import services.moleculer.context.Context;
-import services.moleculer.web.router.Route;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 
-@FunctionalInterface
-public interface AfterCallProcessor {
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandlerContext;
+import services.moleculer.ServiceBroker;
+import services.moleculer.web.WebSocketRegistry;
 
-	void onAfterCall(Context ctx, Route route, WebRequest req, WebResponse res, Promise data);
+public class NettyWebSocketRegistry implements WebSocketRegistry {
+
+	protected HashMap<String, ChannelHandlerContext> registry = new HashMap<>();
+	
+	public NettyWebSocketRegistry(ServiceBroker broker) {
+		
+	}
+	
+	public void register(String path, ChannelHandlerContext ctx) {
+		registry.put(path, ctx);
+	}
+
+	@Override
+	public boolean send(String path, String message) {
+		ChannelHandlerContext ctx = registry.get(path);
+		if (ctx == null) {
+			return false;
+		}
+		byte[] bytes = message.getBytes(StandardCharsets.UTF_8);
+		ctx.write(Unpooled.wrappedBuffer(bytes));
+		ctx.flush();
+		return ctx.channel().isOpen();
+	}
 	
 }
