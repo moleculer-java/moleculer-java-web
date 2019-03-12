@@ -75,6 +75,20 @@ public class Alias {
 		hashCode = result;
 	}
 
+	// --- PROPERTY GETTERS ---
+	
+	public String getHttpMethod() {
+		return httpMethod;
+	}
+
+	public String getPathPattern() {
+		return pathPattern;
+	}
+
+	public String getActionName() {
+		return actionName;
+	}
+	
 	// --- COLLECTION HELPERS ---
 
 	@Override

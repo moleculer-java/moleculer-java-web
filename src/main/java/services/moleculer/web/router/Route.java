@@ -53,11 +53,11 @@ public class Route {
 
 	// --- PROPERTIES ---
 
-	protected final String path;
-	protected final MappingPolicy mappingPolicy;
-	protected final CallOptions.Options opts;
-	protected final String[] whitelist;
-	protected final Alias[] aliases;
+	protected String path = "";
+	protected MappingPolicy mappingPolicy = MappingPolicy.RESTRICT;
+	protected CallOptions.Options opts;
+	protected String[] whiteList;
+	protected Alias[] aliases;
 
 	// --- PARENT BROKER ---
 
@@ -76,38 +76,14 @@ public class Route {
 
 	protected final Set<HttpMiddleware> routeMiddlewares = new LinkedHashSet<>(32);
 
-	// --- CONSTRUCTOR ---
+	// --- CONSTRUCTORS ---
 
-	public Route(String path, MappingPolicy mappingPolicy, CallOptions.Options opts, String[] whitelist,
-			Alias[] aliases) {
-		this.path = formatPath(path);
-		this.mappingPolicy = mappingPolicy;
-		this.opts = opts;
+	public Route() {
+	}
 
-		if (whitelist != null && whitelist.length > 0) {
-			for (int i = 0; i < whitelist.length; i++) {
-				whitelist[i] = formatPath(whitelist[i]);
-			}
-		}
-		this.whitelist = whitelist;
-		if (aliases != null && aliases.length > 0) {
-			LinkedList<Alias> list = new LinkedList<>();
-			for (Alias alias : aliases) {
-				if (Alias.REST.endsWith(alias.httpMethod)) {
-					list.addLast(new Alias(Alias.GET, alias.pathPattern, alias.actionName + ".find"));
-					list.addLast(new Alias(Alias.GET, alias.pathPattern + "/:id", alias.actionName + ".get"));
-					list.addLast(new Alias(Alias.POST, alias.pathPattern, alias.actionName + ".create"));
-					list.addLast(new Alias(Alias.PUT, alias.pathPattern + "/:id", alias.actionName + ".update"));
-					list.addLast(new Alias(Alias.DELETE, alias.pathPattern + "/:id", alias.actionName + ".remove"));
-				} else {
-					list.addLast(alias);
-				}
-			}
-			this.aliases = new Alias[list.size()];
-			list.toArray(this.aliases);
-		} else {
-			this.aliases = null;
-		}
+	public Route(String path, HttpMiddleware... middlewares) {
+		setPath(path);
+		use(middlewares);
 	}
 
 	// --- REQUEST PROCESSOR ---
@@ -137,8 +113,8 @@ public class Route {
 		while (actionName.startsWith(".")) {
 			actionName = actionName.substring(1);
 		}
-		if (whitelist != null && whitelist.length > 0) {
-			for (String pattern : whitelist) {
+		if (whiteList != null && whiteList.length > 0) {
+			for (String pattern : whiteList) {
 				if (Matcher.matches(shortPath, pattern)) {
 					Mapping mapping = new Mapping(broker, httpMethod, this.path + pattern, actionName, opts,
 							templateEngine, this, beforeCall, afterCall);
@@ -168,12 +144,22 @@ public class Route {
 
 	// --- ADD MIDDLEWARES TO ROUTE ---
 
-	public void use(HttpMiddleware... middlewares) {
-		use(Arrays.asList(middlewares));
+	public Route use(HttpMiddleware... middlewares) {
+		if (middlewares != null && middlewares.length > 0) {
+			use(Arrays.asList(middlewares));
+		}
+
+		// Return this (for method chaining)
+		return this;
 	}
 
-	public void use(Collection<HttpMiddleware> middlewares) {
-		routeMiddlewares.addAll(middlewares);
+	public Route use(Collection<HttpMiddleware> middlewares) {
+		if (middlewares != null) {
+			routeMiddlewares.addAll(middlewares);
+		}
+
+		// Return this (for method chaining)
+		return this;
 	}
 
 	// --- START MIDDLEWARES ---
@@ -187,7 +173,8 @@ public class Route {
 		for (HttpMiddleware middleware : routeMiddlewares) {
 			if (!globalMiddlewares.contains(middleware)) {
 				middleware.started(broker);
-				logger.info(nameOf(middleware, true) + " middleware started on route \"" + path + "\".");
+				String p = path == null || path.isEmpty() ? p = "/" : path;
+				logger.info(nameOf(middleware, false) + " middleware started on route \"" + p + "\".");
 			}
 		}
 	}
@@ -202,7 +189,8 @@ public class Route {
 				try {
 					middleware.stopped();
 					if (debug) {
-						logger.info(nameOf(middleware, true) + " middleware stopped on route \"" + path + "\".");
+						String p = path == null || path.isEmpty() ? p = "/" : path;
+						logger.info(nameOf(middleware, false) + " middleware stopped on route \"" + p + "\".");
 					}
 				} catch (Exception ignored) {
 					logger.warn("Unable to stop middleware!");
@@ -216,8 +204,8 @@ public class Route {
 	public Tree toTree() {
 		Tree tree = new Tree();
 		tree.put("path", path);
-		if (whitelist != null) {
-			tree.putObject("whitelist", whitelist);
+		if (whiteList != null) {
+			tree.putObject("whiteList", whiteList);
 		}
 		if (opts != null) {
 			Tree o = tree.putMap("opts");
@@ -235,6 +223,71 @@ public class Route {
 			}
 		}
 		return tree;
+	}
+
+	// --- ADD ALIAS ---
+
+	public Route addAlias(String pathPattern, String actionName) {
+		return addAlias(Alias.ALL, pathPattern, actionName);
+	}
+
+	public Route addAlias(String httpMethod, String pathPattern, String actionName) {
+		return addAlias(new Alias(httpMethod, pathPattern, actionName));
+	}
+
+	public Route addAlias(Alias... aliases) {
+		if (aliases == null || aliases.length == 0) {
+			return this;
+		}
+		LinkedList<Alias> list = new LinkedList<>();
+		if (this.aliases != null) {
+			list.addAll(Arrays.asList(this.aliases));
+		}
+		for (Alias alias : aliases) {
+			if (Alias.REST.endsWith(alias.httpMethod)) {
+				list.addLast(new Alias(Alias.GET, alias.pathPattern, alias.actionName + ".find"));
+				list.addLast(new Alias(Alias.GET, alias.pathPattern + "/:id", alias.actionName + ".get"));
+				list.addLast(new Alias(Alias.POST, alias.pathPattern, alias.actionName + ".create"));
+				list.addLast(new Alias(Alias.PUT, alias.pathPattern + "/:id", alias.actionName + ".update"));
+				list.addLast(new Alias(Alias.DELETE, alias.pathPattern + "/:id", alias.actionName + ".remove"));
+			} else {
+				list.addLast(alias);
+			}
+		}
+		this.aliases = new Alias[list.size()];
+		list.toArray(this.aliases);
+
+		// Return this (for method chaining)
+		return this;
+	}
+
+	// --- ADD TO WHITE LIST ---
+
+	public Route addToWhiteList(String... whiteListEntries) {
+		if (whiteListEntries == null || whiteListEntries.length == 0) {
+			return this;
+		}
+		LinkedList<String> list = new LinkedList<>();
+		if (whiteList != null) {
+			list.addAll(Arrays.asList(whiteList));
+		}
+		for (String whiteListEntry : whiteListEntries) {
+			if (whiteListEntry != null && !whiteListEntry.isEmpty()) {
+				if (whiteListEntry.indexOf('.') == -1) {
+					whiteListEntry = whiteListEntry + "*";
+				}
+				if (!whiteListEntry.startsWith("/")) {
+					whiteListEntry = "/" + whiteListEntry;
+				}
+				list.addLast(whiteListEntry);
+			}
+		}
+
+		whiteList = new String[list.size()];
+		list.toArray(whiteList);
+
+		// Return this (for method chaining)
+		return this;
 	}
 
 	// --- PROPERTY GETTERS AND SETTERS ---
@@ -264,7 +317,7 @@ public class Route {
 	}
 
 	// --- READ-ONLY PROPERTY GETTERS ---
-	
+
 	public String getPath() {
 		return path;
 	}
@@ -287,12 +340,12 @@ public class Route {
 		return opts;
 	}
 
-	public String[] getWhitelist() {
-		if (whitelist == null) {
+	public String[] getWhiteList() {
+		if (whiteList == null) {
 			return null;
 		}
-		String[] copy = new String[whitelist.length];
-		System.arraycopy(whitelist, 0, copy, 0, copy.length);
+		String[] copy = new String[whiteList.length];
+		System.arraycopy(whiteList, 0, copy, 0, copy.length);
 		return copy;
 	}
 
@@ -303,6 +356,36 @@ public class Route {
 		Alias[] copy = new Alias[aliases.length];
 		System.arraycopy(aliases, 0, copy, 0, copy.length);
 		return copy;
+	}
+
+	public void setPath(String path) {
+		this.path = formatPath(path);
+	}
+
+	public void setMappingPolicy(MappingPolicy mappingPolicy) {
+		this.mappingPolicy = mappingPolicy;
+	}
+
+	public void setOpts(CallOptions.Options opts) {
+		this.opts = opts;
+	}
+
+	public void setWhiteList(String... whiteList) {
+		this.whiteList = null;
+		if (whiteList != null && whiteList.length > 0) {
+			for (String whiteListEntry : whiteList) {
+				addToWhiteList(whiteListEntry);
+			}
+		}
+	}
+
+	public void setAliases(Alias... aliases) {
+		this.aliases = null;
+		if (aliases != null && aliases.length > 0) {
+			for (Alias alias : aliases) {
+				addAlias(alias);
+			}
+		}
 	}
 
 }

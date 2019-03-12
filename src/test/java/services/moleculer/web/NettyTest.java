@@ -40,7 +40,7 @@ public class NettyTest extends AbstractTemplateTest {
 		
 		gw = new ApiGateway();
 		br.createService(gw);
-		
+	
 		br.start();
 		
 		super.setUp();

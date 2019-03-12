@@ -27,6 +27,6 @@ package services.moleculer.web;
 
 public interface WebSocketRegistry {
 
-	public boolean send(String path, String message);
+	public void send(String path, String message);
 	
 }

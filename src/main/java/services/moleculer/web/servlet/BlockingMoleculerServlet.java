@@ -38,6 +38,12 @@ import javax.servlet.http.HttpServletResponse;
 import services.moleculer.web.servlet.request.BlockingWebRequest;
 import services.moleculer.web.servlet.response.BlockingWebResponse;
 
+/**
+ * Old type (blocking) Servlet without WebSocket support. Can be used for REST
+ * services and file servicing. It can be used in the same way with every
+ * Middleware as with non-blocking Moleculer servlet. The only difference is the
+ * lack of WebSocket support.
+ */
 public class BlockingMoleculerServlet extends AbstractMoleculerServlet {
 
 	// --- UID ---
@@ -45,9 +51,9 @@ public class BlockingMoleculerServlet extends AbstractMoleculerServlet {
 	private static final long serialVersionUID = 1669628991868900133L;
 
 	// --- CONSTANTS ---
-	
+
 	protected long timeout;
-	
+
 	// --- INIT / START ---
 
 	@Override
@@ -62,7 +68,7 @@ public class BlockingMoleculerServlet extends AbstractMoleculerServlet {
 			timeout = Long.parseLong(value);
 		}
 	}
-	
+
 	// --- BLOCKING SERVICE ---
 
 	@Override
@@ -77,7 +83,7 @@ public class BlockingMoleculerServlet extends AbstractMoleculerServlet {
 				rsp.sendError(408);
 				getServletContext().log("Unexpected timeout exception occured!", timeout);
 			} catch (Throwable ignored) {
-			}				
+			}
 		} catch (Throwable cause) {
 			try {
 				if (gateway == null) {

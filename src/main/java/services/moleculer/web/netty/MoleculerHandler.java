@@ -32,12 +32,15 @@ import java.util.concurrent.ExecutorService;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponseEncoder;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.ContinuationWebSocketFrame;
@@ -63,7 +66,7 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 
 	// --- WEBSOCKET VARIABLES ---
 
-	protected final NettyWebSocketRegistry nettyWebSocketRegistry;
+	protected final NettyWebSocketRegistry webSocketRegistry;
 
 	protected volatile String path;
 	protected volatile WebSocketServerHandshaker handshaker;
@@ -73,7 +76,7 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 	public MoleculerHandler(ApiGateway gateway, ServiceBroker broker, NettyWebSocketRegistry nettyWebSocketRegistry) {
 		this.gateway = gateway;
 		this.broker = broker;
-		this.nettyWebSocketRegistry = nettyWebSocketRegistry;
+		this.webSocketRegistry = nettyWebSocketRegistry;
 		this.executor = broker.getConfig().getExecutor();
 	}
 
@@ -110,8 +113,13 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 							
 							// TODO check access
 							
+							ChannelPipeline p = ctx.pipeline();
+							p.addAfter("decoder", "encoder", new HttpResponseEncoder());
+							p.addBefore("decoder", "aggregator", new HttpObjectAggregator(8000));
+														
 							handshaker.handshake(ctx.channel(), req);
-							nettyWebSocketRegistry.register(path, ctx);
+							webSocketRegistry.register(path, ctx);
+							
 						}
 						ctx.flush();
 						return;
@@ -154,7 +162,13 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 
 				// Process close/ping/continue WebSocket frames
 				if (request instanceof CloseWebSocketFrame) {
-					handshaker.close(ctx.channel(), ((CloseWebSocketFrame) request).retain());
+					try {
+						handshaker.close(ctx.channel(), ((CloseWebSocketFrame) request).retain());						
+					} catch (Exception ignored) {
+						
+						// Ignore I/O exception
+					}
+					webSocketRegistry.deregister(path, ctx);
 					return;
 				}
 				if (request instanceof PingWebSocketFrame) {

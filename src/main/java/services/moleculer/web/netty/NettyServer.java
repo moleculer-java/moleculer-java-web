@@ -57,7 +57,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpRequestDecoder;
-import io.netty.handler.codec.http.HttpResponseEncoder;
 import io.netty.handler.ssl.OpenSsl;
 import io.netty.handler.ssl.OpenSslServerContext;
 import io.netty.handler.ssl.OpenSslServerSessionContext;
@@ -88,6 +87,8 @@ public class NettyServer extends Service {
 
 	protected ChannelHandler handler;
 
+	protected int webSocketCleanupSeconds = 15;
+
 	// --- SSL PROPERTIES ---
 
 	protected boolean useSSL;
@@ -113,9 +114,9 @@ public class NettyServer extends Service {
 	protected SslContext cachedSslContext;
 
 	// --- WEBSOCKET REGISTRY ---
-	
-	protected NettyWebSocketRegistry nettyWebSocketRegistry;
-	
+
+	protected NettyWebSocketRegistry webSocketRegistry;
+
 	// --- START NETTY SERVER ---
 
 	@Override
@@ -125,7 +126,7 @@ public class NettyServer extends Service {
 		// Worker group
 		if (singletonGroup == null) {
 			singletonGroup = new NioEventLoopGroup(1, Executors.newSingleThreadExecutor(r -> {
-				Thread t = new Thread(r , "Netty Server on port " + port);
+				Thread t = new Thread(r, "Netty Server on port " + port);
 				t.setPriority(Thread.MAX_PRIORITY - 1);
 				return t;
 			}));
@@ -134,12 +135,14 @@ public class NettyServer extends Service {
 		// Create request chain
 		ServerBootstrap bootstrap = new ServerBootstrap();
 		bootstrap.group(singletonGroup, singletonGroup);
-		
+
 		bootstrap.channel(NioServerSocketChannel.class);
 
 		// Create webSocketRegistry
-		nettyWebSocketRegistry = new NettyWebSocketRegistry(broker);
-		
+		if (webSocketRegistry == null) {
+			webSocketRegistry = new NettyWebSocketRegistry(broker, webSocketCleanupSeconds);
+		}
+
 		// Define request chain
 		if (handler == null) {
 			handler = new ChannelInitializer<Channel>() {
@@ -148,14 +151,10 @@ public class NettyServer extends Service {
 				protected void initChannel(Channel ch) throws Exception {
 					ChannelPipeline p = ch.pipeline();
 					if (useSSL) {
-						p.addLast(createSslHandler(ch));
+						p.addLast("ssl", createSslHandler(ch));
 					}
-					p.addLast(new HttpRequestDecoder());
-					p.addLast(new MoleculerHandler(gateway, broker, nettyWebSocketRegistry));
-					
-					// Necessary for the websocket handler,
-					// but not used
-					p.addLast(new HttpResponseEncoder());					
+					p.addLast("decoder", new HttpRequestDecoder());
+					p.addLast("handler", new MoleculerHandler(gateway, broker, webSocketRegistry));
 				}
 
 			};
@@ -182,6 +181,10 @@ public class NettyServer extends Service {
 			if (localService) {
 				gateway = getService(broker, ApiGateway.class);
 				if (gateway != null) {
+					if (webSocketRegistry == null) {
+						webSocketRegistry = new NettyWebSocketRegistry(broker, webSocketCleanupSeconds);
+					}
+					gateway.setWebSocketRegistry(webSocketRegistry);
 					logger.info("ApiGateway connected to Netty Server.");
 				}
 			}
@@ -198,6 +201,10 @@ public class NettyServer extends Service {
 			singletonGroup = null;
 		}
 		handler = null;
+		if (webSocketRegistry != null) {
+			webSocketRegistry.stopped();
+			webSocketRegistry = null;
+		}
 	}
 
 	// --- SSL HANDLER ---
@@ -302,6 +309,16 @@ public class NettyServer extends Service {
 			}
 		}
 		return cachedSslContext;
+	}
+
+	// --- GETTERS AND SETTERS ---
+
+	public int getWebSocketCleanupSeconds() {
+		return webSocketCleanupSeconds;
+	}
+
+	public void setWebSocketCleanupSeconds(int webSocketCleanupSeconds) {
+		this.webSocketCleanupSeconds = webSocketCleanupSeconds;
 	}
 
 }

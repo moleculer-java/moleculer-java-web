@@ -49,7 +49,7 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 	private static final long serialVersionUID = -1038240217177335483L;
 
 	// --- GATEWAY SERVICE ---
-	
+
 	protected ApiGateway gateway;
 
 	// --- SERVICE BROKER'S SPRING CONTEXT ---
@@ -64,9 +64,9 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 	// --- INTERNAL VARIABLES ---
 
 	protected int tries;
-	
+
 	// --- INIT / START ---
-	
+
 	@Override
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
@@ -96,9 +96,9 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 			getServletContext().log("ApiGateway connected to Servlet instance.");
 		}
 	}
-	
+
 	// --- INIT GATEWAY ---
-	
+
 	protected void initApiGateway() {
 		gateway = getService(broker, ApiGateway.class);
 		if (gateway == null) {
@@ -112,9 +112,9 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 			getServletContext().log("ApiGateway connected to Servlet instance.");
 		}
 	}
-	
+
 	// --- DESTROY / STOP ---
-	
+
 	@Override
 	public void destroy() {
 		super.destroy();
@@ -125,7 +125,7 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 			broker.stop();
 			broker = null;
 		}
-		
+
 		// Stop Spring Context
 		if (ctx != null) {
 			try {
@@ -135,7 +135,7 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 			ctx = null;
 		}
 	}
-	
+
 	// --- GETTERS ---
 
 	public ApiGateway getGateway() {

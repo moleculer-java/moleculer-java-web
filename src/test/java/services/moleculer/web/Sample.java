@@ -25,15 +25,77 @@
  */
 package services.moleculer.web;
 
+import org.eclipse.jetty.server.Server;
+import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.handler.HandlerCollection;
+import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.ServletHolder;
+
 import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
 import services.moleculer.service.Action;
 import services.moleculer.service.Service;
+import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.netty.NettyServer;
+import services.moleculer.web.servlet.NonBlockingMoleculerServlet;
 
 public class Sample {
 
 	public static void main(String[] args) {
+		System.out.println("START");
+		try {
+			Server server = new Server();
+			ServerConnector pContext = new ServerConnector(server);
+			pContext.setHost("127.0.0.1");
+			pContext.setPort(3000);
+			ServletContextHandler publicContext = new ServletContextHandler(ServletContextHandler.SESSIONS);
+			publicContext.setContextPath("/");
+			   
+			// Create non-blocking servlet
+			NonBlockingMoleculerServlet sc = new NonBlockingMoleculerServlet();
+			ServletHolder sh = new ServletHolder(sc);
+
+			sh.setInitParameter("moleculer.config", "/services/moleculer/web/moleculer.config.xml");
+			publicContext.addServlet(sh, "/*");		
+
+			HandlerCollection collection = new HandlerCollection();
+			collection.addHandler(publicContext);
+			server.setHandler(collection);
+			server.addConnector(pContext);
+						
+			server.start();
+			
+			ServiceBroker broker = sc.getBroker();
+			ApiGateway gateway = sc.getGateway();
+			
+			// REST services
+			gateway.addRoute().use(new CorsHeaders()).addAlias("/test", "test.send");
+			
+			// Static web content
+			gateway.addRoute("/templates").setEnableReloading(true);
+
+			broker.createService(new Service("test") {
+
+				@SuppressWarnings("unused")
+				public Action send = ctx -> {
+
+					Tree packet = new Tree();
+					packet.put("path", "/ws/test");
+					packet.put("data", 123);
+
+					ctx.broadcast("websocket.send", packet);
+
+					return "Data submitted!";
+				};
+
+			});
+			
+		} catch (Exception cause) {
+			cause.printStackTrace();
+		}
+	}
+
+	public static void main2(String[] args) {
 		System.out.println("START");
 		try {
 			ServiceBroker broker = ServiceBroker.builder().build();
@@ -45,20 +107,24 @@ public class Sample {
 			gateway.setDebug(true);
 			broker.createService(gateway);
 
-			gateway.addServeStatic("/static", "/templates").setEnableReloading(true);
+			// REST services
+			gateway.addRoute().use(new CorsHeaders()).addAlias("/test", "test.send");
 			
-			gateway.addRoute("/test", "test.send");
-			
+			// Static web content
+			gateway.addRoute("/templates").setEnableReloading(true);
+
 			broker.createService(new Service("test") {
 
 				@SuppressWarnings("unused")
 				public Action send = ctx -> {
-					
-					Tree payload = new Tree();
-					payload.put("a", 3);
-					
-					gateway.sendWebSocket("/ws/test", payload);
-					return payload;
+
+					Tree packet = new Tree();
+					packet.put("path", "/ws/test");
+					packet.put("data", 123);
+
+					ctx.broadcast("websocket.send", packet);
+
+					return "Data submitted!";
 				};
 
 			});

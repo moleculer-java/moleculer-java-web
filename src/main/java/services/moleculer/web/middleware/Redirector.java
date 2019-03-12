@@ -25,6 +25,7 @@
  */
 package services.moleculer.web.middleware;
 
+import static services.moleculer.util.CommonUtils.formatPath;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
@@ -49,6 +50,11 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 	protected int status = 307;
 
 	/**
+	 * Path to redirect (null = redirects all requests).
+	 */
+	protected String path;
+	
+	/**
 	 * URL of the redirection.
 	 */
 	protected String location = "/";
@@ -69,6 +75,12 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 	}
 
 	public Redirector(String location, int status) {
+		setLocation(location);
+		setStatus(status);
+	}
+
+	public Redirector(String path, String location, int status) {
+		setPath(path);
 		setLocation(location);
 		setStatus(status);
 	}
@@ -97,6 +109,12 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 			public void service(WebRequest req, WebResponse rsp) throws Exception {
 				try {
 
+					// Check path
+					if (path != null && !path.equals(req.getPath())) {
+						next.service(req, rsp);
+						return;
+					}
+					
 					// Create HTML body
 					String body = htmlTemplate.replace("{location}", location);
 					byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
@@ -162,6 +180,24 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 	 */
 	public void setStatus(int status) {
 		this.status = status;
+	}
+
+	/**
+	 * @return the path
+	 */
+	public String getPath() {
+		return path;
+	}
+
+	/**
+	 * @param path
+	 *            the path to set
+	 */
+	public void setPath(String path) {
+		this.path = formatPath(path);
+		if (this.path.isEmpty()) {
+			this.path = "/";
+		}
 	}
 
 }

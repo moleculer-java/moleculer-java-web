@@ -8,9 +8,8 @@
 
 	<!-- API GATEWAY -->
 
-	<bean id="api-gw" class="services.moleculer.web.ApiGateway">
-	</bean>
-	
+	<bean id="api-gw" class="services.moleculer.web.ApiGateway" />
+
 	<!-- PACKAGE OF THE MOLECULER SERVICES -->
 	
 	<context:component-scan base-package="my.services" />

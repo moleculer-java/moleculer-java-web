@@ -77,6 +77,11 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 		setCookieName(cookieName);
 	}
 
+	public SessionCookie(String cookieName, String path) {
+		setCookieName(cookieName);
+		setPath(path);
+	}
+
 	// --- CREATE NEW PROCESSOR ---
 
 	@Override

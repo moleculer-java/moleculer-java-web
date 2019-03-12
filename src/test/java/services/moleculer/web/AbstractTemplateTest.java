@@ -43,6 +43,8 @@ import services.moleculer.util.CommonUtils;
 import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.middleware.Favicon;
 import services.moleculer.web.middleware.SessionCookie;
+import services.moleculer.web.router.Alias;
+import services.moleculer.web.router.MappingPolicy;
 import services.moleculer.web.router.Route;
 import services.moleculer.web.template.DataTreeEngine;
 import services.moleculer.web.template.FreeMarkerEngine;
@@ -56,7 +58,6 @@ public abstract class AbstractTemplateTest extends TestCase {
 	protected ServiceBroker br;
 	protected ApiGateway gw;
 	protected CloseableHttpAsyncClient cl;
-	protected Route r;
 
 	@Override
 	protected void setUp() throws Exception {
@@ -96,9 +97,17 @@ public abstract class AbstractTemplateTest extends TestCase {
 		});
 
 		gw.use(new Favicon());
-		r = gw.addRoute("GET", "/html", "test.html", new SessionCookie());
-		r = gw.addRoute("GET", "/math/add/:a/:b", "math.add", new CorsHeaders());
-
+		
+		Route r1 = new Route();
+		r1.addAlias(Alias.GET, "/math/add/:a/:b", "math.add");
+		r1.use(new CorsHeaders());
+		gw.addRoute(r1);
+		
+		Route r2 = new Route();
+		r2.addAlias(Alias.GET, "/html", "test.html");
+		r2.use(new SessionCookie("SID", "/html"));
+		gw.addRoute(r2);
+		
 		cl = HttpAsyncClients.createDefault();
 		cl.start();
 	}
@@ -178,8 +187,8 @@ public abstract class AbstractTemplateTest extends TestCase {
 		String header = rsp.getLastHeader("Set-Cookie").getValue();
 
 		// JSESSIONID="1|1c4xy2u8fjab3";$Path="/"
-		assertTrue(header.startsWith("JSESSIONID=\""));
-		assertTrue(header.endsWith("\";$Path=\"/\""));
+		assertTrue(header.startsWith("SID=\""));
+		assertTrue(header.endsWith("\";$Path=\"/html\""));
 
 		assertEquals(200, rsp.getStatusLine().getStatusCode());
 		byte[] bytes = CommonUtils.readFully(rsp.getEntity().getContent());

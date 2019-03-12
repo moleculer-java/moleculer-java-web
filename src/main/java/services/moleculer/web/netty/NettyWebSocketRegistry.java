@@ -27,34 +27,94 @@ package services.moleculer.web.netty;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.WeakHashMap;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import services.moleculer.ServiceBroker;
 import services.moleculer.web.WebSocketRegistry;
 
-public class NettyWebSocketRegistry implements WebSocketRegistry {
+public class NettyWebSocketRegistry implements WebSocketRegistry, Runnable {
 
-	protected HashMap<String, ChannelHandlerContext> registry = new HashMap<>();
-	
-	public NettyWebSocketRegistry(ServiceBroker broker) {
-		
+	protected HashMap<String, WeakHashMap<ChannelHandlerContext, Long>> registry = new HashMap<>();
+
+	protected final ScheduledFuture<?> timer;
+
+	public NettyWebSocketRegistry(ServiceBroker broker, long cleanupSeconds) {
+		timer = broker.getConfig().getScheduler().scheduleAtFixedRate(this, cleanupSeconds, cleanupSeconds,
+				TimeUnit.SECONDS);
+	}
+
+	public void stopped() {
+		if (timer != null && !timer.isCancelled()) {
+			timer.cancel(false);			
+		}
 	}
 	
 	public void register(String path, ChannelHandlerContext ctx) {
-		registry.put(path, ctx);
+		WeakHashMap<ChannelHandlerContext, Long> ctxs = registry.get(path);
+		if (ctxs == null) {
+			ctxs = new WeakHashMap<ChannelHandlerContext, Long>();
+			registry.put(path, ctxs);
+		}
+		ctxs.put(ctx, System.currentTimeMillis());
+	}
+
+	public void deregister(String path, ChannelHandlerContext ctx) {
+		WeakHashMap<ChannelHandlerContext, Long> ctxs = registry.get(path);
+		if (ctxs == null) {
+			return;
+		}
+		ctxs.remove(ctx);
+	}
+	
+	@Override
+	public void send(String path, String message) {
+		WeakHashMap<ChannelHandlerContext, Long> ctxs = registry.get(path);
+		if (ctxs == null || ctxs.isEmpty()) {
+			return;
+		}
+		byte[] bytes = message.getBytes(StandardCharsets.UTF_8);
+		Iterator<ChannelHandlerContext> i = ctxs.keySet().iterator();
+		ChannelHandlerContext ctx;
+		while (i.hasNext()) {
+			ctx = i.next();
+			if (ctx == null) {
+				continue;
+			}
+			ctx.write(new TextWebSocketFrame(Unpooled.wrappedBuffer(bytes)));
+			ctx.flush();
+		}
 	}
 
 	@Override
-	public boolean send(String path, String message) {
-		ChannelHandlerContext ctx = registry.get(path);
-		if (ctx == null) {
-			return false;
+	public void run() {
+		Iterator<WeakHashMap<ChannelHandlerContext, Long>> j = registry.values().iterator();
+		WeakHashMap<ChannelHandlerContext, Long> ctxs;
+		Iterator<ChannelHandlerContext> i;
+		ChannelHandlerContext ctx;
+		while (j.hasNext()) {
+			ctxs = j.next();
+			if (ctxs == null) {
+				j.remove();
+				continue;
+			}
+			i = ctxs.keySet().iterator();
+			while (i.hasNext()) {
+				ctx = i.next();
+				if (ctx == null || ctx.channel() == null || !ctx.channel().isOpen()) {
+					i.remove();
+					continue;
+				}
+			}
+			if (ctxs.isEmpty()) {
+				j.remove();
+			}
 		}
-		byte[] bytes = message.getBytes(StandardCharsets.UTF_8);
-		ctx.write(Unpooled.wrappedBuffer(bytes));
-		ctx.flush();
-		return ctx.channel().isOpen();
 	}
-	
+
 }
