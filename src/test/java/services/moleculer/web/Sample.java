@@ -37,7 +37,7 @@ import services.moleculer.service.Action;
 import services.moleculer.service.Service;
 import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.netty.NettyServer;
-import services.moleculer.web.servlet.NonBlockingMoleculerServlet;
+import services.moleculer.web.servlet.NonBlockingServlet;
 
 public class Sample {
 
@@ -52,7 +52,7 @@ public class Sample {
 			publicContext.setContextPath("/");
 			   
 			// Create non-blocking servlet
-			NonBlockingMoleculerServlet sc = new NonBlockingMoleculerServlet();
+			NonBlockingServlet sc = new NonBlockingServlet();
 			ServletHolder sh = new ServletHolder(sc);
 
 			sh.setInitParameter("moleculer.config", "/services/moleculer/web/moleculer.config.xml");

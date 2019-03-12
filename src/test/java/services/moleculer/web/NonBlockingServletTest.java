@@ -31,7 +31,7 @@ import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 
-import services.moleculer.web.servlet.NonBlockingMoleculerServlet;
+import services.moleculer.web.servlet.NonBlockingServlet;
 
 public class NonBlockingServletTest extends AbstractTemplateTest {
 
@@ -47,7 +47,7 @@ public class NonBlockingServletTest extends AbstractTemplateTest {
 		publicContext.setContextPath("/");
 		
 		// Create non-blocking servlet
-		NonBlockingMoleculerServlet sc = new NonBlockingMoleculerServlet();
+		NonBlockingServlet sc = new NonBlockingServlet();
 		ServletHolder sh = new ServletHolder(sc);
 		sh.setInitParameter("moleculer.config", "/services/moleculer/web/moleculer.config.xml");
 		publicContext.addServlet(sh, "/*");

@@ -36,17 +36,12 @@ import javax.servlet.ServletResponse;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.websocket.OnClose;
-import javax.websocket.OnOpen;
-import javax.websocket.Session;
-import javax.websocket.server.ServerEndpoint;
 
 import services.moleculer.web.servlet.request.NonBlockingWebRequest;
 import services.moleculer.web.servlet.response.NonBlockingWebResponse;
 
 @WebServlet(asyncSupported = true)
-@ServerEndpoint("/ws/test")
-public class NonBlockingMoleculerServlet extends AbstractMoleculerServlet {
+public class NonBlockingServlet extends AbstractMoleculerServlet {
 
 	// --- UID ---
 
@@ -55,60 +50,15 @@ public class NonBlockingMoleculerServlet extends AbstractMoleculerServlet {
 	// --- COMMON TASK EXECUTOR ---
 
 	protected ExecutorService executor;
-
-	// --- WEBSOCKET REGISTRY ---
-
-	protected NonBlockingWebSocketRegistry webSocketRegistry;
-
-	// --- WEBSOCKET PARAMETERS ---
-
-	protected int webSocketCleanupSeconds = 15;
 	
 	// --- INIT / START ---
 
 	@Override
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
-
-		// Set WebSocket cleanup period
-		String value = config.getInitParameter("websocket.cleanup");
-		if (value != null && !value.isEmpty()) {
-			try {
-				webSocketCleanupSeconds = Integer.parseInt(value);
-			} catch (Exception e) {
-				getServletContext().log("Invalid \"websocket.cleanup\" parameter (not numeric): " + value);
-			}
-		}
 		
-		// Create registry
-		webSocketRegistry = new NonBlockingWebSocketRegistry(broker, webSocketCleanupSeconds);
-		gateway.setWebSocketRegistry(webSocketRegistry);
-
 		// Get executor
 		executor = broker.getConfig().getExecutor();
-	}
-
-	// --- DESTROY / STOP ---
-
-	@Override
-	public void destroy() {
-		if (webSocketRegistry != null) {
-			webSocketRegistry.stopped();
-			webSocketRegistry = null;
-		}
-		super.destroy();
-	}
-
-	// --- WEBSOCKET HANDLERS ---
-
-	@OnOpen
-	public void open(Session session) {
-		webSocketRegistry.register(session);
-	}
-
-	@OnClose
-	public void close(Session session) {
-		webSocketRegistry.deregister(session);
 	}
 
 	// --- NON-BLOCKING SERVICE ---

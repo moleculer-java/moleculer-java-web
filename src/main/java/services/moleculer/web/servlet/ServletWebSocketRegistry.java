@@ -11,13 +11,13 @@ import javax.websocket.Session;
 import services.moleculer.ServiceBroker;
 import services.moleculer.web.WebSocketRegistry;
 
-public class NonBlockingWebSocketRegistry implements WebSocketRegistry, Runnable {
+public class ServletWebSocketRegistry implements WebSocketRegistry, Runnable {
 
 	protected HashMap<String, WeakHashMap<Session, Long>> registry = new HashMap<>();
 
 	protected final ScheduledFuture<?> timer;
 	
-	public NonBlockingWebSocketRegistry(ServiceBroker broker, long cleanupSeconds) {
+	public ServletWebSocketRegistry(ServiceBroker broker, long cleanupSeconds) {
 		timer = broker.getConfig().getScheduler().scheduleAtFixedRate(this, cleanupSeconds, cleanupSeconds,
 				TimeUnit.SECONDS);
 	}

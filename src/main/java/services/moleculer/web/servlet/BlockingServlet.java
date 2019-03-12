@@ -44,7 +44,7 @@ import services.moleculer.web.servlet.response.BlockingWebResponse;
  * Middleware as with non-blocking Moleculer servlet. The only difference is the
  * lack of WebSocket support.
  */
-public class BlockingMoleculerServlet extends AbstractMoleculerServlet {
+public class BlockingServlet extends AbstractMoleculerServlet {
 
 	// --- UID ---
 

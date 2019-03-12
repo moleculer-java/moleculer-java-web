@@ -120,12 +120,6 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 		super.destroy();
 		gateway = null;
 
-		// Stop ServiceBroker instance
-		if (broker != null) {
-			broker.stop();
-			broker = null;
-		}
-
 		// Stop Spring Context
 		if (ctx != null) {
 			try {
