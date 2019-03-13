@@ -60,10 +60,11 @@ public class ServletWebSocketRegistry implements WebSocketRegistry, WebSocketHan
 		final HashMap<String, String> map = new HashMap<>();
 		map.put("org.atmosphere.websocket.suppressJSR356", "true");
 		map.put("org.atmosphere.cpr.AtmosphereInterceptor.disableDefaults", "true");
-		map.put("org.atmosphere.cpr.broadcasterCacheClass", "services.moleculer.web.servlet.NullBroadcasterCache");
 		map.put("org.atmosphere.cpr.Broadcaster.supportOutOfOrderBroadcast", "false");
-		map.put("org.atmosphere.cpr.broadcasterClass", "services.moleculer.web.servlet.SimpleBroadcaster");
 		map.put("org.atmosphere.cpr.Broadcaster.threadWaitTime", "0");
+		map.put("org.atmosphere.cpr.broadcasterClass", "services.moleculer.web.servlet.websocket.SimpleBroadcaster");
+		map.put("org.atmosphere.cpr.broadcasterCacheClass",
+				"services.moleculer.web.servlet.websocket.NullBroadcasterCache");
 
 		// Set async mode
 		if (async) {
