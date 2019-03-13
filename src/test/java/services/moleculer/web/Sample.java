@@ -37,40 +37,41 @@ import services.moleculer.service.Action;
 import services.moleculer.service.Service;
 import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.netty.NettyServer;
-import services.moleculer.web.servlet.NonBlockingServlet;
+import services.moleculer.web.servlet.AsyncMoleculerServlet;
 
 public class Sample {
 
 	public static void main(String[] args) {
 		System.out.println("START");
 		try {
+
 			Server server = new Server();
 			ServerConnector pContext = new ServerConnector(server);
 			pContext.setHost("127.0.0.1");
 			pContext.setPort(3000);
 			ServletContextHandler publicContext = new ServletContextHandler(ServletContextHandler.SESSIONS);
 			publicContext.setContextPath("/");
-			   
+
 			// Create non-blocking servlet
-			NonBlockingServlet sc = new NonBlockingServlet();
+			AsyncMoleculerServlet sc = new AsyncMoleculerServlet();
 			ServletHolder sh = new ServletHolder(sc);
 
 			sh.setInitParameter("moleculer.config", "/services/moleculer/web/moleculer.config.xml");
-			publicContext.addServlet(sh, "/*");		
+			publicContext.addServlet(sh, "/*");
 
 			HandlerCollection collection = new HandlerCollection();
 			collection.addHandler(publicContext);
 			server.setHandler(collection);
 			server.addConnector(pContext);
-						
+
 			server.start();
-			
+
 			ServiceBroker broker = sc.getBroker();
 			ApiGateway gateway = sc.getGateway();
-			
+
 			// REST services
 			gateway.addRoute().use(new CorsHeaders()).addAlias("/test", "test.send");
-			
+
 			// Static web content
 			gateway.addRoute("/templates").setEnableReloading(true);
 
@@ -89,7 +90,7 @@ public class Sample {
 				};
 
 			});
-			
+
 		} catch (Exception cause) {
 			cause.printStackTrace();
 		}
@@ -109,7 +110,7 @@ public class Sample {
 
 			// REST services
 			gateway.addRoute().use(new CorsHeaders()).addAlias("/test", "test.send");
-			
+
 			// Static web content
 			gateway.addRoute("/templates").setEnableReloading(true);
 

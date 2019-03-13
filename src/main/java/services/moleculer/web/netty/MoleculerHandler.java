@@ -38,7 +38,6 @@ import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaders;
-import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseEncoder;
 import io.netty.handler.codec.http.LastHttpContent;
@@ -115,7 +114,6 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 							
 							ChannelPipeline p = ctx.pipeline();
 							p.addAfter("decoder", "encoder", new HttpResponseEncoder());
-							p.addBefore("decoder", "aggregator", new HttpObjectAggregator(8000));
 														
 							handshaker.handshake(ctx.channel(), req);
 							webSocketRegistry.register(path, ctx);

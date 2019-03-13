@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2019 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -28,19 +28,24 @@ package services.moleculer.web.servlet;
 import static services.moleculer.web.common.GatewayUtils.getService;
 
 import java.io.File;
+import java.lang.reflect.Method;
+import java.util.Enumeration;
+import java.util.LinkedList;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 
-import org.springframework.context.support.AbstractApplicationContext;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 import org.springframework.context.support.FileSystemXmlApplicationContext;
 
 import services.moleculer.ServiceBroker;
+import services.moleculer.config.ServiceBrokerConfig;
 import services.moleculer.web.ApiGateway;
+import services.moleculer.web.servlet.websocket.ServletWebSocketRegistry;
 
 public abstract class AbstractMoleculerServlet extends HttpServlet {
 
@@ -48,68 +53,98 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 
 	private static final long serialVersionUID = -1038240217177335483L;
 
-	// --- GATEWAY SERVICE ---
-
-	protected ApiGateway gateway;
-
 	// --- SERVICE BROKER'S SPRING CONTEXT ---
 
-	protected AbstractApplicationContext ctx;
+	protected ConfigurableApplicationContext ctx;
 
 	// --- MOLECULER COMPONENTS ---
 
 	protected ServiceBroker broker;
+	protected ApiGateway gateway;
+	protected ExecutorService executor;
 	protected ScheduledExecutorService scheduler;
+	
+	// --- WEBSOCKET REGISTRY ---
 
-	// --- INTERNAL VARIABLES ---
-
-	protected int tries;
+	protected ServletWebSocketRegistry webSocketRegistry;
 
 	// --- INIT / START ---
 
 	@Override
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
+		try {
 
-		// Start ServiceBroker
-		String configPath = config.getInitParameter("moleculer.config");
-		if (configPath == null || configPath.isEmpty()) {
-			configPath = "/WEB-INF/moleculer.config.xml";
-		}
-		File file = new File(configPath);
-		if (file.isFile()) {
-			ctx = new FileSystemXmlApplicationContext(configPath);
-		} else {
-			ctx = new ClassPathXmlApplicationContext(configPath);
-		}
-		ctx.start();
+			// Start with SpringBoot
+			String springApp = config.getInitParameter("moleculer.application");
+			if (springApp != null && !springApp.isEmpty()) {
 
-		// Get ServiceBroker from Spring
-		broker = ctx.getBean(ServiceBroker.class);
+				// Create "args" String array by Servlet config
+				Enumeration<String> e = config.getInitParameterNames();
+				LinkedList<String> list = new LinkedList<>();
+				while (e.hasMoreElements()) {
+					String key = e.nextElement();
+					String value = config.getInitParameter(key);
+					if (value != null) {
+						list.addLast(key);
+						list.addLast(value);
+					}
+				}
+				String[] args = new String[list.size()];
+				list.toArray(args);
 
-		// Find ApiGateway
-		gateway = getService(broker, ApiGateway.class);
-		if (gateway == null) {
-			scheduler = broker.getConfig().getScheduler();
-			scheduler.execute(this::initApiGateway);
-		} else {
-			getServletContext().log("ApiGateway connected to Servlet instance.");
-		}
-	}
+				// Class of the SpringApplication
+				String springAppName = "org.springframework.boot.SpringApplication";
+				Class<?> springAppClass = Class.forName(springAppName);
 
-	// --- INIT GATEWAY ---
+				// Input types of "run" method
+				Class<?>[] types = new Class[2];
+				types[0] = Class.class;
+				types[1] = new String[0].getClass();
+				Method m = springAppClass.getDeclaredMethod("run", types);
 
-	protected void initApiGateway() {
-		gateway = getService(broker, ApiGateway.class);
-		if (gateway == null) {
-			tries++;
-			if (tries < 50) {
-				scheduler.schedule(this::initApiGateway, 200, TimeUnit.MILLISECONDS);
+				// Input objects of "run" method
+				Object[] in = new Object[2];
+				in[0] = Class.forName(springApp);
+				in[1] = args;
+
+				// Load app with Spring Boot
+				ctx = (ConfigurableApplicationContext) m.invoke(null, in);
+
 			} else {
-				getServletContext().log("ApiGateway Service not defined!");
+
+				// Start by using Spring XML config
+				String configPath = config.getInitParameter("moleculer.config");
+				if (configPath == null || configPath.isEmpty()) {
+					configPath = "/WEB-INF/moleculer.config.xml";
+				}
+				File file = new File(configPath);
+				if (file.isFile()) {
+					ctx = new FileSystemXmlApplicationContext(configPath);
+				} else {
+					ctx = new ClassPathXmlApplicationContext(configPath);
+				}
+				ctx.start();
 			}
-		} else {
-			getServletContext().log("ApiGateway connected to Servlet instance.");
+
+			// Get ServiceBroker from Spring
+			broker = ctx.getBean(ServiceBroker.class);
+
+			// Find ApiGateway
+			gateway = getService(broker, ApiGateway.class);
+			if (gateway == null) {
+				throw new ServletException("ApiGateway Service not defined!");
+			}
+			
+			// Get executor and scheduler
+			ServiceBrokerConfig cfg = broker.getConfig();
+			executor = cfg.getExecutor();
+			scheduler = cfg.getScheduler();
+			
+		} catch (ServletException servletException) {
+			throw servletException;
+		} catch (Exception fatal) {
+			throw new ServletException("Unable to load Moleculer Application!", fatal);
 		}
 	}
 
@@ -118,7 +153,12 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 	@Override
 	public void destroy() {
 		super.destroy();
-		gateway = null;
+
+		// Stop Atmosphere
+		if (webSocketRegistry != null) {
+			webSocketRegistry.stopped();
+			webSocketRegistry = null;
+		}
 
 		// Stop Spring Context
 		if (ctx != null) {

@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2019 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -26,82 +26,87 @@
 package services.moleculer.web.servlet;
 
 import java.io.IOException;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeoutException;
 
-import javax.servlet.AsyncContext;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
-import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import services.moleculer.web.servlet.request.NonBlockingWebRequest;
-import services.moleculer.web.servlet.response.NonBlockingWebResponse;
+import services.moleculer.web.servlet.request.BlockingWebRequest;
+import services.moleculer.web.servlet.response.BlockingWebResponse;
+import services.moleculer.web.servlet.websocket.ServletWebSocketRegistry;
 
-@WebServlet(asyncSupported = true)
-public class NonBlockingServlet extends AbstractMoleculerServlet {
+/**
+ * Old type (blocking) Servlet. Can be used for REST services and file
+ * servicing. It can be used in the same way with every Middleware as with
+ * non-blocking Moleculer servlet.
+ */
+public class BlockingMoleculerServlet extends AbstractMoleculerServlet {
 
 	// --- UID ---
 
-	private static final long serialVersionUID = 3491086564959030123L;
+	private static final long serialVersionUID = 1669628991868900133L;
 
-	// --- COMMON TASK EXECUTOR ---
+	// --- CONSTANTS ---
 
-	protected ExecutorService executor;
-	
+	protected long timeout;
+
 	// --- INIT / START ---
 
 	@Override
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
-		
-		// Get executor
-		executor = broker.getConfig().getExecutor();
+
+		// Get timeout
+		String value = config.getInitParameter("response.timeout");
+		if (value == null || value.isEmpty()) {
+			timeout = 1000L * 60 * 3;
+		} else {
+			timeout = Long.parseLong(value);
+		}
+
+		// Create WebSocket registry
+		webSocketRegistry = new ServletWebSocketRegistry(config, executor, scheduler, false);
+		gateway.setWebSocketRegistry(webSocketRegistry);
 	}
 
-	// --- NON-BLOCKING SERVICE ---
+	// --- BLOCKING SERVICE ---
 
 	@Override
 	public void service(ServletRequest request, ServletResponse response) throws ServletException, IOException {
+		final HttpServletRequest req = (HttpServletRequest) request;
 		final HttpServletResponse rsp = (HttpServletResponse) response;
 		try {
 
-			// Start async
-			AsyncContext async = request.startAsync(request, response);
+			// WebSocket handling
+			if (req.getHeader("Upgrade") != null) {
+				webSocketRegistry.service(req, rsp);
+				return;
+			}
 
 			// Process request
-			executor.execute(() -> {
-				try {
-					gateway.service(new NonBlockingWebRequest(broker, async, (HttpServletRequest) request),
-							new NonBlockingWebResponse(async, rsp));
-				} catch (Throwable cause) {
-					handleError(rsp, cause, async);
-				}
-			});
+			BlockingWebResponse bwr = new BlockingWebResponse(rsp);
+			gateway.service(new BlockingWebRequest(broker, req), bwr);
+			bwr.waitFor(timeout);
 
-		} catch (Throwable cause) {
-
-			// Fatal error
-			handleError(rsp, cause, null);
-		}
-	}
-
-	// --- CLOSE REQUEST WITH ERROR ---
-
-	protected void handleError(HttpServletResponse rsp, Throwable cause, AsyncContext async) {
-		try {
-			if (gateway == null) {
-				rsp.sendError(404);
-			} else {
-				rsp.sendError(500);
-				getServletContext().log("Unable to process request!", cause);
+		} catch (TimeoutException timeout) {
+			try {
+				rsp.sendError(408);
+				getServletContext().log("Unexpected timeout exception occured!", timeout);
+			} catch (Throwable ignored) {
 			}
-		} catch (Throwable ignored) {
-		} finally {
-			if (async != null) {
-				async.complete();
+		} catch (Throwable cause) {
+			try {
+				if (gateway == null) {
+					rsp.sendError(404);
+				} else {
+					rsp.sendError(500);
+					getServletContext().log("Unable to process request!", cause);
+				}
+			} catch (Throwable ignored) {
 			}
 		}
 	}

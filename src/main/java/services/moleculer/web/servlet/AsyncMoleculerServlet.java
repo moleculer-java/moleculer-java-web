@@ -26,33 +26,31 @@
 package services.moleculer.web.servlet;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
 
+import javax.servlet.AsyncContext;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
+import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import services.moleculer.web.servlet.request.BlockingWebRequest;
-import services.moleculer.web.servlet.response.BlockingWebResponse;
+import services.moleculer.web.servlet.request.NonBlockingWebRequest;
+import services.moleculer.web.servlet.response.NonBlockingWebResponse;
+import services.moleculer.web.servlet.websocket.ServletWebSocketRegistry;
 
 /**
- * Old type (blocking) Servlet without WebSocket support. Can be used for REST
- * services and file servicing. It can be used in the same way with every
- * Middleware as with non-blocking Moleculer servlet. The only difference is the
- * lack of WebSocket support.
+ * Non-blocking Servlet. In J2EE environments, this provides the best
+ * performance (but standalone Netty is faster than most J2EE servers or Servlet
+ * Containers). Supports WebSockets.
  */
-public class BlockingServlet extends AbstractMoleculerServlet {
+@WebServlet(asyncSupported = true)
+public class AsyncMoleculerServlet extends AbstractMoleculerServlet {
 
 	// --- UID ---
 
-	private static final long serialVersionUID = 1669628991868900133L;
-
-	// --- CONSTANTS ---
-
-	protected long timeout;
+	private static final long serialVersionUID = 4491486564959030123L;
 
 	// --- INIT / START ---
 
@@ -60,39 +58,59 @@ public class BlockingServlet extends AbstractMoleculerServlet {
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
 
-		// Get timeout
-		String value = config.getInitParameter("response.timeout");
-		if (value == null || value.isEmpty()) {
-			timeout = 1000L * 60 * 3;
-		} else {
-			timeout = Long.parseLong(value);
-		}
+		// Create WebSocket registry
+		webSocketRegistry = new ServletWebSocketRegistry(config, executor, scheduler, true);
+		gateway.setWebSocketRegistry(webSocketRegistry);
 	}
 
-	// --- BLOCKING SERVICE ---
+	// --- NON-BLOCKING SERVICE ---
 
 	@Override
 	public void service(ServletRequest request, ServletResponse response) throws ServletException, IOException {
+		final HttpServletRequest req = (HttpServletRequest) request;
 		final HttpServletResponse rsp = (HttpServletResponse) response;
 		try {
-			BlockingWebResponse bwr = new BlockingWebResponse(rsp);
-			gateway.service(new BlockingWebRequest(broker, (HttpServletRequest) request), bwr);
-			bwr.waitFor(timeout);
-		} catch (TimeoutException timeout) {
-			try {
-				rsp.sendError(408);
-				getServletContext().log("Unexpected timeout exception occured!", timeout);
-			} catch (Throwable ignored) {
+
+			// WebSocket handling
+			if (req.getHeader("Upgrade") != null) {
+				webSocketRegistry.service(req, rsp);
+				return;
 			}
-		} catch (Throwable cause) {
-			try {
-				if (gateway == null) {
-					rsp.sendError(404);
-				} else {
-					rsp.sendError(500);
-					getServletContext().log("Unable to process request!", cause);
+
+			// Start async
+			AsyncContext async = request.startAsync(request, response);
+
+			// Process request
+			executor.execute(() -> {
+				try {
+					gateway.service(new NonBlockingWebRequest(broker, async, req),
+							new NonBlockingWebResponse(async, rsp));
+				} catch (Throwable cause) {
+					handleError(rsp, cause, async);
 				}
-			} catch (Throwable ignored) {
+			});
+
+		} catch (Throwable cause) {
+
+			// Fatal error
+			handleError(rsp, cause, null);
+		}
+	}
+
+	// --- CLOSE REQUEST WITH ERROR ---
+
+	protected void handleError(HttpServletResponse rsp, Throwable cause, AsyncContext async) {
+		try {
+			if (gateway == null) {
+				rsp.sendError(404);
+			} else {
+				rsp.sendError(500);
+				getServletContext().log("Unable to process request!", cause);
+			}
+		} catch (Throwable ignored) {
+		} finally {
+			if (async != null) {
+				async.complete();
 			}
 		}
 	}

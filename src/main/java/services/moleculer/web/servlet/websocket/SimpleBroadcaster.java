@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2019 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -23,25 +23,16 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package services.moleculer.web.servlet;
+package services.moleculer.web.servlet.websocket;
 
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletException;
+import org.atmosphere.cpr.DefaultBroadcaster;
+import org.atmosphere.cpr.Deliver;
 
-/**
- * Old type (blocking) Servlet with WebSocket support.
- */
-public class BlockingWebSocketServlet extends BlockingServlet {
-
-	// --- UID ---
-	
-	private static final long serialVersionUID = -3473746345846305389L;
-	
-	// --- INIT / START ---
+public class SimpleBroadcaster extends DefaultBroadcaster {
 
 	@Override
-	public void init(ServletConfig config) throws ServletException {
-		super.init(config);
+	protected void dispatchMessages(Deliver e) {
+		push(e);
 	}
-
+	
 }
