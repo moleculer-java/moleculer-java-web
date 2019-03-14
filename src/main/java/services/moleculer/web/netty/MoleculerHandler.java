@@ -69,7 +69,7 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 
 	protected volatile String path;
 	protected volatile WebSocketServerHandshaker handshaker;
-	
+
 	// --- CONSTRUCTOR ---
 
 	public MoleculerHandler(ApiGateway gateway, ServiceBroker broker, NettyWebSocketRegistry nettyWebSocketRegistry) {
@@ -100,6 +100,13 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 
 					// Upgrade to WebSocket connection
 					if (httpHeaders.contains("Upgrade")) {
+
+						// Check access
+						if (webSocketRegistry.isRefused(ctx, httpRequest, httpHeaders, broker, path)) {
+							return;
+						}
+
+						// Do the handshake
 						WebSocketServerHandshakerFactory factory = new WebSocketServerHandshakerFactory(path, null,
 								true);
 						handshaker = factory.newHandshaker(httpRequest);
@@ -109,15 +116,13 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 							DefaultFullHttpRequest req = new DefaultFullHttpRequest(httpRequest.protocolVersion(),
 									httpRequest.method(), path, Unpooled.buffer(0), httpHeaders,
 									new DefaultHttpHeaders(false));
-							
-							// TODO check access
-							
+
 							ChannelPipeline p = ctx.pipeline();
 							p.addAfter("decoder", "encoder", new HttpResponseEncoder());
-														
+
 							handshaker.handshake(ctx.channel(), req);
 							webSocketRegistry.register(path, ctx);
-							
+
 						}
 						ctx.flush();
 						return;
@@ -161,9 +166,9 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 				// Process close/ping/continue WebSocket frames
 				if (request instanceof CloseWebSocketFrame) {
 					try {
-						handshaker.close(ctx.channel(), ((CloseWebSocketFrame) request).retain());						
+						handshaker.close(ctx.channel(), ((CloseWebSocketFrame) request).retain());
 					} catch (Exception ignored) {
-						
+
 						// Ignore I/O exception
 					}
 					webSocketRegistry.deregister(path, ctx);
@@ -180,8 +185,11 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 
 				// Process WebSocket message frame
 				if (request instanceof WebSocketFrame) {
-
-					// Not implemented (use REST)
+					ByteBuf byteBuffer = ((WebSocketFrame) request).content();
+					if (byteBuffer != null && byteBuffer.readableBytes() == 1 && byteBuffer.array()[0] == (byte) '!') {
+						ctx.channel().write((byte) '!');
+						ctx.flush();
+					}
 					return;
 				}
 

@@ -35,8 +35,9 @@ import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
 import services.moleculer.service.Action;
 import services.moleculer.service.Service;
-import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.netty.NettyServer;
+import services.moleculer.web.router.RestRoute;
+import services.moleculer.web.router.StaticRoute;
 import services.moleculer.web.servlet.AsyncMoleculerServlet;
 
 public class Sample {
@@ -70,11 +71,15 @@ public class Sample {
 			ApiGateway gateway = sc.getGateway();
 
 			// REST services
-			gateway.addRoute().use(new CorsHeaders()).addAlias("/test", "test.send");
-
+			RestRoute rest = new RestRoute();
+			rest.addAlias("/test", "test.send");
+			gateway.addRoute(rest);
+			
 			// Static web content
-			gateway.addRoute("/templates").setEnableReloading(true);
-
+			StaticRoute www = new StaticRoute("/templates");
+			www.setEnableReloading(true);
+			gateway.addRoute(www);
+			
 			broker.createService(new Service("test") {
 
 				@SuppressWarnings("unused")
@@ -109,10 +114,14 @@ public class Sample {
 			broker.createService(gateway);
 
 			// REST services
-			gateway.addRoute().use(new CorsHeaders()).addAlias("/test", "test.send");
-
+			RestRoute rest = new RestRoute();
+			rest.addAlias("/test", "test.send");
+			gateway.addRoute(rest);
+			
 			// Static web content
-			gateway.addRoute("/templates").setEnableReloading(true);
+			StaticRoute www = new StaticRoute("/templates");
+			www.setEnableReloading(true);
+			gateway.addRoute(www);
 
 			broker.createService(new Service("test") {
 

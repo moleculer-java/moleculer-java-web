@@ -68,6 +68,8 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 
 	protected ServletWebSocketRegistry webSocketRegistry;
 
+	protected int webSocketCleanupSeconds = 15;
+	
 	// --- INIT / START ---
 
 	@Override

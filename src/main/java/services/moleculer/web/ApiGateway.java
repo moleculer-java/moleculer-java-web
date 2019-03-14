@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2019 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -46,11 +46,8 @@ import services.moleculer.ServiceBroker;
 import services.moleculer.eventbus.Listener;
 import services.moleculer.eventbus.Subscribe;
 import services.moleculer.service.Service;
-import services.moleculer.web.middleware.Favicon;
 import services.moleculer.web.middleware.HttpMiddleware;
 import services.moleculer.web.middleware.NotFound;
-import services.moleculer.web.middleware.Redirector;
-import services.moleculer.web.middleware.ServeStatic;
 import services.moleculer.web.router.Alias;
 import services.moleculer.web.router.Mapping;
 import services.moleculer.web.router.MappingPolicy;
@@ -109,12 +106,17 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 */
 	protected AbstractTemplateEngine templateEngine;
 
-	// --- WEBSOCKET REGISTRY ---
+	// --- WEBSOCKET REGISTRY AND FILTER ---
 
 	/**
 	 * WebSocket registry (Netty or J2EE)
 	 */
 	protected WebSocketRegistry webSocketRegistry;
+
+	/**
+	 * WebSocket filter (access control)
+	 */
+	protected WebSocketFilter webSocketFilter;
 
 	// --- CUSTOM PRE/POST PROCESSORS ---
 
@@ -490,33 +492,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	// --- CREATING ROUTES ---
 
 	public Route addRoute() {
-		Route route = new Route();
-		route.setMappingPolicy(MappingPolicy.RESTRICT);
-		return addRoute(route);
-	}
-
-	public ServeStatic addRoute(String wwwDirectory) {
-		Route route = new Route();
-		route.setMappingPolicy(MappingPolicy.ALL);
-
-		// Last middleware produces "Error 404" responses
-		route.use(new NotFound());
-
-		// Third is static file handler
-		ServeStatic serveStatic = new ServeStatic("/", wwwDirectory);
-		route.use(serveStatic);
-
-		// Second middleware is the "favicon" handler
-		route.use(new Favicon());
-
-		// First redirects "/" to "/index.html"
-		route.use(new Redirector("/", "/index.html", 307));
-
-		// Register route
-		addRoute(route);
-
-		// Return ServeStatic handler (eg. to call "setReloadable" method)
-		return serveStatic;
+		return addRoute(new Route());
 	}
 
 	/**
@@ -727,6 +703,20 @@ public class ApiGateway extends Service implements RequestProcessor {
 
 	public void setWebSocketRegistry(WebSocketRegistry webSocketRegistry) {
 		this.webSocketRegistry = Objects.requireNonNull(webSocketRegistry);
+		if (webSocketFilter != null) {
+			this.webSocketRegistry.setWebSocketFilter(webSocketFilter);	
+		}
+	}
+
+	public WebSocketFilter getWebSocketFilter() {
+		return webSocketFilter;
+	}
+
+	public void setWebSocketFilter(WebSocketFilter webSocketFilter) {
+		this.webSocketFilter = webSocketFilter;
+		if (webSocketRegistry != null) {
+			webSocketRegistry.setWebSocketFilter(webSocketFilter);
+		}
 	}
 
 }

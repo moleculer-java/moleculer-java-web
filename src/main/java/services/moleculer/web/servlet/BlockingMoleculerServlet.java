@@ -69,7 +69,7 @@ public class BlockingMoleculerServlet extends AbstractMoleculerServlet {
 		}
 
 		// Create WebSocket registry
-		webSocketRegistry = new ServletWebSocketRegistry(config, executor, scheduler, false);
+		webSocketRegistry = new ServletWebSocketRegistry(config, broker, webSocketCleanupSeconds, false);
 		gateway.setWebSocketRegistry(webSocketRegistry);
 	}
 

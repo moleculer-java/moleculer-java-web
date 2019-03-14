@@ -43,7 +43,7 @@ import services.moleculer.web.servlet.websocket.ServletWebSocketRegistry;
 /**
  * Non-blocking Servlet. In J2EE environments, this provides the best
  * performance (but standalone Netty is faster than most J2EE servers or Servlet
- * Containers). Supports WebSockets.
+ * Containers). AsyncMoleculerServlet supports WebSockets.
  */
 @WebServlet(asyncSupported = true)
 public class AsyncMoleculerServlet extends AbstractMoleculerServlet {
@@ -59,7 +59,7 @@ public class AsyncMoleculerServlet extends AbstractMoleculerServlet {
 		super.init(config);
 
 		// Create WebSocket registry
-		webSocketRegistry = new ServletWebSocketRegistry(config, executor, scheduler, true);
+		webSocketRegistry = new ServletWebSocketRegistry(config, broker, webSocketCleanupSeconds, true);
 		gateway.setWebSocketRegistry(webSocketRegistry);
 	}
 

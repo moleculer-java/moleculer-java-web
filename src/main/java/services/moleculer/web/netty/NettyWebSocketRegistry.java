@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2019 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -25,96 +25,89 @@
  */
 package services.moleculer.web.netty;
 
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.WeakHashMap;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
+import java.io.IOException;
 
-import io.netty.buffer.Unpooled;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpRequest;
 import services.moleculer.ServiceBroker;
 import services.moleculer.web.WebSocketRegistry;
+import services.moleculer.web.common.Endpoint;
 
-public class NettyWebSocketRegistry implements WebSocketRegistry, Runnable {
+public class NettyWebSocketRegistry extends WebSocketRegistry {
 
-	protected HashMap<String, WeakHashMap<ChannelHandlerContext, Long>> registry = new HashMap<>();
+	// --- LOGGER ---
 
-	protected final ScheduledFuture<?> timer;
+	private static final Logger logger = LoggerFactory.getLogger(NettyWebSocketRegistry.class);
+
+	// --- CONSTRUCTOR ---
 
 	public NettyWebSocketRegistry(ServiceBroker broker, long cleanupSeconds) {
-		timer = broker.getConfig().getScheduler().scheduleAtFixedRate(this, cleanupSeconds, cleanupSeconds,
-				TimeUnit.SECONDS);
+		super(broker, cleanupSeconds);
 	}
 
-	public void stopped() {
-		if (timer != null && !timer.isCancelled()) {
-			timer.cancel(false);			
-		}
-	}
-	
 	public void register(String path, ChannelHandlerContext ctx) {
-		WeakHashMap<ChannelHandlerContext, Long> ctxs = registry.get(path);
-		if (ctxs == null) {
-			ctxs = new WeakHashMap<ChannelHandlerContext, Long>();
-			registry.put(path, ctxs);
-		}
-		ctxs.put(ctx, System.currentTimeMillis());
+		register(path, toEnpoint(ctx));
 	}
 
 	public void deregister(String path, ChannelHandlerContext ctx) {
-		WeakHashMap<ChannelHandlerContext, Long> ctxs = registry.get(path);
-		if (ctxs == null) {
-			return;
-		}
-		ctxs.remove(ctx);
-	}
-	
-	@Override
-	public void send(String path, String message) {
-		WeakHashMap<ChannelHandlerContext, Long> ctxs = registry.get(path);
-		if (ctxs == null || ctxs.isEmpty()) {
-			return;
-		}
-		byte[] bytes = message.getBytes(StandardCharsets.UTF_8);
-		Iterator<ChannelHandlerContext> i = ctxs.keySet().iterator();
-		ChannelHandlerContext ctx;
-		while (i.hasNext()) {
-			ctx = i.next();
-			if (ctx == null) {
-				continue;
-			}
-			ctx.write(new TextWebSocketFrame(Unpooled.wrappedBuffer(bytes)));
-			ctx.flush();
-		}
+		deregister(path, toEnpoint(ctx));
 	}
 
-	@Override
-	public void run() {
-		Iterator<WeakHashMap<ChannelHandlerContext, Long>> j = registry.values().iterator();
-		WeakHashMap<ChannelHandlerContext, Long> ctxs;
-		Iterator<ChannelHandlerContext> i;
-		ChannelHandlerContext ctx;
-		while (j.hasNext()) {
-			ctxs = j.next();
-			if (ctxs == null) {
-				j.remove();
-				continue;
+	protected Endpoint toEnpoint(ChannelHandlerContext ctx) {
+		return new Endpoint() {
+
+			@Override
+			public final void send(String message) {
+				ctx.write(message);
+				ctx.flush();
 			}
-			i = ctxs.keySet().iterator();
-			while (i.hasNext()) {
-				ctx = i.next();
-				if (ctx == null || ctx.channel() == null || !ctx.channel().isOpen()) {
-					i.remove();
-					continue;
+
+			@Override
+			public final boolean isOpen() {
+				return ctx.channel() != null && ctx.channel().isOpen();
+			}
+
+			@Override
+			public int hashCode() {
+				return ctx.hashCode();
+			}
+
+			@Override
+			public boolean equals(Object obj) {
+				if (obj == null || !(obj instanceof Endpoint)) {
+					return false;
 				}
+				Endpoint e = (Endpoint) obj;
+				return e.getInternal() == ctx;
 			}
-			if (ctxs.isEmpty()) {
-				j.remove();
+
+			@Override
+			public Object getInternal() {
+				return ctx;
 			}
+			
+		};
+	}
+
+	// --- CHECK ACCESS ---
+
+	public boolean isRefused(ChannelHandlerContext ctx, HttpRequest req, HttpHeaders headers, ServiceBroker broker,
+			String path) throws IOException {
+		if (webSocketFilter == null) {
+			return false;
 		}
+		NettyWebRequest webRequest = new NettyWebRequest(ctx, req, headers, broker, path);
+		boolean accept = webSocketFilter.onConnect(webRequest);
+		if (accept) {
+			return false;
+		}
+		ctx.close();
+		logger.info("Inbound WebSocket connection closed due to rejection of the WebSocket Filter: " + ctx);
+		return true;
 	}
 
 }

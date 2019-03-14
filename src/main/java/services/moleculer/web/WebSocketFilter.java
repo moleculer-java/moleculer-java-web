@@ -23,16 +23,30 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package services.moleculer.web.servlet.websocket;
+package services.moleculer.web;
 
-import org.atmosphere.cpr.DefaultBroadcaster;
-import org.atmosphere.cpr.Deliver;
+/**
+ * Security filter to decide if an incoming web socket connection is acceptable.
+ * Sample:
+ * 
+ * <pre>
+ * apiGateway.setWebSocketFilter(req -&gt; {
+ * 	return req.getPath().equals("chat");
+ * });
+ * </pre>
+ */
+@FunctionalInterface
+public interface WebSocketFilter {
 
-public class SimpleBroadcaster extends DefaultBroadcaster {
+	/**
+	 * Decides whether to accept the incoming WebSocket request or close the
+	 * connection.
+	 * 
+	 * @param request
+	 *            incoming WebSocket connection
+	 * 
+	 * @return true = accept connection, false = close socket
+	 */
+	boolean onConnect(WebRequest request);
 
-	@Override
-	protected void dispatchMessages(Deliver e) {
-		push(e);
-	}
-	
 }
