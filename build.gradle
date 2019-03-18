@@ -1,6 +1,7 @@
 apply plugin: 'java'
 apply plugin: 'maven'
 apply plugin: 'com.bmuschko.nexus'
+apply plugin: 'jacoco'
 
 buildscript {
     repositories {
@@ -17,6 +18,15 @@ buildscript {
 
 javadoc {
 	failOnError = true
+}
+
+// --- JACOCO ---
+
+jacocoTestReport {
+    reports {
+        xml.enabled true
+        html.enabled true
+    } 
 }
 
 // --- CONFIGURATIONS ---
@@ -36,6 +46,19 @@ repositories {
     mavenCentral()
     jcenter()
     maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
+}
+
+// --- SOURCE ---
+
+sourceSets {
+	main {
+		java {
+			srcDirs= ["src/main/java"]
+		}
+		resources {
+			srcDirs= ["src/test/java"]
+		}
+	}
 }
 
 // --- DEPENDENCIES ---
@@ -91,10 +114,7 @@ dependencies {
 	// https://mvnrepository.com/artifact/javax.servlet/javax.servlet-api
 	compile group: 'javax.servlet', name: 'javax.servlet-api', version: '3.1.0'
 
-	// --- WEBSOCKET API ---
-	
-	// https://mvnrepository.com/artifact/javax.websocket/javax.websocket-api
-	// compile group: 'javax.websocket', name: 'javax.websocket-api', version: '1.1'
+	// --- WEBSOCKET API (FOR SERVLETS) ---
 
 	// https://mvnrepository.com/artifact/org.atmosphere/atmosphere-runtime
 	compile group: 'org.atmosphere', name: 'atmosphere-runtime', version: '2.5.2'
