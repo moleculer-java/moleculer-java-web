@@ -10,7 +10,7 @@ before_install:
   - sudo apt-get install jq
   - wget -O ~/codacy-coverage-reporter-assembly-latest.jar https://github.com/codacy/codacy-coverage-reporter/releases/download/4.0.5/codacy-coverage-reporter-4.0.5-assembly.jar
 
-script: ./gradlew check
+script: ./gradlew -i check
 
 after_success:
   - if [ -e ./gradlew ]; then ./gradlew jacocoTestReport;else gradle jacocoTestReport;fi
