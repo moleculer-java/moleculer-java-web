@@ -38,7 +38,14 @@ public class NonBlockingServletTest extends AbstractTemplateTest {
 	protected Server server;
 	
 	@Override
-	protected void setUp() throws Exception {	
+	protected void setUp() throws Exception {
+		try {
+			if (server != null) {
+				server.stop();
+				server = null;
+			}
+		} catch (Exception ignored) {
+		}
 		server = new Server();
 		ServerConnector pContext = new ServerConnector(server);
 		pContext.setHost("127.0.0.1");

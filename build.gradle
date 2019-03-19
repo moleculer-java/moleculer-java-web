@@ -56,7 +56,7 @@ sourceSets {
 			srcDirs= ["src/main/java"]
 		}
 		resources {
-			srcDirs= ["src/test/java"]
+			srcDirs= ["src/test/java", "src/main/java/services/moleculer/web/middleware"]
 		}
 	}
 }
