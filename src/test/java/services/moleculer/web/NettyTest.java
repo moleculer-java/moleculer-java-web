@@ -31,11 +31,13 @@ import services.moleculer.web.netty.NettyServer;
 
 public class NettyTest extends AbstractTemplateTest {
 
+	protected NettyServer server;
+	
 	@Override
 	protected void setUp() throws Exception {
 		br = ServiceBroker.builder().monitor(new ConstantMonitor()).build();
 		
-		NettyServer server = new NettyServer();
+		server = new NettyServer();
 		br.createService(server);
 		
 		gw = new ApiGateway();
@@ -45,5 +47,5 @@ public class NettyTest extends AbstractTemplateTest {
 		
 		super.setUp();
 	}
-
+	
 }

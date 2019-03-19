@@ -44,7 +44,6 @@ import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.middleware.Favicon;
 import services.moleculer.web.middleware.SessionCookie;
 import services.moleculer.web.router.Alias;
-import services.moleculer.web.router.MappingPolicy;
 import services.moleculer.web.router.Route;
 import services.moleculer.web.template.DataTreeEngine;
 import services.moleculer.web.template.FreeMarkerEngine;

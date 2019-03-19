@@ -65,8 +65,16 @@ public class NonBlockingServletTest extends AbstractTemplateTest {
 
 	@Override
 	protected void tearDown() throws Exception {
-		if (server != null) {
-			server.stop();
+		try {
+			if (server != null) {
+				server.stop();
+				server = null;
+			}
+		} catch (Exception ignored) {
+		}
+		try {
+			Thread.sleep(1000);
+		} catch (Exception ignored) {
 		}
 		super.tearDown();
 	}

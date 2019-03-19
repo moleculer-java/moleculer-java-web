@@ -49,7 +49,7 @@ public class Favicon extends HttpMiddleware implements HttpConstants {
 	// --- CONSTRUCTORS ---
 
 	public Favicon() {
-		this("/favicon.ico");
+		this("favicon.ico");
 	}
 
 	public Favicon(String pathToIcon) {
