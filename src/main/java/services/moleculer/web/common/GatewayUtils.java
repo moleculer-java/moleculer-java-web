@@ -266,12 +266,10 @@ public final class GatewayUtils implements HttpConstants {
 				return test.toURI().toURL();
 			}
 			URL url = ServeStatic.class.getResource(path);
-			System.out.println("GET RESOURCE: " + url);
 			if (url != null) {
 				return url;
 			}
 			url = Thread.currentThread().getContextClassLoader().getResource(path);
-			System.out.println("CLASSLOADER: " + url);
 			if (url != null) {
 				return url;
 			}
