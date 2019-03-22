@@ -40,18 +40,26 @@ public class NullBroadcasterCache implements BroadcasterCache {
 
 	@Override
 	public void configure(AtmosphereConfig config) {
+		
+		// Do nothing
 	}
 
 	@Override
 	public void start() {
+		
+		// Do nothing
 	}
 
 	@Override
 	public void stop() {
+		
+		// Do nothing
 	}
 
 	@Override
 	public void cleanup() {
+		
+		// Do nothing
 	}
 
 	@Override

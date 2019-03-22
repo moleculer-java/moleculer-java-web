@@ -312,6 +312,7 @@ public class ErrorPage extends HttpMiddleware implements HttpConstants {
 								break;
 							default:
 								message = "Unexpected Error Occured";
+								break;
 							}
 						} else {
 

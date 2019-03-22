@@ -55,6 +55,10 @@ import services.moleculer.web.common.HttpConstants;
 @Name("Static File Provider")
 public class ServeStatic extends HttpMiddleware implements HttpConstants {
 
+	// --- DEFAULT CONTENT TYPES ---
+	
+	protected static final HashMap<String, String> defaultContentTypes = new HashMap<>();
+	
 	// --- URL PATH AND ROOT DIRECTORY ---
 
 	/**
@@ -383,8 +387,6 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 	}
 
 	// --- DEFAULT CONTENT TYPES ---
-
-	protected static final HashMap<String, String> defaultContentTypes = new HashMap<>();
 
 	static {
 		defaultContentTypes.put("3dm", "x-world/x-3dmf");

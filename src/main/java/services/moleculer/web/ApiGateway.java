@@ -135,6 +135,36 @@ public class ApiGateway extends Service implements RequestProcessor {
 	protected final ReadLock readLock;
 	protected final WriteLock writeLock;
 
+	// --- SEND WEBSOCKET ---
+
+	/**
+	 * Send WebSocket via broadcasted Moleculer Event.
+	 */
+	@Subscribe("websocket.send")
+	public Listener webSocketListener = payload -> {
+		if (webSocketRegistry == null) {
+			logger.warn("WebSocket Registry not initialized!");
+			return;
+		}
+		if (payload == null) {
+			logger.warn("Empty websocket packet, all parameters are missing!");
+			return;
+		}
+		String path = payload.get("path", "");
+		if (path == null) {
+			logger.warn("Invalid websocket packet, the \"path\" parameter is required: " + payload);
+			return;
+		}
+		Tree data = payload.get("data");
+		String msg;
+		if (data == null) {
+			msg = "null";
+		} else {
+			msg = data.toString(null, false, false);
+		}
+		webSocketRegistry.send(path, msg);
+	};
+	
 	// --- CONSTRUCTOR ---
 
 	public ApiGateway() {
@@ -306,36 +336,6 @@ public class ApiGateway extends Service implements RequestProcessor {
 			writeLock.unlock();
 		}
 	}
-
-	// --- SEND WEBSOCKET ---
-
-	/**
-	 * Send WebSocket via broadcasted Moleculer Event.
-	 */
-	@Subscribe("websocket.send")
-	public Listener webSocketListener = payload -> {
-		if (webSocketRegistry == null) {
-			logger.warn("WebSocket Registry not initialized!");
-			return;
-		}
-		if (payload == null) {
-			logger.warn("Empty websocket packet, all parameters are missing!");
-			return;
-		}
-		String path = payload.get("path", "");
-		if (path == null) {
-			logger.warn("Invalid websocket packet, the \"path\" parameter is required: " + payload);
-			return;
-		}
-		Tree data = payload.get("data");
-		String msg;
-		if (data == null) {
-			msg = "null";
-		} else {
-			msg = data.toString(null, false, false);
-		}
-		webSocketRegistry.send(path, msg);
-	};
 
 	// --- PROCESS (NETTY OR J2EE) HTTP REQUEST ---
 

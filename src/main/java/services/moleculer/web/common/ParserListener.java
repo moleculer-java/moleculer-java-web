@@ -74,14 +74,20 @@ public class ParserListener implements NioMultipartParserListener {
 
 	@Override
 	public final void onNestedPartStarted(Map<String, List<String>> headersFromParentPart) {
+		
+		// Do nothing
 	}
 
 	@Override
 	public final void onNestedPartFinished() {
+		
+		// Do nothing
 	}
 
 	@Override
 	public final void onAllPartsFinished() {
+		
+		// Do nothing
 	}
 
 	// --- CLOSE ---

@@ -117,6 +117,25 @@ public class NettyServer extends Service {
 
 	protected NettyWebSocketRegistry webSocketRegistry;
 
+	// --- INIT GATEWAY ---
+
+	@Subscribe("$services.changed")
+	public Listener evt = payload -> {
+		if (gateway == null) {
+			boolean localService = payload.get("localService", false);
+			if (localService) {
+				gateway = getService(broker, ApiGateway.class);
+				if (gateway != null) {
+					if (webSocketRegistry == null) {
+						webSocketRegistry = new NettyWebSocketRegistry(broker, webSocketCleanupSeconds);
+					}
+					gateway.setWebSocketRegistry(webSocketRegistry);
+					logger.info("ApiGateway connected to Netty Server.");
+				}
+			}
+		}
+	};
+
 	// --- START NETTY SERVER ---
 
 	@Override
@@ -171,25 +190,6 @@ public class NettyServer extends Service {
 			bootstrap.bind(address, port).get();
 		}
 	}
-
-	// --- INIT GATEWAY ---
-
-	@Subscribe("$services.changed")
-	public Listener evt = payload -> {
-		if (gateway == null) {
-			boolean localService = payload.get("localService", false);
-			if (localService) {
-				gateway = getService(broker, ApiGateway.class);
-				if (gateway != null) {
-					if (webSocketRegistry == null) {
-						webSocketRegistry = new NettyWebSocketRegistry(broker, webSocketCleanupSeconds);
-					}
-					gateway.setWebSocketRegistry(webSocketRegistry);
-					logger.info("ApiGateway connected to Netty Server.");
-				}
-			}
-		}
-	};
 
 	// --- STOP NETTY SERVER ---
 
@@ -284,10 +284,14 @@ public class NettyServer extends Service {
 
 					@Override
 					protected void engineInit(KeyStore keyStore) throws Exception {
+
+						// Do nothing
 					}
 
 					@Override
 					protected void engineInit(ManagerFactoryParameters managerFactoryParameters) throws Exception {
+
+						// Do nothing
 					}
 
 					@Override

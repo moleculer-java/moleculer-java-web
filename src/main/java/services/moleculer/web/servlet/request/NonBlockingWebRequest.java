@@ -109,6 +109,8 @@ public class NonBlockingWebRequest extends AbstractWebRequest {
 
 			@Override
 			public final void onError(AsyncEvent event) throws IOException {
+				
+				// Do nothing
 			}
 
 			@Override
@@ -118,6 +120,8 @@ public class NonBlockingWebRequest extends AbstractWebRequest {
 
 			@Override
 			public final void onStartAsync(AsyncEvent event) throws IOException {
+				
+				// Do nothing
 			}
 
 		});
@@ -156,6 +160,8 @@ public class NonBlockingWebRequest extends AbstractWebRequest {
 
 			@Override
 			public final void onAllDataRead() throws IOException {
+				
+				// Do nothing
 			}
 
 		});
