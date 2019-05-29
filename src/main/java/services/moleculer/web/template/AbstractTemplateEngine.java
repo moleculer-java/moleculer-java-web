@@ -35,6 +35,16 @@ import java.util.concurrent.ExecutorService;
 
 import io.datatree.Tree;
 
+/**
+ * Abstract superclass of all server-side template engines (HTML renderers).
+ * 
+ * @see DataTreeEngine
+ * @see FreeMarkerEngine
+ * @see JadeEngine
+ * @see MustacheEngine
+ * @see PebbleEngine
+ * @see ThymeleafEngine
+ */
 public abstract class AbstractTemplateEngine {
 
 	// --- COMMON VARIABLES ---

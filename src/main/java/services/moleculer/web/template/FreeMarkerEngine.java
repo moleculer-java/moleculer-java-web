@@ -52,6 +52,20 @@ import freemarker.template.Version;
 import io.datatree.Tree;
 import services.moleculer.util.CheckedTree;
 
+/**
+ * Server-side template engine based on FreeMarker API. Required dependency:
+ * 
+ * <pre>
+ * // https://mvnrepository.com/artifact/org.freemarker/freemarker
+ * compile group: 'org.freemarker', name: 'freemarker', version: '2.3.28'
+ * </pre>
+ * 
+ * @see DataTreeEngine
+ * @see JadeEngine
+ * @see MustacheEngine
+ * @see PebbleEngine
+ * @see ThymeleafEngine
+ */
 public class FreeMarkerEngine extends AbstractTemplateEngine {
 
 	// --- VARIABLES ---
@@ -159,8 +173,7 @@ public class FreeMarkerEngine extends AbstractTemplateEngine {
 
 		@Override
 		public Reader getReader(Object templateSource, String encoding) throws IOException {
-			String template = loadResource(null, String.valueOf(templateSource), extension,
-					Charset.forName(encoding));
+			String template = loadResource(null, String.valueOf(templateSource), extension, Charset.forName(encoding));
 			return new StringReader(template);
 		}
 
@@ -345,7 +358,7 @@ public class FreeMarkerEngine extends AbstractTemplateEngine {
 			if (obj instanceof TemplateModel) {
 				return (TemplateModel) obj;
 			}
-			return new FreeMarkerTreeModel(new CheckedTree(obj));			
+			return new FreeMarkerTreeModel(new CheckedTree(obj));
 		}
 
 	}

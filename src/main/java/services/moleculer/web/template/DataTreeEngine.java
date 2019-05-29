@@ -34,6 +34,21 @@ import io.datatree.Tree;
 import io.datatree.templates.ResourceLoader;
 import io.datatree.templates.TemplateEngine;
 
+/**
+ * Server-side template engine based on DataTreeTemplates API. Required
+ * dependency:
+ * 
+ * <pre>
+ * // https://mvnrepository.com/artifact/com.github.berkesa/datatree-templates
+ * compile group: 'com.github.berkesa', name: 'datatree-templates', version: '1.1.1'
+ * </pre>
+ * 
+ * @see FreeMarkerEngine
+ * @see JadeEngine
+ * @see MustacheEngine
+ * @see PebbleEngine
+ * @see ThymeleafEngine
+ */
 public class DataTreeEngine extends AbstractTemplateEngine {
 
 	// --- VARIABLES ---

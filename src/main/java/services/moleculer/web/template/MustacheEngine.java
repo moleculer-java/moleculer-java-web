@@ -38,6 +38,20 @@ import com.github.mustachejava.MustacheResolver;
 
 import io.datatree.Tree;
 
+/**
+ * Server-side template engine based on Mustache API. Required dependency:
+ * 
+ * <pre>
+ * // https://mvnrepository.com/artifact/com.github.spullara.mustache.java/compiler
+ * compile group: 'com.github.spullara.mustache.java', name: 'compiler', version: '0.9.6'
+ * </pre>
+ * 
+ * @see DataTreeEngine
+ * @see FreeMarkerEngine
+ * @see JadeEngine
+ * @see PebbleEngine
+ * @see ThymeleafEngine
+ */
 public class MustacheEngine extends AbstractTemplateEngine {
 
 	// --- VARIABLES ---

@@ -44,6 +44,20 @@ import org.thymeleaf.util.FastStringWriter;
 
 import io.datatree.Tree;
 
+/**
+ * Server-side template engine based on Thymeleaf API. Required dependency:
+ * 
+ * <pre>
+ * // https://mvnrepository.com/artifact/org.thymeleaf/thymeleaf
+ * compile group: 'org.thymeleaf', name: 'thymeleaf', version: '3.0.11.RELEASE'
+ * </pre>
+ * 
+ * @see DataTreeEngine
+ * @see FreeMarkerEngine
+ * @see JadeEngine
+ * @see MustacheEngine
+ * @see PebbleEngine
+ */
 public class ThymeleafEngine extends AbstractTemplateEngine {
 
 	// --- VARIABLES ---

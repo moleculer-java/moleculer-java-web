@@ -39,6 +39,20 @@ import com.mitchellbosecke.pebble.loader.Loader;
 
 import io.datatree.Tree;
 
+/**
+ * Server-side template engine based on Pebble API. Required dependency:
+ * 
+ * <pre>
+ * // https://mvnrepository.com/artifact/com.mitchellbosecke/pebble
+ * compile group: 'com.mitchellbosecke', name: 'pebble', version: '2.4.0'
+ * </pre>
+ * 
+ * @see DataTreeEngine
+ * @see FreeMarkerEngine
+ * @see JadeEngine
+ * @see MustacheEngine
+ * @see ThymeleafEngine
+ */
 public class PebbleEngine extends AbstractTemplateEngine {
 
 	// --- VARIABLES ---

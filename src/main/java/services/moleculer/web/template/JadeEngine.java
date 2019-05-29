@@ -39,6 +39,20 @@ import de.neuland.jade4j.JadeConfiguration;
 import de.neuland.jade4j.template.TemplateLoader;
 import io.datatree.Tree;
 
+/**
+ * Server-side template engine based on Jade4J API. Required dependency:
+ * 
+ * <pre>
+ * // https://mvnrepository.com/artifact/de.neuland-bfi/jade4j
+ * compile group: 'de.neuland-bfi', name: 'jade4j', version: '1.2.7'
+ * </pre>
+ * 
+ * @see DataTreeEngine
+ * @see FreeMarkerEngine
+ * @see MustacheEngine
+ * @see PebbleEngine
+ * @see ThymeleafEngine
+ */
 public class JadeEngine extends AbstractTemplateEngine {
 
 	// --- VARIABLES ---
@@ -120,7 +134,7 @@ public class JadeEngine extends AbstractTemplateEngine {
 		protected Charset charset = StandardCharsets.UTF_8;
 
 		protected String templatePath = "";
-		
+
 		protected String extension = "html";
 
 		protected boolean reloadable;
