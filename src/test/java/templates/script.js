@@ -1,93 +1,152 @@
-var webSocket = null;
+// ---------------- SAMPLE ----------------------
+//
+// Create websocket-handler instance: 
+// var ws = MoleculerWebsocket("/ws/up", function(msg) {
+//      console.log("Message received:", msg);
+// }, {
+// 	heartbeatInterval: 5 * 1000,
+// 	debug: true,
+// 	onopen: function() {
+//      console.log("Websocket opened.");
+// 	},
+// 	onreconnect: function() {
+//      console.log("Websocket reconnecting...");
+// 	},
+// 	onclose: function() {
+//      console.log("Websocket closed.");
+// 	},
+// });
+// 
+// Connect to Moleculer-Java server (or servlet):
+// ws.connect();
+// 
+// Disconnect from Moleculer-Java server (or servlet):
+// ws.disconnect();
+// 
+function MoleculerWebsocket(channel, handler, opts) {
 
-var pingPongTimer = null;
-var pingSubmitted = 0;
-var pongReceived = 0;
-var pingPeriod = 6 * 1000;
-var pongTimeout = 1 * 1000;
-
-var savedChannel = null;
-var savedHandler = null;
-
-function connect(channel, handler) {
-	if (webSocket) {
-		return;
-	}
 	if (!channel) {
 		channel = "/ws/common";
 	}
-	savedChannel = channel;
-	savedHandler = handler;
-	var url = new URL(channel, window.location.href).href;
-	url = url.replace(/http+/, "ws");
-	console.log("Connecting to " + url + "...");
-	webSocket = new WebSocket(url);
-	webSocket.onopen = function (evt) {
-		console.log("WebSocket channel opened.");
-		pongReceived = pingSubmitted = new Date().valueOf();	
-		startPingPongTimer();
-	}
-	webSocket.onmessage = function (evt) {
-	    var msg = evt.data;
-	    if (msg == "!") {
-			pongReceived = new Date().valueOf();
-			return;
-		}	    
-		if (handler) { 
-			handler(msg);
-		} else {
-			console.log("WebSocket message received: " + msg);
+
+	var webSocket = null;
+	var heartbeatTimer = null;
+
+	var submittedAt = 0;
+	var receivedAt = 0;
+
+	opts = opts || {};
+
+	var heartbeatInterval = opts.heartbeatInterval != null ? opts.heartbeatInterval : 6 * 1000;
+	var heartbeatTimeout = opts.heartbeatTimeout != null ? opts.heartbeatTimeout : 1 * 1000;
+
+	function connect() {
+		var url = new URL(channel, window.location.href).href;
+		url = url.replace(/^http/, "ws");
+		if (opts.debug) 
+			console.log("Connecting to " + url + "...");
+		webSocket = new WebSocket(url);
+		webSocket.onopen = function (evt) {
+			if (opts.debug) 
+				console.log("WebSocket channel opened.");
+			if (opts.onopen)
+				opts.onopen(evt);
+			
+			receivedAt = submittedAt = new Date().valueOf();	
+			
+			if (heartbeatInterval > 0 && heartbeatTimeout > 0)
+				startHeartbeatTimer();
+		}
+
+		webSocket.onmessage = function(evt) {
+			var msg = evt.data;
+			if (msg == "!") {
+				receivedAt = new Date().valueOf();
+				if (opts.debug) 
+					console.log("Heartbeat response received from server.");				
+				return;
+			}	    
+
+			if (opts.debug) 
+				console.log("WebSocket message received: ", msg);
+
+			if (handler) { 
+				handler(msg);
+			}
+		}
+
+		webSocket.onerror = function (evt) { 
+			onConnectionLost();
+		}
+
+		webSocket.onclose = function (evt) {
+			if (opts.debug) 
+				console.log("WebSocket channel closed.");
+
+			if (opts.onclose)
+				opts.onclose();
 		}
 	}
-	webSocket.onerror = function (evt) { 
-		webSocketConnectionLost();
-	}	
-	webSocket.onclose = function (evt) {
-		console.log("WebSocket channel closed.");
+
+	function disconnect() {
+		if (webSocket) {
+			if (opts.debug) 
+				console.log("WebSocket channel disconnecting...");
+			webSocket.close();
+			webSocket = null;
+		}
 	}
-}
 
-function disconnect() {
-	if (webSocket) {
-		webSocket.close();
-		webSocket = null;
-		console.warn("WebSocket channel disconnected.");		
+	function startHeartbeatTimer() {
+		stopHeartbeatTimer();
+		heartbeatTimer = setInterval(function() {		
+			var now = new Date().valueOf();
+			if (now - submittedAt > heartbeatInterval) {
+				if (opts.debug) 
+					console.log("Sending heartbeat message to server...");
+				submittedAt = now;
+				webSocket.send("!");
+				return;
+			}
+			if ((submittedAt - receivedAt) >= heartbeatTimeout
+					&& (now - submittedAt) >= heartbeatTimeout) {
+				if (opts.debug)
+					console.log("Heartbeat response message timeouted.");
+				onConnectionLost();		        	
+			}        
+		}, heartbeatInterval / 3);
+
+		if (opts.debug) 
+			console.log("Websocket heartbeat timer started.");
 	}
-}
 
-function startPingPongTimer() {
-	stopPingPongTimer();
-	pingPongTimer = setInterval(function() {		
-		var now = new Date().valueOf();
-    	if (now - pingSubmitted > pingPeriod) {
-    		pingSubmitted = now;
-    		webSocket.send("!");
-    		return;
-    	}
-        if ((pingSubmitted - pongReceived) >= pongTimeout
-        		&& (now - pingSubmitted) >= pongTimeout) {       	
-        	console.debug("Pong message timeouted.");
-        	webSocketConnectionLost();		        	
-        }
-        
-	}, 5000);
-	console.log("Ping-pong timer started.");
-}
-
-function stopPingPongTimer() {
-	if (pingPongTimer != null) {
-		clearInterval(pingPongTimer);
-		pingPongTimer = null;
-		console.log("Ping-pong timer stopped.");
-	}	
-}
-
-function webSocketConnectionLost() {
-	if (!webSocket) {
-		return;
+	function stopHeartbeatTimer() {
+		if (heartbeatTimer != null) {
+			clearInterval(heartbeatTimer);
+			heartbeatTimer = null;
+			if (opts.debug) 
+				console.log("Websocket heartbeat timer stopped.");
+		}	
 	}
-	console.log("WebSocket connection lost.");
-	disconnect();
-	stopPingPongTimer();
-	connect(savedChannel, savedHandler);	
+
+	function onConnectionLost() {
+		if (!webSocket) {
+			return;
+		}
+		if (opts.debug) 
+			console.log("WebSocket connection lost.");
+
+		if (opts.onreconnect)
+			opts.onreconnect();
+
+		disconnect();
+		stopHeartbeatTimer();
+		connect();	
+	}
+
+	return {
+		channel,
+		connect: connect,
+		disconnect: disconnect
+	}
 }

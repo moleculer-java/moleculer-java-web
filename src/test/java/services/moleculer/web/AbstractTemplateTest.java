@@ -42,6 +42,7 @@ import services.moleculer.service.Service;
 import services.moleculer.util.CommonUtils;
 import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.middleware.Favicon;
+import services.moleculer.web.middleware.ServeStatic;
 import services.moleculer.web.middleware.SessionCookie;
 import services.moleculer.web.router.Alias;
 import services.moleculer.web.router.Route;
@@ -103,10 +104,15 @@ public abstract class AbstractTemplateTest extends TestCase {
 		gw.addRoute(r1);
 		
 		Route r2 = new Route();
-		r2.addAlias(Alias.GET, "/html", "test.html");
+				
+		r2.addAlias(Alias.GET, "/html", "test.html");		
 		r2.use(new SessionCookie("SID", "/html"));
+
+		r2.addToWhiteList("/static/*");
+		r2.use(new ServeStatic("/static", "/templates"));
+
 		gw.addRoute(r2);
-		
+				
 		cl = HttpAsyncClients.createDefault();
 		cl.start();
 	}
@@ -177,6 +183,26 @@ public abstract class AbstractTemplateTest extends TestCase {
 		doTemplateTests("thymeleaf");
 	}
 
+	@Test
+	public void testStaticTest() throws Exception {
+		HttpGet get = new HttpGet("http://localhost:3000/static/index.html");
+		HttpResponse rsp = cl.execute(get, null).get();
+		
+		assertEquals(200, rsp.getStatusLine().getStatusCode());
+		
+		String etag = rsp.getLastHeader("ETag").getValue();
+		
+		byte[] bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+		String txt = new String(bytes, StandardCharsets.UTF_8);
+		
+		assertTrue(txt.contains("<h1>header</h1>"));
+
+		// TODO continue!
+		// get = new HttpGet("http://localhost:3000/static/index.html");
+		// get.addHeader("ETag", etag);
+		// rsp = cl.execute(get, null).get();
+	}
+	
 	// --- COMMON TESTS ---
 
 	protected void doTemplateTests(String name) throws Exception {

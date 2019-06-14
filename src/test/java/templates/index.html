@@ -1,8 +1,22 @@
 <html>
 	<head>
-		 <script src="script.js"></script> 
+    <script>
+      var ws;
+      window.addEventListener('load', function(event) {
+        ws = MoleculerWebsocket("/ws/mychannel", function(msg) {
+          console.log("Message received:", msg);
+        });
+        ws.connect();
+      });
+      window.addEventListener('unload', function(event) {
+        if (ws) {
+          ws.disconnect();
+          ws = null;
+        }
+      });
+    </script>
 	</head>
-	<body onload="connect()">
+	<body>
 		<h1>header</h1>
 		<p>content</p>
 	</body>
