@@ -42,6 +42,7 @@ import services.moleculer.service.Service;
 import services.moleculer.util.CommonUtils;
 import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.middleware.Favicon;
+import services.moleculer.web.middleware.RequestLogger;
 import services.moleculer.web.middleware.ServeStatic;
 import services.moleculer.web.middleware.SessionCookie;
 import services.moleculer.web.router.Alias;
@@ -96,6 +97,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 
 		});
 
+		gw.use(new RequestLogger());
 		gw.use(new Favicon());
 		
 		Route r1 = new Route();
@@ -185,22 +187,26 @@ public abstract class AbstractTemplateTest extends TestCase {
 
 	@Test
 	public void testStaticTest() throws Exception {
+		
+		// First load
 		HttpGet get = new HttpGet("http://localhost:3000/static/index.html");
 		HttpResponse rsp = cl.execute(get, null).get();
 		
-		assertEquals(200, rsp.getStatusLine().getStatusCode());
-		
-		String etag = rsp.getLastHeader("ETag").getValue();
+		assertEquals(200, rsp.getStatusLine().getStatusCode());		
+		String etag1 = rsp.getLastHeader("ETag").getValue();
 		
 		byte[] bytes = CommonUtils.readFully(rsp.getEntity().getContent());
 		String txt = new String(bytes, StandardCharsets.UTF_8);
 		
 		assertTrue(txt.contains("<h1>header</h1>"));
 
-		// TODO continue!
-		// get = new HttpGet("http://localhost:3000/static/index.html");
-		// get.addHeader("ETag", etag);
-		// rsp = cl.execute(get, null).get();
+		// Reload page (using ETags)
+		get.reset();
+		get.setHeader("If-None-Match", etag1);
+		rsp = cl.execute(get, null).get();
+		
+		assertEquals(304, rsp.getStatusLine().getStatusCode());
+		assertTrue(rsp.getLastHeader("Content-Type").getValue().contains("text/html"));
 	}
 	
 	// --- COMMON TESTS ---

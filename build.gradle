@@ -64,11 +64,16 @@ sourceSets {
 // --- DEPENDENCIES ---
 
 dependencies {
-
+	
     // ============== COMPILATION ==============
     
     testCompile 'junit:junit:4.12'
 	ecj 'org.eclipse.jdt.core.compiler:ecj:4.4.2'
+
+	// ================ TESTING ================
+
+	// https://mvnrepository.com/artifact/com.openpojo/openpojo
+	testCompile group: 'com.openpojo', name: 'openpojo', version: '0.8.10'	
 	
     // =============== MOLECULER ===============
 

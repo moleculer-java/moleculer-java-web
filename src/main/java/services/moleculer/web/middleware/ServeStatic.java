@@ -290,11 +290,13 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 
 						// Set cached content
 						if (!compressionSupported || cached.compressedBody == null) {
+							rsp.setHeader(CONTENT_LENGTH, Integer.toString(cached.body.length));
 							rsp.send(cached.body);
 						} else {
 
 							// Client supports compressed content
 							rsp.setHeader(CONTENT_ENCODING, DEFLATE);
+							rsp.setHeader(CONTENT_LENGTH, Integer.toString(cached.compressedBody.length));
 							rsp.send(cached.compressedBody);
 						}
 

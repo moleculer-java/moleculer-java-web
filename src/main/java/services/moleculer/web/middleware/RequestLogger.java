@@ -250,8 +250,8 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 		if (bytes == null || bytes.length == 0 || maxPrintedBytes < 1) {
 			return;
 		}
-		tmp.append(CR_LF);
-		tmp.append("  ");
+		tmp.append(CR_LF);		
+		// tmp.append("  ");
 		byte b;
 		char c;
 		int max = Math.min(bytes.length, maxPrintedBytes);
