@@ -43,33 +43,35 @@ function MoleculerWebsocket(channel, handler, opts) {
 	function connect() {
 		var url = new URL(channel, window.location.href).href;
 		url = url.replace(/^http/, "ws");
-		if (opts.debug) 
+		if (opts.debug && console) { 
 			console.log("Connecting to " + url + "...");
+		}
 		webSocket = new WebSocket(url);
 		webSocket.onopen = function (evt) {
-			if (opts.debug) 
+			if (opts.debug && console) { 
 				console.log("WebSocket channel opened.");
-			if (opts.onopen)
+			}
+			if (opts.onopen) {
 				opts.onopen(evt);
-			
-			receivedAt = submittedAt = new Date().valueOf();	
-			
-			if (heartbeatInterval > 0 && heartbeatTimeout > 0)
+			}
+			receivedAt = submittedAt = new Date().valueOf();				
+			if (heartbeatInterval > 0 && heartbeatTimeout > 0) {
 				startHeartbeatTimer();
+			}
 		}
 
 		webSocket.onmessage = function(evt) {
 			var msg = evt.data;
 			if (msg == "!") {
 				receivedAt = new Date().valueOf();
-				if (opts.debug) 
-					console.log("Heartbeat response received from server.");				
+				if (opts.debug && console) {
+					console.log("Heartbeat response received from server.");
+				}				
 				return;
 			}	    
-
-			if (opts.debug) 
+			if (opts.debug && console) { 
 				console.log("WebSocket message received: ", msg);
-
+			}
 			if (handler) { 
 				handler(msg);
 			}
@@ -80,18 +82,20 @@ function MoleculerWebsocket(channel, handler, opts) {
 		}
 
 		webSocket.onclose = function (evt) {
-			if (opts.debug) 
+			if (opts.debug && console) {
 				console.log("WebSocket channel closed.");
-
-			if (opts.onclose)
+			}
+			if (opts.onclose) {
 				opts.onclose();
+			}
 		}
 	}
 
 	function disconnect() {
 		if (webSocket) {
-			if (opts.debug) 
+			if (opts.debug && console) { 
 				console.log("WebSocket channel disconnecting...");
+			}
 			webSocket.close();
 			webSocket = null;
 		}
@@ -102,30 +106,33 @@ function MoleculerWebsocket(channel, handler, opts) {
 		heartbeatTimer = setInterval(function() {		
 			var now = new Date().valueOf();
 			if (now - submittedAt > heartbeatInterval) {
-				if (opts.debug) 
+				if (opts.debug && console) {
 					console.log("Sending heartbeat message to server...");
+				}
 				submittedAt = now;
 				webSocket.send("!");
 				return;
 			}
 			if ((submittedAt - receivedAt) >= heartbeatTimeout
 					&& (now - submittedAt) >= heartbeatTimeout) {
-				if (opts.debug)
+				if (opts.debug && console) {
 					console.log("Heartbeat response message timeouted.");
+				}
 				onConnectionLost();		        	
 			}        
 		}, heartbeatInterval / 3);
-
-		if (opts.debug) 
+		if (opts.debug && console) {
 			console.log("Websocket heartbeat timer started.");
+		}
 	}
 
 	function stopHeartbeatTimer() {
 		if (heartbeatTimer != null) {
 			clearInterval(heartbeatTimer);
 			heartbeatTimer = null;
-			if (opts.debug) 
+			if (opts.debug && console) {
 				console.log("Websocket heartbeat timer stopped.");
+			}
 		}	
 	}
 
@@ -133,12 +140,12 @@ function MoleculerWebsocket(channel, handler, opts) {
 		if (!webSocket) {
 			return;
 		}
-		if (opts.debug) 
+		if (opts.debug && console) {
 			console.log("WebSocket connection lost.");
-
-		if (opts.onreconnect)
+		}
+		if (opts.onreconnect) {
 			opts.onreconnect();
-
+		}
 		disconnect();
 		stopHeartbeatTimer();
 		connect();	
@@ -149,4 +156,5 @@ function MoleculerWebsocket(channel, handler, opts) {
 		connect: connect,
 		disconnect: disconnect
 	}
+	
 }
