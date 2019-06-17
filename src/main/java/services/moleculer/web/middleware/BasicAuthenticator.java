@@ -25,9 +25,9 @@
  */
 package services.moleculer.web.middleware;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 
 import io.datatree.Tree;
 import io.datatree.dom.BASE64;
@@ -64,7 +64,7 @@ public class BasicAuthenticator extends HttpMiddleware implements HttpConstants,
 
 	// --- USER DATABASE FOR INTERNAL AUTHENTICATION ---
 
-	protected Map<String, String> users = new HashMap<>();
+	protected Map<String, String> users = new ConcurrentHashMap<>();
 
 	// --- LOGIN CACHE ---
 
@@ -189,6 +189,9 @@ public class BasicAuthenticator extends HttpMiddleware implements HttpConstants,
 
 	@Override
 	public boolean authenticate(ServiceBroker broker, String username, String password) {
+		if (users == null) {
+			return false;
+		}
 		String savedPassword = users.get(username);
 		if (savedPassword == null) {
 
@@ -199,6 +202,9 @@ public class BasicAuthenticator extends HttpMiddleware implements HttpConstants,
 	}
 
 	public BasicAuthenticator addUser(String username, String password) {
+		if (users == null) {
+			users = new ConcurrentHashMap<>();
+		}
 		users.put(username, password);
 		cache.clear();
 		return this;
@@ -243,8 +249,10 @@ public class BasicAuthenticator extends HttpMiddleware implements HttpConstants,
 	}
 
 	public void setUsers(Map<String, String> users) {
-		this.users = Objects.requireNonNull(users);
-		cache.clear();
+		this.users = users;
+		if (cache != null) {
+			cache.clear();
+		}
 	}
 
 }

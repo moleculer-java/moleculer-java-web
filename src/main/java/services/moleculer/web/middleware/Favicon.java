@@ -89,6 +89,12 @@ public class Favicon extends HttpMiddleware implements HttpConstants {
 						if (maxAge > 0) {
 							rsp.setHeader(CACHE_CONTROL, "public, max-age=" + maxAge);
 						}
+						if (image == null && iconPath != null) {
+							image = readAllBytes(iconPath);
+							if (image.length == 0) {
+								throw new IllegalArgumentException("File or resource not found: " + iconPath);
+							}
+						}
 						rsp.setHeader(CONTENT_LENGTH, Integer.toString(image.length));
 						rsp.send(image);
 					} finally {
@@ -111,11 +117,8 @@ public class Favicon extends HttpMiddleware implements HttpConstants {
 	}
 
 	public void setIconPath(String iconPath) {
-		this.image = readAllBytes(iconPath);
+		this.image = null;
 		this.iconPath = iconPath;
-		if (image.length == 0) {
-			throw new IllegalArgumentException("File or resource not found: " + iconPath);
-		}
 	}
 
 	public int getMaxAge() {

@@ -55,6 +55,11 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 	protected String path;
 	
 	/**
+	 * Path to redirect (formatted and checked).
+	 */
+	protected String formattedPath;
+	
+	/**
 	 * URL of the redirection.
 	 */
 	protected String location = "/";
@@ -110,7 +115,7 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 				try {
 
 					// Check path
-					if (path != null && !path.equals(req.getPath())) {
+					if (formattedPath != null && !formattedPath.equals(req.getPath())) {
 						next.service(req, rsp);
 						return;
 					}
@@ -194,9 +199,11 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 	 *            the path to set
 	 */
 	public void setPath(String path) {
-		this.path = formatPath(path);
-		if (this.path.isEmpty()) {
-			this.path = "/";
+		this.path = path;
+		if (path.isEmpty()) {
+			formattedPath = "/";
+		} else {
+			formattedPath = formatPath(path);			
 		}
 	}
 

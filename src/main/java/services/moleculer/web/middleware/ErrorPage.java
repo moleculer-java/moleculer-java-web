@@ -338,6 +338,9 @@ public class ErrorPage extends HttpMiddleware implements HttpConstants {
 						String template = statusSpecificTemplates.get(code);
 
 						// Use common HTML template
+						if (htmlTemplate == null && htmlTemplatePath != null) {
+							htmlTemplate = new String(readAllBytes(htmlTemplatePath), StandardCharsets.UTF_8);
+						}
 						if (template == null) {
 							template = htmlTemplate;
 						}
@@ -436,10 +439,7 @@ public class ErrorPage extends HttpMiddleware implements HttpConstants {
 	 *            the htmlTemplatePath to set
 	 */
 	public void setHtmlTemplatePath(String htmlTemplatePath) {
-		this.htmlTemplate = new String(readAllBytes(htmlTemplatePath), StandardCharsets.UTF_8);
-		if (htmlTemplate.isEmpty()) {
-			throw new IllegalArgumentException("Empty file or resource not found: " + htmlTemplatePath);
-		}
+		this.htmlTemplate = null;
 		this.htmlTemplatePath = htmlTemplatePath;
 	}
 

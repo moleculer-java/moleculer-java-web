@@ -122,6 +122,9 @@ public class NotFound extends HttpMiddleware implements HttpConstants {
 
 						// Response in HTML format
 						rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_HTML);
+						if (htmlTemplate == null && htmlTemplatePath != null) {
+							htmlTemplate = new String(readAllBytes(htmlTemplatePath), StandardCharsets.UTF_8);
+						}
 						String body = htmlTemplate.replace("{path}", path);
 						bytes = body.getBytes(StandardCharsets.UTF_8);
 
@@ -165,10 +168,7 @@ public class NotFound extends HttpMiddleware implements HttpConstants {
 	 *            the htmlTemplatePath to set
 	 */
 	public void setHtmlTemplatePath(String htmlTemplatePath) {
-		this.htmlTemplate = new String(readAllBytes(htmlTemplatePath), StandardCharsets.UTF_8);
-		if (htmlTemplate.isEmpty()) {
-			throw new IllegalArgumentException("Empty file or resource not found: " + htmlTemplatePath);
-		}
+		this.htmlTemplate = null;
 		this.htmlTemplatePath = htmlTemplatePath;
 	}
 

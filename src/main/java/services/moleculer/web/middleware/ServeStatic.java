@@ -67,10 +67,15 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 	protected String path;
 
 	/**
-	 * Local directory prefix (eg. "C:/content" or "/www" or "/WEB-INF/static")
+	 * Local directory prefix (eg. "C:\content" or "www" or "WEB-INF\static")
 	 */
 	protected String localDirectory;
 
+	/**
+	 * Formatted local directory prefix (eg. "C:/content" or "/www" or "/WEB-INF/static")
+	 */
+	protected String formattedLocalDirectory;
+	
 	// --- PROPERTIES ---
 
 	/**
@@ -161,6 +166,12 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 
 	@Override
 	public RequestProcessor install(RequestProcessor next, Tree config) {
+		
+		// Init cache
+		if (fileCache == null) {
+			fileCache = new Cache<>(numberOfCachedFiles);
+		}
+		
 		return new RequestProcessor() {
 
 			/**
@@ -213,7 +224,7 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 					}
 
 					// Absolute path
-					String absolutePath = localDirectory + formatPath(relativePath);
+					String absolutePath = formattedLocalDirectory + formatPath(relativePath);
 
 					// Get file from cache
 					CachedFile cached = fileCache.get(relativePath);
@@ -872,14 +883,15 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 		return localDirectory;
 	}
 
-	public void setLocalDirectory(String wwwRootDirectory) {
-		String path = wwwRootDirectory.replace('\\', '/');
+	public void setLocalDirectory(String localDirectory) {
+		this.localDirectory = localDirectory;
+		String path = localDirectory.replace('\\', '/');
 		if (path.indexOf(':') == -1) {
 			path = formatPath(path);
 		} else if (path.endsWith("/")) {
 			path = path.substring(0, path.length() - 1);
 		}
-		this.localDirectory = path;
+		formattedLocalDirectory = path;
 	}
 
 	public void setContentType(String extension, String contentType) {
@@ -904,7 +916,7 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 	}
 
 	public void setNumberOfCachedFiles(int numberOfCachedFiles) {
-		if (this.numberOfCachedFiles != numberOfCachedFiles) {
+		if (this.numberOfCachedFiles != numberOfCachedFiles && fileCache != null) {
 			fileCache = new Cache<>(numberOfCachedFiles);
 		}
 		this.numberOfCachedFiles = numberOfCachedFiles;
