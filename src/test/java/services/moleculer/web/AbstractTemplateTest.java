@@ -42,10 +42,14 @@ import services.moleculer.service.Service;
 import services.moleculer.util.CommonUtils;
 import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.middleware.Favicon;
+import services.moleculer.web.middleware.NotFound;
+import services.moleculer.web.middleware.Redirector;
 import services.moleculer.web.middleware.RequestLogger;
+import services.moleculer.web.middleware.ResponseDeflater;
 import services.moleculer.web.middleware.ServeStatic;
 import services.moleculer.web.middleware.SessionCookie;
 import services.moleculer.web.router.Alias;
+import services.moleculer.web.router.MappingPolicy;
 import services.moleculer.web.router.Route;
 import services.moleculer.web.template.DataTreeEngine;
 import services.moleculer.web.template.FreeMarkerEngine;
@@ -99,22 +103,39 @@ public abstract class AbstractTemplateTest extends TestCase {
 
 		gw.use(new RequestLogger());
 		gw.use(new Favicon());
-		
+
+		// REST route
 		Route r1 = new Route();
+		
 		r1.addAlias(Alias.GET, "/math/add/:a/:b", "math.add");
 		r1.use(new CorsHeaders());
-		gw.addRoute(r1);
 		
-		Route r2 = new Route();
-				
-		r2.addAlias(Alias.GET, "/html", "test.html");		
-		r2.use(new SessionCookie("SID", "/html"));
+		// Add deflater to REST service
+		ResponseDeflater deflater = new ResponseDeflater();
+		r1.use(deflater);
+		
+		r1.addAlias(Alias.GET, "/html", "test.html");
+		r1.use(new SessionCookie("SID", "/html"));
+		
+		gw.addRoute(r1);
 
-		r2.addToWhiteList("/static/*");
+		// Create route for serving html content
+		Route r2 = new Route();
+		
+		// Enable all requests (not just the aliases or whitelist entries)
+		r2.setMappingPolicy(MappingPolicy.ALL);
+				
+		// Last handler must be the "404 not found" middleware
+		r2.use(new NotFound("<html>NOT FOUND</html>"));
+		
+		// Add static page (html, images, javascript) folder
 		r2.use(new ServeStatic("/static", "/templates"));
 
-		gw.addRoute(r2);
+		// ...and a sample Redirector middleware
+		r2.use(new Redirector("/missing", "/index.html", 307));
 				
+		gw.addRoute(r2);
+		
 		cl = HttpAsyncClients.createDefault();
 		cl.start();
 	}
@@ -186,29 +207,67 @@ public abstract class AbstractTemplateTest extends TestCase {
 	}
 
 	@Test
-	public void testStaticTest() throws Exception {
-		
+	public void testMiddlewares() throws Exception {
+
 		// First load
 		HttpGet get = new HttpGet("http://localhost:3000/static/index.html");
 		HttpResponse rsp = cl.execute(get, null).get();
-		
-		assertEquals(200, rsp.getStatusLine().getStatusCode());		
+
+		assertEquals(200, rsp.getStatusLine().getStatusCode());
 		String etag1 = rsp.getLastHeader("ETag").getValue();
-		
+
 		byte[] bytes = CommonUtils.readFully(rsp.getEntity().getContent());
 		String txt = new String(bytes, StandardCharsets.UTF_8);
-		
+
 		assertTrue(txt.contains("<h1>header</h1>"));
 
 		// Reload page (using ETags)
 		get.reset();
 		get.setHeader("If-None-Match", etag1);
 		rsp = cl.execute(get, null).get();
-		
+
 		assertEquals(304, rsp.getStatusLine().getStatusCode());
 		assertTrue(rsp.getLastHeader("Content-Type").getValue().contains("text/html"));
+
+		// Favicon
+		get("favicon.ico", 200, "image/x-icon", null);
+		
+		// Invalid page
+		get("invalid.html", 404, "text/html", "<html>NOT FOUND</html>");
+		
+		// Deflated REST
+		get = new HttpGet("http://localhost:3000/math/add/3/4");
+		get.setHeader("Accept-Encoding", "deflate");
+		rsp = cl.execute(get, null).get();
+		assertEquals(200, rsp.getStatusLine().getStatusCode());
+		assertTrue(rsp.getLastHeader("Content-Encoding").getValue().contains("deflate"));
+		
+		bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+		txt = new String(bytes, StandardCharsets.UTF_8);
+		assertFalse(txt.contains("{"));
+		assertFalse(txt.contains(","));
+		assertFalse(txt.contains("3"));
+		
+		System.out.println(txt);
 	}
-	
+
+	private final void get(String path, Integer requiredCode, String requiredType, String requiredText)
+			throws Exception {
+		HttpGet get = new HttpGet("http://localhost:3000/" + path);
+		HttpResponse rsp = cl.execute(get, null).get();
+		if (requiredCode != null) {
+			assertEquals(requiredCode.intValue(), rsp.getStatusLine().getStatusCode());
+		}
+		if (requiredType != null) {
+			assertTrue(rsp.getLastHeader("Content-Type").getValue().contains(requiredType));
+		}
+		byte[] bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+		if (requiredText != null) {
+			String txt = new String(bytes, StandardCharsets.UTF_8);
+			assertTrue(txt.contains(requiredText));
+		}
+	}
+
 	// --- COMMON TESTS ---
 
 	protected void doTemplateTests(String name) throws Exception {
@@ -238,19 +297,19 @@ public abstract class AbstractTemplateTest extends TestCase {
 			assertTrue(html.contains("<p>C: xyz</p>"));
 			assertTrue(html.contains("<p>D.E: 3210</p>") || html.contains("<p>D.E: 3,210</p>"));
 		}
-		
+
 		for (int i = 0; i < 10; i++) {
 			assertTrue(html.contains("<td>" + i + "</td>"));
-		}		
-		
+		}
+
 		get = new HttpGet("http://localhost:3000/math/add/1/2");
 		rsp = cl.execute(get, null).get();
-		
+
 		header = rsp.getLastHeader("Access-Control-Allow-Origin").getValue();
 		assertEquals("*", header);
 		header = rsp.getLastHeader("Access-Control-Allow-Methods").getValue();
 		assertEquals("GET,OPTIONS,POST,PUT,DELETE", header);
-		
+
 		bytes = CommonUtils.readFully(rsp.getEntity().getContent());
 		String json = new String(bytes, StandardCharsets.UTF_8);
 		Tree t = new Tree(json);

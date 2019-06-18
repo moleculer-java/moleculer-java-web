@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.Deflater;
 import java.util.zip.DeflaterOutputStream;
@@ -59,7 +60,7 @@ public class ResponseDeflater extends HttpMiddleware implements HttpConstants {
 
 	protected int compressionLevel = Deflater.BEST_COMPRESSION;
 	protected int bufferSize = 512;
-	protected HashSet<String> compressedTypes = new HashSet<>(
+	protected Set<String> compressedTypes = new HashSet<>(
 			Arrays.asList(new String[] { "image", "audio", "video", "gzip" }));
 
 	// --- CONSTRUCTORS ---
@@ -113,6 +114,8 @@ public class ResponseDeflater extends HttpMiddleware implements HttpConstants {
 				// Invoke next handler / action
 				next.service(req, new WebResponse() {
 
+					AtomicBoolean finished = new AtomicBoolean();
+
 					@Override
 					public final void setStatus(int code) {
 						rsp.setStatus(code);
@@ -122,7 +125,7 @@ public class ResponseDeflater extends HttpMiddleware implements HttpConstants {
 					public final int getStatus() {
 						return rsp.getStatus();
 					}
-					
+
 					@Override
 					public final void setHeader(String name, String value) {
 						rsp.setHeader(name, value);
@@ -144,7 +147,7 @@ public class ResponseDeflater extends HttpMiddleware implements HttpConstants {
 					public final String getHeader(String name) {
 						return rsp.getHeader(name);
 					}
-					
+
 					@Override
 					public final void send(byte[] bytes) throws IOException {
 						if (compressionSupported && !alreadyCompressed.get()) {
@@ -161,24 +164,27 @@ public class ResponseDeflater extends HttpMiddleware implements HttpConstants {
 
 					@Override
 					public final boolean end() {
-						boolean ok;
-						try {
-							if (compressionSupported && !alreadyCompressed.get()) {
+						if (finished.compareAndSet(false, true)) {
+							boolean ok;
+							try {
+								if (compressionSupported && !alreadyCompressed.get()) {
 
-								// Send compressed content
-								deflater.finish();
-								byte[] bytes = buffer.toByteArray();
-								rsp.setHeader(CONTENT_ENCODING, DEFLATE);
-								rsp.setHeader(CONTENT_LENGTH, Integer.toString(bytes.length));
-								rsp.send(bytes);
+									// Send compressed content
+									deflater.finish();
+									byte[] bytes = buffer.toByteArray();
+									rsp.setHeader(CONTENT_ENCODING, DEFLATE);
+									rsp.setHeader(CONTENT_LENGTH, Integer.toString(bytes.length));
+									rsp.send(bytes);
 
+								}
+							} catch (IOException cause) {
+								logger.error("Unable to send compressed content!", cause);
+							} finally {
+								ok = rsp.end();
 							}
-						} catch (IOException cause) {
-							logger.error("Unable to send compressed content!", cause);
-						} finally {
-							ok = rsp.end();
+							return ok;
 						}
-						return ok;
+						return false;
 					}
 
 					@Override
@@ -239,7 +245,7 @@ public class ResponseDeflater extends HttpMiddleware implements HttpConstants {
 	/**
 	 * @return the compressedTypes
 	 */
-	public HashSet<String> getCompressedTypes() {
+	public Set<String> getCompressedTypes() {
 		return compressedTypes;
 	}
 
@@ -247,8 +253,16 @@ public class ResponseDeflater extends HttpMiddleware implements HttpConstants {
 	 * @param compressedMimeTypeParts
 	 *            the compressedTypes to set
 	 */
-	public void setCompressedTypes(HashSet<String> compressedMimeTypeParts) {
+	public void setCompressedTypes(Set<String> compressedMimeTypeParts) {
 		compressedTypes = Objects.requireNonNull(compressedMimeTypeParts);
+	}
+
+	/**
+	 * @param compressedMimeTypeParts
+	 *            the compressedTypes to set
+	 */
+	public void setCompressedTypes(String... compressedMimeTypeParts) {
+		compressedTypes = new HashSet<>(Arrays.asList(compressedMimeTypeParts));
 	}
 
 }

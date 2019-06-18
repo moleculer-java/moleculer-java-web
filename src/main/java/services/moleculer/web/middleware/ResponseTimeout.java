@@ -33,6 +33,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.datatree.Tree;
 import services.moleculer.service.Name;
@@ -80,10 +81,10 @@ public class ResponseTimeout extends HttpMiddleware implements HttpConstants {
 	protected ScheduledExecutorService scheduler;
 
 	// --- MESSAGE CACHES ---
-	
+
 	protected byte[] cachedHTML;
 	protected byte[] cachedJSON;
-	
+
 	// --- CONSTRUCTORS ---
 
 	public ResponseTimeout() {
@@ -104,7 +105,7 @@ public class ResponseTimeout extends HttpMiddleware implements HttpConstants {
 		this.status = status;
 		setTimeout(timeoutMillis);
 	}
-	
+
 	// --- START MIDDLEWARE ---
 
 	public void started(services.moleculer.ServiceBroker broker) throws Exception {
@@ -151,7 +152,7 @@ public class ResponseTimeout extends HttpMiddleware implements HttpConstants {
 							htmlTemplate = new String(readAllBytes(htmlTemplatePath), StandardCharsets.UTF_8);
 							refreshCaches();
 						}
-						
+
 						// Create body
 						byte[] bytes;
 						if (sendJSON) {
@@ -165,15 +166,15 @@ public class ResponseTimeout extends HttpMiddleware implements HttpConstants {
 							// Response in HTML format
 							rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_HTML);
 							bytes = cachedHTML;
-							
+
 						}
-						
+
 						// Set Content-Length
 						rsp.setHeader(CONTENT_LENGTH, Integer.toString(bytes.length));
-							
+
 						// Send message body
 						rsp.send(bytes);
-						
+
 					} catch (Exception cause) {
 						logger.error("Unable to send timeout message to client!", cause);
 					} finally {
@@ -184,6 +185,8 @@ public class ResponseTimeout extends HttpMiddleware implements HttpConstants {
 				// Invoke next handler / action
 				next.service(req, new WebResponse() {
 
+					AtomicBoolean finished = new AtomicBoolean();
+
 					@Override
 					public final void setStatus(int code) {
 						rsp.setStatus(code);
@@ -193,7 +196,7 @@ public class ResponseTimeout extends HttpMiddleware implements HttpConstants {
 					public final int getStatus() {
 						return rsp.getStatus();
 					}
-					
+
 					@Override
 					public final void setHeader(String name, String value) {
 						rsp.setHeader(name, value);
@@ -203,7 +206,7 @@ public class ResponseTimeout extends HttpMiddleware implements HttpConstants {
 					public final String getHeader(String name) {
 						return rsp.getHeader(name);
 					}
-					
+
 					@Override
 					public final void send(byte[] bytes) throws IOException {
 						rsp.send(bytes);
@@ -211,10 +214,13 @@ public class ResponseTimeout extends HttpMiddleware implements HttpConstants {
 
 					@Override
 					public final boolean end() {
-						if (future != null) {
-							future.cancel(false);
+						if (finished.compareAndSet(false, true)) {
+							if (future != null) {
+								future.cancel(false);
+							}
+							return rsp.end();
 						}
-						return rsp.end();
+						return false;
 					}
 
 					@Override
@@ -233,7 +239,7 @@ public class ResponseTimeout extends HttpMiddleware implements HttpConstants {
 	}
 
 	// --- REFRESH CACHED MESSAGES ---
-	
+
 	protected void refreshCaches() {
 		FastBuildTree json = new FastBuildTree(2);
 		json.putUnsafe("success", false);
@@ -242,7 +248,7 @@ public class ResponseTimeout extends HttpMiddleware implements HttpConstants {
 		String html = htmlTemplate.replace("{status}", Integer.toString(status));
 		cachedHTML = html.getBytes(StandardCharsets.UTF_8);
 	}
-	
+
 	// --- PROPERTY GETTERS AND SETTERS ---
 
 	public long getTimeout() {
@@ -301,5 +307,5 @@ public class ResponseTimeout extends HttpMiddleware implements HttpConstants {
 		this.status = status;
 		refreshCaches();
 	}
-	
+
 }

@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -156,6 +157,7 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 					int code = 200;
 					LinkedHashMap<String, String> headers = new LinkedHashMap<>();
 					ByteArrayOutputStream out = new ByteArrayOutputStream(512);
+					AtomicBoolean finished = new AtomicBoolean();
 
 					@Override
 					public final void setStatus(int code) {
@@ -167,7 +169,7 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 					public final int getStatus() {
 						return rsp.getStatus();
 					}
-					
+
 					@Override
 					public final void setHeader(String name, String value) {
 						rsp.setHeader(name, value);
@@ -178,7 +180,7 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 					public final String getHeader(String name) {
 						return headers.get(name);
 					}
-					
+
 					@Override
 					public final void send(byte[] bytes) throws IOException {
 						rsp.send(bytes);
@@ -189,45 +191,49 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 
 					@Override
 					public final boolean end() {
-						long duration = System.nanoTime() - start;
-						boolean ok = rsp.end();
+						if (finished.compareAndSet(false, true)) {
+							long duration = System.nanoTime() - start;
+							boolean ok = rsp.end();
 
-						// It's not known (but Servlet and Netty use HTTP1.1)
-						tmp.append("  HTTP/1.1 ");
+							// It's not known (but Servlet and Netty use
+							// HTTP1.1)
+							tmp.append("  HTTP/1.1 ");
 
-						// Status code and message
-						tmp.append(HttpResponseStatus.valueOf(code));
-						tmp.append(CR_LF);
-						for (Map.Entry<String, String> entry : headers.entrySet()) {
-							tmp.append("  ");
-							tmp.append(entry.getKey());
-							tmp.append(": ");
-							tmp.append(entry.getValue());
+							// Status code and message
+							tmp.append(HttpResponseStatus.valueOf(code));
 							tmp.append(CR_LF);
+							for (Map.Entry<String, String> entry : headers.entrySet()) {
+								tmp.append("  ");
+								tmp.append(entry.getKey());
+								tmp.append(": ");
+								tmp.append(entry.getValue());
+								tmp.append(CR_LF);
+							}
+
+							// Try to dump body
+							if (out.size() > 0) {
+								printBytes(tmp, out.toByteArray());
+							}
+
+							// Insert processing time (first line)
+							tmp.insert(0, '.');
+							tmp.insert(0, formatNamoSec(duration));
+							tmp.insert(0, " processed within ");
+
+							// Client address
+							String address = req.getAddress();
+							if (address == null || address.isEmpty()) {
+								tmp.insert(0, "<unknown host>");
+							} else {
+								tmp.insert(0, address);
+							}
+							tmp.insert(0, "Request from ");
+
+							// Write to log
+							logger.info(tmp.toString());
+							return ok;
 						}
-
-						// Try to dump body
-						if (out.size() > 0) {
-							printBytes(tmp, out.toByteArray());
-						}
-
-						// Insert processing time (first line)
-						tmp.insert(0, '.');
-						tmp.insert(0, formatNamoSec(duration));
-						tmp.insert(0, " processed within ");
-
-						// Client address
-						String address = req.getAddress();
-						if (address == null || address.isEmpty()) {
-							tmp.insert(0, "<unknown host>");
-						} else {
-							tmp.insert(0, address);
-						}
-						tmp.insert(0, "Request from ");
-
-						// Write to log
-						logger.info(tmp.toString());
-						return ok;
+						return false;
 					}
 
 					@Override
@@ -250,8 +256,8 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 		if (bytes == null || bytes.length == 0 || maxPrintedBytes < 1) {
 			return;
 		}
-		tmp.append(CR_LF);		
-		// tmp.append("  ");
+		tmp.append(CR_LF);
+		// tmp.append(" ");
 		byte b;
 		char c;
 		int max = Math.min(bytes.length, maxPrintedBytes);

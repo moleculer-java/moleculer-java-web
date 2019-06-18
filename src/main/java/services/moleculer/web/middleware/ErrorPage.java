@@ -112,6 +112,7 @@ public class ErrorPage extends HttpMiddleware implements HttpConstants {
 				LinkedHashMap<String, String> headers = new LinkedHashMap<>();
 				ByteArrayOutputStream buffer = new ByteArrayOutputStream();
 				AtomicBoolean headersSent = new AtomicBoolean();
+				AtomicBoolean finished = new AtomicBoolean();
 
 				// Invoke next handler / action
 				next.service(req, new WebResponse() {
@@ -160,218 +161,221 @@ public class ErrorPage extends HttpMiddleware implements HttpConstants {
 
 					@Override
 					public final boolean end() {
-						int code = status.get();
-						if (code < 400) {
+						if (finished.compareAndSet(false, true)) {
+							int code = status.get();
+							if (code < 400) {
 
-							// Unmodified response
-							return rsp.end();
+								// Unmodified response
+								return rsp.end();
 
-						}
-
-						// Create body
-						byte[] bytes = buffer.toByteArray();
-						String stack = "[absent]";
-						String message = null;
-						try {
-							if (bytes[0] == '{' || bytes[0] == '[') {
-								Tree t = new Tree(bytes);
-								message = t.get("message", (String) null);
-								stack = t.get("stack", "[absent]");
 							}
-						} catch (Throwable ignored) {
-						}
 
-						// Create message
-						if (message == null || message.isEmpty()) {
-							switch (code) {
-							case 400:
-								message = "Bad Request";
-								break;
-							case 401:
-								message = "Unauthorized";
-								break;
-							case 402:
-								message = "Payment Required";
-								break;
-							case 403:
-								message = "Forbidden";
-								break;
-							case 404:
-								message = "Not Found";
-								break;
-							case 405:
-								message = "Method Not Allowed";
-								break;
-							case 406:
-								message = "Not Acceptable";
-								break;
-							case 407:
-								message = "Proxy Authentication Required";
-								break;
-							case 408:
-								message = "Request Timeout";
-								break;
-							case 409:
-								message = "Conflict";
-								break;
-							case 410:
-								message = "Gone";
-								break;
-							case 411:
-								message = "Length Required";
-								break;
-							case 412:
-								message = "Precondition Failed";
-								break;
-							case 413:
-								message = "Request Entity Too Large";
-								break;
-							case 414:
-								message = "Request-URI Too Long";
-								break;
-							case 415:
-								message = "Unsupported Media Type";
-								break;
-							case 416:
-								message = "Requested range not satisfiable";
-								break;
-							case 417:
-								message = "Expectation Failed";
-								break;
-							case 418:
-								message = "I'm a teapot";
-								break;
-							case 419:
-								message = "Insufficient Space On Resource";
-								break;
-							case 420:
-								message = "Method Failure";
-								break;
-							case 421:
-								message = "Destination Locked";
-								break;
-							case 422:
-								message = "Unprocessable Entity";
-								break;
-							case 423:
-								message = "Locked";
-								break;
-							case 424:
-								message = "Failed Dependency";
-								break;
-							case 426:
-								message = "Upgrade Required";
-								break;
-							case 428:
-								message = "Precondition Required";
-								break;
-							case 429:
-								message = "Too Many Requests";
-								break;
-							case 431:
-								message = "Request Header Fields Too Large";
-								break;
-							case 451:
-								message = "Unavailable For Legal Reasons";
-								break;
-							case 500:
-								message = "Internal Server Error";
-								break;
-							case 501:
-								message = "Not Implemented";
-								break;
-							case 502:
-								message = "Bad Gateway";
-								break;
-							case 503:
-								message = "Service Unavailable";
-								break;
-							case 504:
-								message = "Gateway Timeout";
-								break;
-							case 505:
-								message = "HTTP Version not supported";
-								break;
-							case 506:
-								message = "Variant Also Negotiates";
-								break;
-							case 507:
-								message = "Insufficient Storage";
-								break;
-							case 508:
-								message = "Loop Detected";
-								break;
-							case 509:
-								message = "Bandwidth Limit Exceeded";
-								break;
-							case 510:
-								message = "Not Extended";
-								break;
-							case 511:
-								message = "Network Authentication Required";
-								break;
-							default:
-								message = "Unexpected Error Occured";
-								break;
-							}
-						} else {
-
-							// Detect Accept-Encoding
-							String accept = req.getHeader(ACCEPT);
-							if (accept != null && accept.contains("json")) {
-
-								// Original message is JSON, and client
-								// accepts JSON -> send original JSON
-								boolean ok;
-								try {
-									rsp.send(bytes);
-								} catch (Exception cause) {
-									logger.error("Unable to send error message!", cause);
-								} finally {
-									ok = rsp.end();
+							// Create body
+							byte[] bytes = buffer.toByteArray();
+							String stack = "[absent]";
+							String message = null;
+							try {
+								if (bytes[0] == '{' || bytes[0] == '[') {
+									Tree t = new Tree(bytes);
+									message = t.get("message", (String) null);
+									stack = t.get("stack", "[absent]");
 								}
-								return ok;
-							}
-						}
-
-						// Find in status-specific templates
-						String template = statusSpecificTemplates.get(code);
-
-						// Use common HTML template
-						if (htmlTemplate == null && htmlTemplatePath != null) {
-							htmlTemplate = new String(readAllBytes(htmlTemplatePath), StandardCharsets.UTF_8);
-						}
-						if (template == null) {
-							template = htmlTemplate;
-						}
-
-						// Create body
-						String body = template.replace("{status}", Integer.toString(code)).replace("{message}",
-								message).replace("{stack}", stack);
-						bytes = body.getBytes(StandardCharsets.UTF_8);
-
-						// Set headers
-						headers.put(CONTENT_TYPE, CONTENT_TYPE_HTML);
-						headers.put(CONTENT_LENGTH, Integer.toString(bytes.length));
-						headers.put(CACHE_CONTROL, NO_CACHE);
-
-						boolean ok;
-						try {
-
-							// Send headers
-							for (Map.Entry<String, String> entry : headers.entrySet()) {
-								rsp.setHeader(entry.getKey(), entry.getValue());
+							} catch (Throwable ignored) {
 							}
 
-							// Send body
-							rsp.send(bytes);
+							// Create message
+							if (message == null || message.isEmpty()) {
+								switch (code) {
+								case 400:
+									message = "Bad Request";
+									break;
+								case 401:
+									message = "Unauthorized";
+									break;
+								case 402:
+									message = "Payment Required";
+									break;
+								case 403:
+									message = "Forbidden";
+									break;
+								case 404:
+									message = "Not Found";
+									break;
+								case 405:
+									message = "Method Not Allowed";
+									break;
+								case 406:
+									message = "Not Acceptable";
+									break;
+								case 407:
+									message = "Proxy Authentication Required";
+									break;
+								case 408:
+									message = "Request Timeout";
+									break;
+								case 409:
+									message = "Conflict";
+									break;
+								case 410:
+									message = "Gone";
+									break;
+								case 411:
+									message = "Length Required";
+									break;
+								case 412:
+									message = "Precondition Failed";
+									break;
+								case 413:
+									message = "Request Entity Too Large";
+									break;
+								case 414:
+									message = "Request-URI Too Long";
+									break;
+								case 415:
+									message = "Unsupported Media Type";
+									break;
+								case 416:
+									message = "Requested range not satisfiable";
+									break;
+								case 417:
+									message = "Expectation Failed";
+									break;
+								case 418:
+									message = "I'm a teapot";
+									break;
+								case 419:
+									message = "Insufficient Space On Resource";
+									break;
+								case 420:
+									message = "Method Failure";
+									break;
+								case 421:
+									message = "Destination Locked";
+									break;
+								case 422:
+									message = "Unprocessable Entity";
+									break;
+								case 423:
+									message = "Locked";
+									break;
+								case 424:
+									message = "Failed Dependency";
+									break;
+								case 426:
+									message = "Upgrade Required";
+									break;
+								case 428:
+									message = "Precondition Required";
+									break;
+								case 429:
+									message = "Too Many Requests";
+									break;
+								case 431:
+									message = "Request Header Fields Too Large";
+									break;
+								case 451:
+									message = "Unavailable For Legal Reasons";
+									break;
+								case 500:
+									message = "Internal Server Error";
+									break;
+								case 501:
+									message = "Not Implemented";
+									break;
+								case 502:
+									message = "Bad Gateway";
+									break;
+								case 503:
+									message = "Service Unavailable";
+									break;
+								case 504:
+									message = "Gateway Timeout";
+									break;
+								case 505:
+									message = "HTTP Version not supported";
+									break;
+								case 506:
+									message = "Variant Also Negotiates";
+									break;
+								case 507:
+									message = "Insufficient Storage";
+									break;
+								case 508:
+									message = "Loop Detected";
+									break;
+								case 509:
+									message = "Bandwidth Limit Exceeded";
+									break;
+								case 510:
+									message = "Not Extended";
+									break;
+								case 511:
+									message = "Network Authentication Required";
+									break;
+								default:
+									message = "Unexpected Error Occured";
+									break;
+								}
+							} else {
 
-						} catch (Exception cause) {
-							logger.error("Unable to send error message!", cause);
-						} finally {
-							ok = rsp.end();
+								// Detect Accept-Encoding
+								String accept = req.getHeader(ACCEPT);
+								if (accept != null && accept.contains("json")) {
+
+									// Original message is JSON, and client
+									// accepts JSON -> send original JSON
+									boolean ok;
+									try {
+										rsp.send(bytes);
+									} catch (Exception cause) {
+										logger.error("Unable to send error message!", cause);
+									} finally {
+										ok = rsp.end();
+									}
+									return ok;
+								}
+							}
+
+							// Find in status-specific templates
+							String template = statusSpecificTemplates.get(code);
+
+							// Use common HTML template
+							if (htmlTemplate == null && htmlTemplatePath != null) {
+								htmlTemplate = new String(readAllBytes(htmlTemplatePath), StandardCharsets.UTF_8);
+							}
+							if (template == null) {
+								template = htmlTemplate;
+							}
+
+							// Create body
+							String body = template.replace("{status}", Integer.toString(code))
+									.replace("{message}", message).replace("{stack}", stack);
+							bytes = body.getBytes(StandardCharsets.UTF_8);
+
+							// Set headers
+							headers.put(CONTENT_TYPE, CONTENT_TYPE_HTML);
+							headers.put(CONTENT_LENGTH, Integer.toString(bytes.length));
+							headers.put(CACHE_CONTROL, NO_CACHE);
+
+							boolean ok;
+							try {
+
+								// Send headers
+								for (Map.Entry<String, String> entry : headers.entrySet()) {
+									rsp.setHeader(entry.getKey(), entry.getValue());
+								}
+
+								// Send body
+								rsp.send(bytes);
+
+							} catch (Exception cause) {
+								logger.error("Unable to send error message!", cause);
+							} finally {
+								ok = rsp.end();
+							}
+							return ok;
 						}
-						return ok;
+						return false;
 					}
 
 					@Override

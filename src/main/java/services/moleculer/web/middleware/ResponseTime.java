@@ -87,6 +87,8 @@ public class ResponseTime extends HttpMiddleware {
 				// Invoke next handler / action
 				next.service(req, new WebResponse() {
 
+					AtomicBoolean finished = new AtomicBoolean();
+
 					@Override
 					public final void setStatus(int code) {
 						rsp.setStatus(code);
@@ -96,7 +98,7 @@ public class ResponseTime extends HttpMiddleware {
 					public final int getStatus() {
 						return rsp.getStatus();
 					}
-					
+
 					@Override
 					public final void setHeader(String name, String value) {
 						rsp.setHeader(name, value);
@@ -106,7 +108,7 @@ public class ResponseTime extends HttpMiddleware {
 					public final String getHeader(String name) {
 						return rsp.getHeader(name);
 					}
-					
+
 					@Override
 					public final void send(byte[] bytes) throws IOException {
 						if (firstBody.compareAndSet(true, false)) {
@@ -118,7 +120,10 @@ public class ResponseTime extends HttpMiddleware {
 
 					@Override
 					public final boolean end() {
-						return rsp.end();
+						if (finished.compareAndSet(false, true)) {
+							return rsp.end();
+						}
+						return false;
 					}
 
 					@Override
