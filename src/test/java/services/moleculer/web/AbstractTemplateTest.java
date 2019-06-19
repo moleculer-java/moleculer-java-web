@@ -35,17 +35,21 @@ import org.apache.http.impl.nio.client.HttpAsyncClients;
 import org.junit.Test;
 
 import io.datatree.Tree;
+import io.datatree.dom.BASE64;
 import junit.framework.TestCase;
 import services.moleculer.ServiceBroker;
 import services.moleculer.service.Action;
 import services.moleculer.service.Service;
 import services.moleculer.util.CommonUtils;
+import services.moleculer.web.middleware.BasicAuthenticator;
 import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.middleware.Favicon;
 import services.moleculer.web.middleware.NotFound;
 import services.moleculer.web.middleware.Redirector;
 import services.moleculer.web.middleware.RequestLogger;
 import services.moleculer.web.middleware.ResponseDeflater;
+import services.moleculer.web.middleware.ResponseHeaders;
+import services.moleculer.web.middleware.ResponseTime;
 import services.moleculer.web.middleware.ServeStatic;
 import services.moleculer.web.middleware.SessionCookie;
 import services.moleculer.web.router.Alias;
@@ -95,6 +99,9 @@ public abstract class AbstractTemplateTest extends TestCase {
 			@SuppressWarnings("unused")
 			public Action add = ctx -> {
 				int c = ctx.params.get("a", 0) + ctx.params.get("b", 0);
+				if (c == -1) {
+					Thread.sleep(1000);
+				}
 				ctx.params.put("c", c);
 				return ctx.params;
 			};
@@ -104,38 +111,51 @@ public abstract class AbstractTemplateTest extends TestCase {
 		gw.use(new RequestLogger());
 		gw.use(new Favicon());
 
+		// Create authenticated route
+		Route r0 = new Route();
+
+		r0.use(new BasicAuthenticator("testuser", "testpassword"));
+		
+		r0.addAlias(Alias.GET, "/auth", "math.add");
+
+		r0.use(new ResponseHeaders("Test-Header", "Test-Value"));
+		
+		r0.use(new ResponseTime("Response-Time"));
+		
+		gw.addRoute(r0);
+		
 		// REST route
 		Route r1 = new Route();
-		
+
 		r1.addAlias(Alias.GET, "/math/add/:a/:b", "math.add");
 		r1.use(new CorsHeaders());
-		
+
 		// Add deflater to REST service
 		ResponseDeflater deflater = new ResponseDeflater();
 		r1.use(deflater);
-		
+
 		r1.addAlias(Alias.GET, "/html", "test.html");
 		r1.use(new SessionCookie("SID", "/html"));
-		
+
 		gw.addRoute(r1);
 
 		// Create route for serving html content
 		Route r2 = new Route();
-		
+
 		// Enable all requests (not just the aliases or whitelist entries)
 		r2.setMappingPolicy(MappingPolicy.ALL);
-				
+
 		// Last handler must be the "404 not found" middleware
 		r2.use(new NotFound("<html>NOT FOUND</html>"));
-		
+
 		// Add static page (html, images, javascript) folder
 		r2.use(new ServeStatic("/static", "/templates"));
 
 		// ...and a sample Redirector middleware
 		r2.use(new Redirector("/missing", "/index.html", 307));
-				
+
 		gw.addRoute(r2);
-		
+
 		cl = HttpAsyncClients.createDefault();
 		cl.start();
 	}
@@ -231,24 +251,57 @@ public abstract class AbstractTemplateTest extends TestCase {
 
 		// Favicon
 		get("favicon.ico", 200, "image/x-icon", null);
-		
+
 		// Invalid page
 		get("invalid.html", 404, "text/html", "<html>NOT FOUND</html>");
-		
+
 		// Deflated REST
 		get = new HttpGet("http://localhost:3000/math/add/3/4");
 		get.setHeader("Accept-Encoding", "deflate");
 		rsp = cl.execute(get, null).get();
 		assertEquals(200, rsp.getStatusLine().getStatusCode());
 		assertTrue(rsp.getLastHeader("Content-Encoding").getValue().contains("deflate"));
-		
+
 		bytes = CommonUtils.readFully(rsp.getEntity().getContent());
 		txt = new String(bytes, StandardCharsets.UTF_8);
 		assertFalse(txt.contains("{"));
 		assertFalse(txt.contains(","));
 		assertFalse(txt.contains("3"));
+
+		// REST without deflating
+		get.reset();
+		get.removeHeaders("Accept-Encoding");
+		rsp = cl.execute(get, null).get();
+		assertEquals(200, rsp.getStatusLine().getStatusCode());
+		assertTrue(rsp.getLastHeader("Content-Encoding") == null);
+
+		bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+		txt = new String(bytes, StandardCharsets.UTF_8);
+		assertTrue(txt.contains("{"));
+		assertTrue(txt.contains(","));
+		assertTrue(txt.contains("3"));
+
+		// Invoke authenticated method
+		get("auth", 401, null, null);
 		
-		System.out.println(txt);
+		// Invoke authenticated method with userid/password		
+		get = new HttpGet("http://localhost:3000/auth?a=1&b=2");
+		
+		String secret = "BASIC " + new String(BASE64.encode("testuser:testpassword".getBytes()));
+		get.setHeader("Authorization", secret);
+		rsp = cl.execute(get, null).get();
+		assertEquals(200, rsp.getStatusLine().getStatusCode());
+		bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+		txt = new String(bytes, StandardCharsets.UTF_8);
+		assertTrue(txt.contains("{"));
+		assertTrue(txt.contains(","));
+		assertTrue(txt.contains("3"));
+		
+		assertEquals("Test-Value", rsp.getLastHeader("Test-Header").getValue());
+		
+		String time = rsp.getLastHeader("Response-Time").getValue();
+		assertTrue(time.contains("ms"));
+		assertTrue(Integer.parseInt(time.substring(0, time.length() - 2)) > 0);
 	}
 
 	private final void get(String path, Integer requiredCode, String requiredType, String requiredText)
