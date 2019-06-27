@@ -33,6 +33,7 @@ import java.util.Enumeration;
 import java.util.LinkedList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -53,9 +54,9 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 
 	private static final long serialVersionUID = -1038240217177335483L;
 
-	// --- SERVICE BROKER'S SPRING CONTEXT ---
+	// --- SERVICE BROKER'S SPRING CONTEXT (XML-BASED OR SPRING BOOT) ---
 
-	protected ConfigurableApplicationContext ctx;
+	protected final AtomicReference<ConfigurableApplicationContext> context = new AtomicReference<>();
 
 	// --- MOLECULER COMPONENTS ---
 
@@ -75,10 +76,14 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 	@Override
 	public void init(ServletConfig config) throws ServletException {
 		super.init(config);
+		if (context.get() != null) {
+			return;
+		}
 		try {
 
 			// Start with SpringBoot
 			String springApp = config.getInitParameter("moleculer.application");
+			ConfigurableApplicationContext ctx = null;
 			if (springApp != null && !springApp.isEmpty()) {
 
 				// Create "args" String array by Servlet config
@@ -112,7 +117,8 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 
 				// Load app with Spring Boot
 				ctx = (ConfigurableApplicationContext) m.invoke(null, in);
-
+				context.set(ctx);
+				
 			} else {
 
 				// Start by using Spring XML config
@@ -126,6 +132,7 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 				} else {
 					ctx = new ClassPathXmlApplicationContext(configPath);
 				}
+				context.set(ctx);
 				ctx.start();
 			}
 
@@ -163,12 +170,12 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 		}
 
 		// Stop Spring Context
+		ConfigurableApplicationContext ctx = context.getAndSet(null);
 		if (ctx != null) {
 			try {
 				ctx.stop();
 			} catch (Throwable ignored) {
 			}
-			ctx = null;
 		}
 	}
 
