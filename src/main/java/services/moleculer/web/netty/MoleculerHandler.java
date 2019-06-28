@@ -185,10 +185,14 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 
 				// Process WebSocket message frame
 				if (request instanceof WebSocketFrame) {
-					ByteBuf byteBuffer = ((WebSocketFrame) request).content();
-					if (byteBuffer != null && byteBuffer.readableBytes() == 1 && byteBuffer.array()[0] == (byte) '!') {
-						ctx.channel().write((byte) '!');
-						ctx.flush();
+					WebSocketFrame frame = (WebSocketFrame) request;
+					if (frame.refCnt() > 0) {
+						ByteBuf byteBuffer = frame.content();
+						if (byteBuffer != null && byteBuffer.readableBytes() == 1
+								&& byteBuffer.array()[0] == (byte) '!') {
+							ctx.channel().write((byte) '!');
+							ctx.flush();
+						}
 					}
 					return;
 				}

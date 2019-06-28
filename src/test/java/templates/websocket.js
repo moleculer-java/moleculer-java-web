@@ -1,7 +1,7 @@
 // ---------------- SAMPLE ----------------------
 //
 // Create websocket-handler instance: 
-// var ws = MoleculerWebsocket("/ws/up", function(msg) {
+// var ws = MoleculerWebsocket("/ws/chat", function(msg) {
 //      console.log("Message received:", msg);
 // }, {
 // 	heartbeatInterval: 5 * 1000,

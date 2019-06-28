@@ -35,50 +35,50 @@ import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
 import services.moleculer.service.Action;
 import services.moleculer.service.Service;
-import services.moleculer.web.netty.NettyServer;
-import services.moleculer.web.router.RestRoute;
 import services.moleculer.web.router.StaticRoute;
 import services.moleculer.web.servlet.AsyncMoleculerServlet;
 
-public class Sample {
+public class SampleWithJetty {
 
 	public static void main(String[] args) {
 		System.out.println("START");
 		try {
 
 			Server server = new Server();
-			ServerConnector pContext = new ServerConnector(server);
-			pContext.setHost("127.0.0.1");
-			pContext.setPort(3000);
-			ServletContextHandler publicContext = new ServletContextHandler(ServletContextHandler.SESSIONS);
-			publicContext.setContextPath("/");
+			ServerConnector serverConnector = new ServerConnector(server);
+			serverConnector.setHost("127.0.0.1");
+			serverConnector.setPort(3000);
+			ServletContextHandler servletContextHandler = new ServletContextHandler(ServletContextHandler.SESSIONS);
+			servletContextHandler.setContextPath("/");
 
 			// Create non-blocking servlet
-			AsyncMoleculerServlet sc = new AsyncMoleculerServlet();
-			ServletHolder sh = new ServletHolder(sc);
+			AsyncMoleculerServlet servlet = new AsyncMoleculerServlet();
+			ServletHolder servletHolder = new ServletHolder(servlet);
 
-			sh.setInitParameter("moleculer.config", "/services/moleculer/web/moleculer.config.xml");
-			publicContext.addServlet(sh, "/*");
+			servletHolder.setInitParameter("moleculer.config", "/services/moleculer/web/moleculer.config.xml");
+			servletContextHandler.addServlet(servletHolder, "/*");
 
-			HandlerCollection collection = new HandlerCollection();
-			collection.addHandler(publicContext);
-			server.setHandler(collection);
-			server.addConnector(pContext);
+			HandlerCollection handlerCollection = new HandlerCollection();
+			handlerCollection.addHandler(servletContextHandler);
+			server.setHandler(handlerCollection);
+			server.addConnector(serverConnector);
 
 			server.start();
 
-			ServiceBroker broker = sc.getBroker();
-			ApiGateway gateway = sc.getGateway();
+			ServiceBroker broker = servlet.getBroker();
+			broker.repl();
+			ApiGateway gateway = servlet.getGateway();
 
 			// REST services
-			RestRoute rest = new RestRoute();
-			rest.addAlias("/test", "test.send");
-			gateway.addRoute(rest);
+			// RestRoute rest = new RestRoute();
+			// rest.addAlias("/test", "test.send");
+			// gateway.addRoute(rest);
 			
 			// Static web content
-			StaticRoute www = new StaticRoute("/templates");
-			www.setEnableReloading(true);
-			gateway.addRoute(www);
+			StaticRoute route = new StaticRoute("/templates");
+			route.addAlias("/test", "test.send");
+			route.setEnableReloading(true);
+			gateway.addRoute(route);
 			
 			broker.createService(new Service("test") {
 
@@ -95,50 +95,6 @@ public class Sample {
 				};
 
 			});
-
-		} catch (Exception cause) {
-			cause.printStackTrace();
-		}
-	}
-
-	public static void main2(String[] args) {
-		System.out.println("START");
-		try {
-			ServiceBroker broker = ServiceBroker.builder().build();
-
-			NettyServer server = new NettyServer();
-			broker.createService(server);
-
-			ApiGateway gateway = new ApiGateway();
-			gateway.setDebug(true);
-			broker.createService(gateway);
-
-			// REST services
-			RestRoute rest = new RestRoute();
-			rest.addAlias("/test", "test.send");
-			gateway.addRoute(rest);
-			
-			// Static web content
-			StaticRoute www = new StaticRoute("/templates");
-			www.setEnableReloading(true);
-			gateway.addRoute(www);
-
-			broker.createService(new Service("test") {
-
-				@SuppressWarnings("unused")
-				public Action send = ctx -> {
-
-					Tree packet = new Tree();
-					packet.put("path", "/ws/test");
-					packet.put("data", 123);
-
-					ctx.broadcast("websocket.send", packet);
-
-					return "Data submitted!";
-				};
-
-			});
-			broker.start();
 
 		} catch (Exception cause) {
 			cause.printStackTrace();

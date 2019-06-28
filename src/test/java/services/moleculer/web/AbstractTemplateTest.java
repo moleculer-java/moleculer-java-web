@@ -301,7 +301,8 @@ public abstract class AbstractTemplateTest extends TestCase {
 		
 		String time = rsp.getLastHeader("Response-Time").getValue();
 		assertTrue(time.contains("ms"));
-		assertTrue(Integer.parseInt(time.substring(0, time.length() - 2)) > 0);
+		System.out.println(time);
+		assertTrue(Integer.parseInt(time.substring(0, time.length() - 2)) >= 0);
 	}
 
 	private final void get(String path, Integer requiredCode, String requiredType, String requiredText)

@@ -1,9 +1,11 @@
 <html>
-	<head>
-    <script>
+	<head>	
+	<meta charset="UTF-8" />
+	<script src="websocket.js"></script> 
+	<script>
       var ws;
       window.addEventListener('load', function(event) {
-        ws = MoleculerWebsocket("/ws/mychannel", function(msg) {
+        ws = MoleculerWebsocket("/ws/test", function(msg) {
           console.log("Message received:", msg);
         });
         ws.connect();
@@ -14,7 +16,7 @@
           ws = null;
         }
       });
-    </script>
+	</script>
 	</head>
 	<body>
 		<h1>header</h1>
