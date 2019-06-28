@@ -17,7 +17,7 @@ buildscript {
 // --- JAVADOC ---
 
 javadoc {
-	failOnError = true
+	failOnError = false
 }
 
 // --- JACOCO ---
@@ -53,11 +53,17 @@ repositories {
 sourceSets {
 	main {
 		java {
-			srcDirs= ["src/main/java"]
+			srcDirs = ["src/main/java"]
 		}
 		resources {
-			srcDirs= ["src/test/java"]
+		    srcDirs = ["src/main/java"]
+		    includes = ["**/*.ico"]
 		}
+	}
+	test {
+	    resources {
+	        srcDirs = ["src/test/java"]
+	    }
 	}
 }
 
@@ -193,4 +199,11 @@ compileJava {
 		executable = 'java'
 		jvmArgs = ['-classpath', project.configurations.ecj.asPath, 'org.eclipse.jdt.internal.compiler.batch.Main', '-nowarn']
 	}
+}
+
+// --- JAR ---
+
+jar {
+    baseName = 'moleculer-web'
+    version =  '1.0.1'
 }

@@ -143,12 +143,14 @@ function MoleculerWebsocket(channel, handler, opts) {
 		if (opts.debug && console) {
 			console.log("WebSocket connection lost.");
 		}
-		if (opts.onreconnect) {
-			opts.onreconnect();
-		}
 		disconnect();
 		stopHeartbeatTimer();
-		connect();	
+		setTimeout(function() {
+			if (opts.onreconnect) {
+				opts.onreconnect();
+			}
+			connect();
+		}, 3000);	
 	}
 
 	return {
