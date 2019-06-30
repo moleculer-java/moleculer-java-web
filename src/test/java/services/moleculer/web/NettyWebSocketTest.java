@@ -122,6 +122,7 @@ public class NettyWebSocketTest extends TestCase {
 		URL url = new URL("http://localhost:3000/test");
 		HttpURLConnection c = (HttpURLConnection) url.openConnection();
 		assertEquals(200, c.getResponseCode());		
+		Thread.sleep(500);
 		assertEquals("123", msg);
 	}
 
