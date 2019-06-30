@@ -33,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import services.moleculer.ServiceBroker;
 import services.moleculer.web.WebSocketRegistry;
 import services.moleculer.web.common.Endpoint;
@@ -62,8 +63,7 @@ public class NettyWebSocketRegistry extends WebSocketRegistry {
 
 			@Override
 			public final void send(String message) {
-				ctx.write(message);
-				ctx.flush();
+				ctx.writeAndFlush(new TextWebSocketFrame(message));
 			}
 
 			@Override
