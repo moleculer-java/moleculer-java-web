@@ -129,6 +129,11 @@ dependencies {
 
 	// https://mvnrepository.com/artifact/org.atmosphere/atmosphere-runtime
 	compile group: 'org.atmosphere', name: 'atmosphere-runtime', version: '2.5.3'
+
+	// --- WEBSOCKET API (CLIENT FOR TESTING) ---
+		
+	// https://mvnrepository.com/artifact/org.java-websocket/Java-WebSocket
+	compile group: 'org.java-websocket', name: 'Java-WebSocket', version: '1.4.0'
 	
 	// ========== ASYNC HTTP CLIENT ============
 	

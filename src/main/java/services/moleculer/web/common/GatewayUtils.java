@@ -201,11 +201,9 @@ public final class GatewayUtils implements HttpConstants {
 	public static final long getFileSize(String path) {
 		try {
 			URL url = getFileURL(path);
-			if (url != null) {
-				if ("file".equals(url.getProtocol())) {
-					File file = new File(new URI(url.toString()));
-					return file.length();
-				}
+			if (url != null && "file".equals(url.getProtocol())) {
+				File file = new File(new URI(url.toString()));
+				return file.length();
 			}
 		} catch (Exception ignored) {
 			logger.debug("Unable to get file size: " + path);

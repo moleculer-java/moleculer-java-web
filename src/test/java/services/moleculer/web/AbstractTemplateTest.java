@@ -45,11 +45,13 @@ import services.moleculer.web.middleware.BasicAuthenticator;
 import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.middleware.Favicon;
 import services.moleculer.web.middleware.NotFound;
+import services.moleculer.web.middleware.RateLimiter;
 import services.moleculer.web.middleware.Redirector;
 import services.moleculer.web.middleware.RequestLogger;
 import services.moleculer.web.middleware.ResponseDeflater;
 import services.moleculer.web.middleware.ResponseHeaders;
 import services.moleculer.web.middleware.ResponseTime;
+import services.moleculer.web.middleware.ResponseTimeout;
 import services.moleculer.web.middleware.ServeStatic;
 import services.moleculer.web.middleware.SessionCookie;
 import services.moleculer.web.router.Alias;
@@ -100,7 +102,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 			public Action add = ctx -> {
 				int c = ctx.params.get("a", 0) + ctx.params.get("b", 0);
 				if (c == -1) {
-					Thread.sleep(1000);
+					Thread.sleep(2000);
 				}
 				ctx.params.put("c", c);
 				return ctx.params;
@@ -121,6 +123,10 @@ public abstract class AbstractTemplateTest extends TestCase {
 		r0.use(new ResponseHeaders("Test-Header", "Test-Value"));
 		
 		r0.use(new ResponseTime("Response-Time"));
+		
+		r0.use(new RateLimiter(10, true));
+		
+		r0.use(new ResponseTimeout(700));
 		
 		gw.addRoute(r0);
 		
@@ -297,12 +303,34 @@ public abstract class AbstractTemplateTest extends TestCase {
 		assertTrue(txt.contains(","));
 		assertTrue(txt.contains("3"));
 		
+		// Custom response header test
 		assertEquals("Test-Value", rsp.getLastHeader("Test-Header").getValue());
 		
+		// Response time test
 		String time = rsp.getLastHeader("Response-Time").getValue();
 		assertTrue(time.contains("ms"));
-		System.out.println(time);
 		assertTrue(Integer.parseInt(time.substring(0, time.length() - 2)) >= 0);
+		
+		// Rate limiter test
+		Thread.sleep(1500);
+		for (int n = 9; n > -2; n--) { 
+			rsp = cl.execute(get, null).get();
+			int remaining = Integer.parseInt(rsp.getLastHeader("X-Rate-Limit-Remaining").getValue());
+			if (n < 0) {
+				assertEquals(0, remaining);
+				assertEquals("0", rsp.getLastHeader("Content-Length").getValue());
+				assertEquals(429, rsp.getStatusLine().getStatusCode());
+			} else {
+				assertEquals(n, remaining);
+			}
+		}
+		
+		// Response timeout
+		Thread.sleep(1500);
+		get = new HttpGet("http://localhost:3000/auth?a=2&b=-3");
+		get.setHeader("Authorization", secret);
+		rsp = cl.execute(get, null).get();
+		assertEquals(408, rsp.getStatusLine().getStatusCode());
 	}
 
 	private final void get(String path, Integer requiredCode, String requiredType, String requiredText)

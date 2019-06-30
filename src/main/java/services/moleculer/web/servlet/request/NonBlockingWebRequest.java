@@ -46,7 +46,7 @@ public class NonBlockingWebRequest extends AbstractWebRequest {
 	// --- CONSTRUCTOR ---
 
 	public NonBlockingWebRequest(ServiceBroker broker, AsyncContext async, HttpServletRequest req) throws IOException {
-		super(broker, req);
+		super(req);
 
 		// Create body stream
 		if (multipart) {

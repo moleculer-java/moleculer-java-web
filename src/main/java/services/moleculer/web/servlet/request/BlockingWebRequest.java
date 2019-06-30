@@ -45,7 +45,7 @@ public class BlockingWebRequest extends AbstractWebRequest {
 	// --- CONSTRUCTOR ---
 
 	public BlockingWebRequest(ServiceBroker broker, HttpServletRequest req) throws IOException {
-		super(broker, req);
+		super(req);
 
 		// Create body stream
 		if (multipart) {

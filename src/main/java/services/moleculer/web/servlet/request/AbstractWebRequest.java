@@ -33,7 +33,6 @@ import javax.servlet.http.HttpServletRequest;
 
 import org.synchronoss.cloud.nio.multipart.MultipartUtils;
 
-import services.moleculer.ServiceBroker;
 import services.moleculer.stream.PacketStream;
 import services.moleculer.web.WebRequest;
 
@@ -53,7 +52,7 @@ public abstract class AbstractWebRequest implements WebRequest {
 
 	// --- CONSTRUCTOR ---
 
-	protected AbstractWebRequest(ServiceBroker broker, HttpServletRequest req) throws IOException {
+	protected AbstractWebRequest(HttpServletRequest req) throws IOException {
 
 		// Store request
 		this.req = req;

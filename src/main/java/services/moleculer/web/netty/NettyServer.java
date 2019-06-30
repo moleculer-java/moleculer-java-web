@@ -267,16 +267,22 @@ public class NettyServer extends Service {
 					@Override
 					public void checkClientTrusted(X509Certificate[] x509Certificates, String s)
 							throws CertificateException {
+						
+						// Trust all certificates
 					}
 
 					@Override
 					public void checkServerTrusted(X509Certificate[] x509Certificates, String s)
 							throws CertificateException {
+						
+						// Trust all servers
 					}
 
 					@Override
 					public X509Certificate[] getAcceptedIssuers() {
 						return new X509Certificate[0];
+						
+						// Trust all issuers
 					}
 
 				} };

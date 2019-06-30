@@ -89,10 +89,8 @@ public class Route {
 	// --- REQUEST PROCESSOR ---
 
 	public Mapping findMapping(String httpMethod, String path) {
-		if (this.path != null && !this.path.isEmpty()) {
-			if (!path.startsWith(this.path)) {
-				return null;
-			}
+		if (this.path != null && !this.path.isEmpty() && !path.startsWith(this.path)) {
+			return null;
 		}
 		String shortPath = path.substring(this.path.length());
 		if (aliases != null && aliases.length > 0) {

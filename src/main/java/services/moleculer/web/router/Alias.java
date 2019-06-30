@@ -27,8 +27,6 @@ package services.moleculer.web.router;
 
 import static services.moleculer.util.CommonUtils.formatPath;
 
-import java.util.Objects;
-
 public class Alias {
 
 	// --- HTTP METHODS ---
@@ -57,19 +55,19 @@ public class Alias {
 	public Alias(String httpMethod, String pathPattern, String actionName) {
 		this.httpMethod = httpMethod.trim().toUpperCase();
 		this.pathPattern = formatPath(pathPattern);
-		actionName = actionName.trim().replace('/', '.');
-		while (actionName.startsWith(".")) {
-			actionName = actionName.substring(1);
+		String name = actionName.trim().replace('/', '.');
+		while (name.startsWith(".")) {
+			name = name.substring(1);
 		}
-		while (actionName.endsWith(".")) {
-			actionName = actionName.substring(0, actionName.length() - 1);
+		while (name.endsWith(".")) {
+			name = name.substring(0, name.length() - 1);
 		}
-		this.actionName = Objects.requireNonNull(actionName);
+		this.actionName = name;
 
 		// Generate hashcode
 		final int prime = 31;
 		int result = 1;
-		result = prime * result + actionName.hashCode();
+		result = prime * result + name.hashCode();
 		result = prime * result + httpMethod.hashCode();
 		result = prime * result + pathPattern.hashCode();
 		hashCode = result;
