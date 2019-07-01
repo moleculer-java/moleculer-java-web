@@ -17,6 +17,7 @@ buildscript {
 // --- JAVADOC ---
 
 javadoc {
+	options.encoding = 'UTF-8'
 	failOnError = false
 }
 
@@ -188,6 +189,54 @@ dependencies {
 	// https://mvnrepository.com/artifact/com.mitchellbosecke/pebble
 	compile group: 'com.mitchellbosecke', name: 'pebble', version: '2.4.0'
 
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+group = 'com.github.berkesa'
+
+version = '1.0.1'
+
+modifyPom {
+    project {
+        artifactId 'moleculer-java-jmx'
+        name 'Java API gateway service for Moleculer'
+        description 'Non-blocking J2EE and Netty connector with WebSocket and SSL support.'
+        url 'https://moleculer-java.github.io/moleculer-java-web/'
+        inceptionYear '2019'
+
+        scm {
+            url 'https://moleculer-java.github.io/moleculer-java-web/'
+            connection 'scm:https://github.com/moleculer-java/moleculer-java-web.git'
+            developerConnection 'scm:git://github.com/moleculer-java/moleculer-java-web.git'
+        }
+
+        licenses {
+            license {
+                name "The MIT License"
+                url "http://www.opensource.org/licenses/MIT"
+                distribution 'repo'
+            }
+        }
+        
+        dependencies {
+            dependency {
+                groupId 'com.github.berkesa'
+                artifactId 'moleculer-java'
+                version '1.1.0'
+                scope 'runtime'
+            }
+        }
+
+        developers {
+            developer {
+                id 'berkesa'
+                name 'Andras Berkes'
+                email 'andras.berkes@programmer.net'
+            }
+        }
+    }
 }
 
 nexus {

@@ -28,9 +28,11 @@ package services.moleculer.web;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
@@ -41,14 +43,14 @@ import services.moleculer.web.common.Endpoint;
 public abstract class WebSocketRegistry implements Runnable {
 
 	protected WebSocketFilter webSocketFilter;
-	
-	protected HashMap<String, HashSet<Endpoint>> registry = new HashMap<>();
+
+	protected HashMap<String, EndpointSet> registry = new HashMap<>(128);
 
 	protected final ReadLock readLock;
 	protected final WriteLock writeLock;
 
 	protected final ScheduledFuture<?> timer;
-	
+
 	public WebSocketRegistry(ServiceBroker broker, long cleanupSeconds) {
 		ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 		readLock = lock.readLock();
@@ -56,15 +58,15 @@ public abstract class WebSocketRegistry implements Runnable {
 		timer = broker.getConfig().getScheduler().scheduleAtFixedRate(this, cleanupSeconds, cleanupSeconds,
 				TimeUnit.SECONDS);
 	}
-	
+
 	public void stopped() {
 		if (timer != null && !timer.isCancelled()) {
 			timer.cancel(false);
 		}
 	}
-	
+
 	public void register(String path, Endpoint endpoint) {
-		HashSet<Endpoint> endpoints;
+		EndpointSet endpoints;
 		readLock.lock();
 		try {
 			endpoints = registry.get(path);
@@ -72,10 +74,10 @@ public abstract class WebSocketRegistry implements Runnable {
 			readLock.unlock();
 		}
 		if (endpoints == null) {
+			endpoints = new EndpointSet();
 			writeLock.lock();
 			try {
-				endpoints = new HashSet<Endpoint>();
-				HashSet<Endpoint> prev = registry.put(path, endpoints);
+				EndpointSet prev = registry.put(path, endpoints);
 				if (prev != null) {
 					endpoints = prev;
 				}
@@ -83,13 +85,11 @@ public abstract class WebSocketRegistry implements Runnable {
 				writeLock.unlock();
 			}
 		}
-		synchronized (endpoints) {
-			endpoints.add(endpoint);
-		}
+		endpoints.add(endpoint);
 	}
 
 	public void deregister(String path, Endpoint endpoint) {
-		HashSet<Endpoint> endpoints;
+		EndpointSet endpoints;
 		readLock.lock();
 		try {
 			endpoints = registry.get(path);
@@ -99,28 +99,23 @@ public abstract class WebSocketRegistry implements Runnable {
 		if (endpoints == null) {
 			return;
 		}
-		synchronized (endpoints) {
-			endpoints.remove(endpoint);
-		}
+		endpoints.remove(endpoint);
 	}
 
 	public void send(String path, String message) {
-		HashSet<Endpoint> endpoints;
+		EndpointSet endpoints;
 		readLock.lock();
 		try {
 			endpoints = registry.get(path);
 		} finally {
 			readLock.unlock();
 		}
-		if (endpoints == null || endpoints.isEmpty()) {
+		if (endpoints == null) {
 			return;
 		}
-		HashSet<Endpoint> snapshot;
-		synchronized (endpoints) {
-			if (endpoints.isEmpty()) {
-				return;
-			}
-			snapshot = new HashSet<>(endpoints);
+		Set<Endpoint> snapshot = endpoints.get();
+		if (snapshot == null) {
+			return;
 		}
 		for (Endpoint endpoint : snapshot) {
 			endpoint.send(message);
@@ -129,39 +124,23 @@ public abstract class WebSocketRegistry implements Runnable {
 
 	@Override
 	public void run() {
-		HashSet<String> emptyKeys = new HashSet<>();
-
 		readLock.lock();
 		try {
-			for (Map.Entry<String, HashSet<Endpoint>> entries : registry.entrySet()) {
-				HashSet<Endpoint> endpoints = entries.getValue();
-				synchronized (endpoints) {
-					Iterator<Endpoint> i = endpoints.iterator();
-					while (i.hasNext()) {
-						Endpoint endpoint = i.next();
-						if (!endpoint.isOpen()) {
-							i.remove();
-						}
-					}
-					if (endpoints.isEmpty()) {
-						emptyKeys.add(entries.getKey());
-					}
-				}
+			if (registry.isEmpty()) {
+				return;
+			}
+			for (EndpointSet endpoints : registry.values()) {
+				endpoints.cleanup();
 			}
 		} finally {
 			readLock.unlock();
 		}
-
-		if (emptyKeys.isEmpty()) {
-			return;
-		}
-
 		writeLock.lock();
 		try {
-			for (String key : emptyKeys) {
-				HashSet<Endpoint> endpoints = registry.get(key);
-				if (endpoints == null || endpoints.isEmpty()) {
-					registry.remove(key);
+			Iterator<EndpointSet> i = registry.values().iterator();
+			while (i.hasNext()) {
+				if (i.next().canRemove()) {
+					i.remove();
 				}
 			}
 		} finally {
@@ -172,5 +151,79 @@ public abstract class WebSocketRegistry implements Runnable {
 	public void setWebSocketFilter(WebSocketFilter webSocketFilter) {
 		this.webSocketFilter = webSocketFilter;
 	}
-	
+
+	private class EndpointSet {
+
+		private final AtomicBoolean empty = new AtomicBoolean();		
+		private final AtomicLong lastTouched = new AtomicLong(); 
+		
+		private final ReadLock endpointReadLock;
+		private final WriteLock endpointWriteLock;
+
+		private final HashSet<Endpoint> set = new HashSet<>(128);
+		
+		private EndpointSet() {
+			ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+			endpointReadLock = lock.readLock();
+			endpointWriteLock = lock.writeLock();
+		}
+
+		private Set<Endpoint> get() {
+			lastTouched.set(System.currentTimeMillis());			
+			endpointReadLock.lock();
+			try {
+				if (set.isEmpty()) {
+					return null;
+				}
+				return new HashSet<>(set);
+			} finally {
+				endpointReadLock.unlock();
+			}
+		}
+
+		private void add(Endpoint endpoint) {
+			lastTouched.set(System.currentTimeMillis());
+			empty.set(false);
+			endpointWriteLock.lock();
+			try {
+				set.add(endpoint);
+			} finally {
+				endpointWriteLock.unlock();
+			}
+		}
+
+		private void remove(Endpoint endpoint) {
+			lastTouched.set(System.currentTimeMillis());			
+			endpointWriteLock.lock();
+			try {
+				if (set.remove(endpoint)) {
+					empty.set(set.isEmpty());
+				}
+			} finally {
+				endpointWriteLock.unlock();
+			}
+		}
+
+		private boolean canRemove() {
+			long now = System.currentTimeMillis();
+			return empty.get() && now - lastTouched.get() > 60000;
+		}
+
+		private void cleanup() {
+			endpointWriteLock.lock();
+			try {
+				Iterator<Endpoint> i = set.iterator();
+				while (i.hasNext()) {
+					if (!i.next().isOpen()) {
+						i.remove();
+					}
+				}
+				empty.set(set.isEmpty());
+			} finally {
+				endpointWriteLock.unlock();
+			}
+		}
+
+	}
+
 }

@@ -214,11 +214,9 @@ public final class GatewayUtils implements HttpConstants {
 	public static final long getLastModifiedTime(String path) {
 		try {
 			URL url = getFileURL(path);
-			if (url != null) {
-				if ("file".equals(url.getProtocol())) {
-					File file = new File(new URI(url.toString()));
-					return file.lastModified();
-				}
+			if (url != null && "file".equals(url.getProtocol())) {
+				File file = new File(new URI(url.toString()));
+				return file.lastModified();
 			}
 		} catch (Exception ignored) {
 			logger.debug("Unable to get last modification time: " + path);
