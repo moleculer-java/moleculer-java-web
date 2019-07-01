@@ -182,8 +182,6 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 *
 	 * @param broker
 	 *            parent ServiceBroker
-	 * @param config
-	 *            optional configuration of the current component
 	 */
 	@Override
 	public void started(ServiceBroker broker) throws Exception {

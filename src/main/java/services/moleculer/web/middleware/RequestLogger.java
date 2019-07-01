@@ -277,15 +277,15 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 	// --- PROPERTY GETTERS AND SETTERS ---
 
 	/**
-	 * @return the maxPrintedBytes
+	 * @return the max number of printed bytes
 	 */
 	public int getMaxPrintedBytes() {
 		return maxPrintedBytes;
 	}
 
 	/**
-	 * @param maxPrintedBytes
-	 *            the maxPrintedBytes to set
+	 * @param maxDumpSize
+	 *            max number of printed bytes
 	 */
 	public void setMaxPrintedBytes(int maxDumpSize) {
 		this.maxPrintedBytes = maxDumpSize;

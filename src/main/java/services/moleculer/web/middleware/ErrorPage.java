@@ -68,7 +68,7 @@ public class ErrorPage extends HttpMiddleware implements HttpConstants {
 	protected String htmlTemplatePath;
 
 	/**
-	 * Optional status-specific templates (eg. 404 -> 404.html, 500 -> 500.html)
+	 * Optional status-specific templates (eg. 404 -&gt; 404.html, 500 -&gt; 500.html)
 	 */
 	protected HashMap<Integer, String> statusSpecificTemplates = new HashMap<>();
 
