@@ -200,7 +200,7 @@ version = '1.0.1'
 
 modifyPom {
     project {
-        artifactId 'moleculer-java-jmx'
+        artifactId 'moleculer-java-web'
         name 'Java API gateway service for Moleculer'
         description 'Non-blocking J2EE and Netty connector with WebSocket and SSL support.'
         url 'https://moleculer-java.github.io/moleculer-java-web/'
