@@ -24,6 +24,7 @@
 - Rate limiter
 - Before & after call hooks
 - Authorization
+- Integrated with server-side template engines (FreeMarker, Jade, Pebble, Thymeleaf, Mustache, DataTree)
 - And much more (favicon, custom error messages, session cookies, etc.)
 
 ## Download
