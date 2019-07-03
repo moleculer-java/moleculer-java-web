@@ -267,21 +267,21 @@ public class NettyServer extends Service {
 					@Override
 					public void checkClientTrusted(X509Certificate[] x509Certificates, String s)
 							throws CertificateException {
-						
+
 						// Trust all certificates
 					}
 
 					@Override
 					public void checkServerTrusted(X509Certificate[] x509Certificates, String s)
 							throws CertificateException {
-						
+
 						// Trust all servers
 					}
 
 					@Override
 					public X509Certificate[] getAcceptedIssuers() {
 						return new X509Certificate[0];
-						
+
 						// Trust all issuers
 					}
 
@@ -329,6 +329,102 @@ public class NettyServer extends Service {
 
 	public void setWebSocketCleanupSeconds(int webSocketCleanupSeconds) {
 		this.webSocketCleanupSeconds = webSocketCleanupSeconds;
+	}
+
+	public int getPort() {
+		return port;
+	}
+
+	public void setPort(int port) {
+		this.port = port;
+	}
+
+	public boolean isUseSSL() {
+		return useSSL;
+	}
+
+	public void setUseSSL(boolean useSSL) {
+		this.useSSL = useSSL;
+	}
+
+	public TrustManagerFactory getTrustManagerFactory() {
+		return trustManagerFactory;
+	}
+
+	public void setTrustManagerFactory(TrustManagerFactory trustManagerFactory) {
+		this.trustManagerFactory = trustManagerFactory;
+	}
+
+	public String getKeyStoreFilePath() {
+		return keyStoreFilePath;
+	}
+
+	public void setKeyStoreFilePath(String keyStoreFilePath) {
+		this.keyStoreFilePath = keyStoreFilePath;
+	}
+
+	public String getKeyStorePassword() {
+		return keyStorePassword;
+	}
+
+	public void setKeyStorePassword(String keyStorePassword) {
+		this.keyStorePassword = keyStorePassword;
+	}
+
+	public String getKeyStoreType() {
+		return keyStoreType;
+	}
+
+	public void setKeyStoreType(String keyStoreType) {
+		this.keyStoreType = keyStoreType;
+	}
+
+	public String getKeyCertChainFilePath() {
+		return keyCertChainFilePath;
+	}
+
+	public void setKeyCertChainFilePath(String keyCertChainFilePath) {
+		this.keyCertChainFilePath = keyCertChainFilePath;
+	}
+
+	public String getKeyFilePath() {
+		return keyFilePath;
+	}
+
+	public void setKeyFilePath(String keyFilePath) {
+		this.keyFilePath = keyFilePath;
+	}
+
+	public boolean isOpenSslSessionCacheEnabled() {
+		return openSslSessionCacheEnabled;
+	}
+
+	public void setOpenSslSessionCacheEnabled(boolean openSslSessionCacheEnabled) {
+		this.openSslSessionCacheEnabled = openSslSessionCacheEnabled;
+	}
+
+	public String getAddress() {
+		return address;
+	}
+
+	public void setAddress(String address) {
+		this.address = address;
+	}
+
+	public EventLoopGroup getSingletonGroup() {
+		return singletonGroup;
+	}
+
+	public void setSingletonGroup(EventLoopGroup singletonGroup) {
+		this.singletonGroup = singletonGroup;
+	}
+
+	public ChannelHandler getHandler() {
+		return handler;
+	}
+
+	public void setHandler(ChannelHandler handler) {
+		this.handler = handler;
 	}
 
 }
