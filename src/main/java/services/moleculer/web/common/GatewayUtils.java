@@ -192,6 +192,11 @@ public final class GatewayUtils implements HttpConstants {
 
 	public static final boolean isReadable(String path) {
 		try {
+			URL url = getFileURL(path);
+			if (url != null && "file".equals(url.getProtocol())) {
+				File file = new File(new URI(url.toString()));
+				return file.isFile() && file.canRead();
+			}
 			return getFileURL(path) != null;
 		} catch (Exception ignored) {
 		}

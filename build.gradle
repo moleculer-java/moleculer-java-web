@@ -196,7 +196,8 @@ targetCompatibility = 1.8
 
 group = 'com.github.berkesa'
 
-version = '1.0.1'
+// version = '1.0.2-SNAPSHOT'
+version = '1.0.2'
 
 modifyPom {
     project {
@@ -225,6 +226,30 @@ modifyPom {
                 groupId 'com.github.berkesa'
                 artifactId 'moleculer-java'
                 version '1.1.0'
+                scope 'runtime'
+            }
+            dependency {
+                groupId 'org.synchronoss.cloud'
+                artifactId 'nio-multipart-parser'
+                version '1.1.0'
+                scope 'runtime'
+            }
+            dependency {
+                groupId 'io.netty'
+                artifactId 'netty-handler'
+                version '4.1.36.Final'
+                scope 'runtime'
+            }
+            dependency {
+                groupId 'io.netty'
+                artifactId 'netty-codec-http'
+                version '4.1.36.Final'
+                scope 'runtime'
+            }
+            dependency {
+                groupId 'org.atmosphere'
+                artifactId 'atmosphere-runtime'
+                version '2.5.3'
                 scope 'runtime'
             }
         }
@@ -259,5 +284,5 @@ compileJava {
 
 jar {
     baseName = 'moleculer-web'
-    version =  '1.0.1'
+    version =  '1.0.2'
 }

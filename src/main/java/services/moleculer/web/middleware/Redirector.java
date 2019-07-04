@@ -57,7 +57,7 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 	/**
 	 * Path to redirect (formatted and checked).
 	 */
-	protected String formattedPath;
+	protected String formattedPath = "";
 	
 	/**
 	 * URL of the redirection.
@@ -132,23 +132,24 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 				try {
 
 					// Check path
-					if (formattedPath != null && !formattedPath.equals(req.getPath())) {
-						next.service(req, rsp);
+					String p = req.getPath();
+					if ((formattedPath.isEmpty() && "/".equals(p)) || formattedPath.equals(p)) {
+						
+						// Create HTML body
+						String body = htmlTemplate.replace("{location}", location);
+						byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+
+						// Send status code and "Location" header
+						rsp.setStatus(status);
+						rsp.setHeader(LOCATION, location);
+						rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_HTML);
+						rsp.setHeader(CONTENT_LENGTH, Integer.toString(bytes.length));
+						
+						// Send HTML body
+						rsp.send(bytes);
 						return;
 					}
-					
-					// Create HTML body
-					String body = htmlTemplate.replace("{location}", location);
-					byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-
-					// Send status code and "Location" header
-					rsp.setStatus(status);
-					rsp.setHeader(LOCATION, location);
-					rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_HTML);
-					rsp.setHeader(CONTENT_LENGTH, Integer.toString(bytes.length));
-					
-					// Send HTML body
-					rsp.send(bytes);
+					next.service(req, rsp);
 					
 				} finally {
 					rsp.end();
@@ -217,11 +218,7 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 	 */
 	public void setPath(String path) {
 		this.path = path;
-		if (path.isEmpty()) {
-			formattedPath = "/";
-		} else {
-			formattedPath = formatPath(path);			
-		}
+		this.formattedPath = formatPath(path);
 	}
 
 }
