@@ -67,8 +67,9 @@ public class AsyncMoleculerServlet extends AbstractMoleculerServlet {
 
 	@Override
 	public void service(ServletRequest request, ServletResponse response) throws ServletException, IOException {
-		final HttpServletRequest req = (HttpServletRequest) request;
-		final HttpServletResponse rsp = (HttpServletResponse) response;
+		HttpServletRequest req = (HttpServletRequest) request;
+		HttpServletResponse rsp = (HttpServletResponse) response;
+		AsyncContext async = null;
 		try {
 
 			// WebSocket handling
@@ -78,39 +79,25 @@ public class AsyncMoleculerServlet extends AbstractMoleculerServlet {
 			}
 
 			// Start async
-			AsyncContext async = request.startAsync(request, response);
+			async = request.startAsync(request, response);
 
 			// Process request
-			executor.execute(() -> {
-				try {
-					gateway.service(new NonBlockingWebRequest(broker, async, req),
-							new NonBlockingWebResponse(async, rsp));
-				} catch (Throwable cause) {
-					handleError(rsp, cause, async);
-				}
-			});
+			gateway.service(new NonBlockingWebRequest(broker, async, req), new NonBlockingWebResponse(async, rsp));
 
 		} catch (Throwable cause) {
-
-			// Fatal error
-			handleError(rsp, cause, null);
-		}
-	}
-
-	// --- CLOSE REQUEST WITH ERROR ---
-
-	protected void handleError(HttpServletResponse rsp, Throwable cause, AsyncContext async) {
-		try {
-			if (gateway == null) {
-				rsp.sendError(404);
-			} else {
-				rsp.sendError(500);
-				getServletContext().log("Unable to process request!", cause);
-			}
-		} catch (Throwable ignored) {
-		} finally {
-			if (async != null) {
-				async.complete();
+			try {
+				if (gateway == null) {
+					rsp.sendError(404);
+					logError("APIGateway Moleculer Service not found!", cause);
+				} else {
+					rsp.sendError(500);
+					logError("Unable to process request!", cause);
+				}
+			} catch (Throwable ignored) {
+			} finally {
+				if (async != null) {
+					async.complete();
+				}
 			}
 		}
 	}

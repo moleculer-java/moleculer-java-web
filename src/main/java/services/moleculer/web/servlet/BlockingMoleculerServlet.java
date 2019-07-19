@@ -42,7 +42,7 @@ import services.moleculer.web.servlet.websocket.ServletWebSocketRegistry;
 /**
  * Old type (blocking) Servlet. Can be used for REST services and file
  * servicing. It can be used in the same way with every Middleware as with
- * non-blocking Moleculer servlet.
+ * non-blocking Moleculer servlet. BlockingMoleculerServlet supports WebSockets.
  */
 public class BlockingMoleculerServlet extends AbstractMoleculerServlet {
 
@@ -77,8 +77,8 @@ public class BlockingMoleculerServlet extends AbstractMoleculerServlet {
 
 	@Override
 	public void service(ServletRequest request, ServletResponse response) throws ServletException, IOException {
-		final HttpServletRequest req = (HttpServletRequest) request;
-		final HttpServletResponse rsp = (HttpServletResponse) response;
+		HttpServletRequest req = (HttpServletRequest) request;
+		HttpServletResponse rsp = (HttpServletResponse) response;
 		try {
 
 			// WebSocket handling
@@ -95,16 +95,17 @@ public class BlockingMoleculerServlet extends AbstractMoleculerServlet {
 		} catch (TimeoutException timeout) {
 			try {
 				rsp.sendError(408);
-				getServletContext().log("Unexpected timeout exception occured!", timeout);
+				logError("Unexpected timeout exception occured!", timeout);
 			} catch (Throwable ignored) {
 			}
 		} catch (Throwable cause) {
 			try {
 				if (gateway == null) {
 					rsp.sendError(404);
+					logError("APIGateway Moleculer Service not found!", cause);
 				} else {
 					rsp.sendError(500);
-					getServletContext().log("Unable to process request!", cause);
+					logError("Unable to process request!", cause);
 				}
 			} catch (Throwable ignored) {
 			}

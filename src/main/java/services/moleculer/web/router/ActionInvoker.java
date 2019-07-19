@@ -30,6 +30,7 @@ import static services.moleculer.web.common.GatewayUtils.sendError;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -78,12 +79,13 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 	protected final Route route;
 	protected final CallProcessor beforeCall;
 	protected final CallProcessor afterCall;
+	protected final ExecutorService executor;
 
 	// --- CONSTRUCTOR ---
 
 	public ActionInvoker(String actionName, String pathPattern, boolean isStatic, String pathPrefix, int[] indexes,
 			String[] names, Options opts, ServiceInvoker serviceInvoker, AbstractTemplateEngine templateEngine,
-			Route route, CallProcessor beforeCall, CallProcessor afterCall) {
+			Route route, CallProcessor beforeCall, CallProcessor afterCall, ExecutorService executor) {
 		this.actionName = actionName;
 		this.pathPattern = pathPattern;
 		this.isStatic = isStatic;
@@ -97,6 +99,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		this.route = route;
 		this.beforeCall = beforeCall;
 		this.afterCall = afterCall;
+		this.executor = executor;
 	}
 
 	// --- PROCESS (SERVLET OR NETTY) HTTP REQUEST ---
@@ -140,23 +143,25 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 			}
 		}
 
-		// Custom "before call" processor
-		// (eg. copy HTTP headers into the "params" variable)
-		if (params == null) {
-			params = new Tree();
-		}
-		if (beforeCall != null) {
-			beforeCall.onCall(route, req, rsp, params);			
-		}
+		// Create not-null, final input structure
+		final Tree in = params == null ? new Tree() : params;
 
 		// Multipart request
 		if (req.isMultipart()) {
+			executor.execute(() -> {
+				
+				// Custom "before call" processor
+				// (eg. copy HTTP headers into the "params" variable)
+				if (beforeCall != null) {
+					beforeCall.onCall(route, req, rsp, in);
+				}
 
-			// Invoke service
-			serviceInvoker.call(actionName, params, opts, req.getBody(), null).then(out -> {
-				sendResponse(req, rsp, out);
-			}).catchError(cause -> {
-				sendError(rsp, cause);
+				// Invoke service
+				serviceInvoker.call(actionName, in, opts, req.getBody(), null).then(out -> {
+					sendResponse(req, rsp, out);
+				}).catchError(cause -> {
+					sendError(rsp, cause);
+				});
 			});
 			return;
 
@@ -165,13 +170,21 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		// GET without body
 		int contentLength = req.getContentLength();
 		if (contentLength == 0) {
+			executor.execute(() -> {
+				
+				// Custom "before call" processor
+				// (eg. copy HTTP headers into the "params" variable)
+				if (beforeCall != null) {
+					beforeCall.onCall(route, req, rsp, in);
+				}
 
-			// Invoke service
-			serviceInvoker.call(actionName, params, opts, null, null).then(out -> {
-				sendResponse(req, rsp, out);
-			}).catchError(cause -> {
-				logger.error("Unable to invoke action!", cause);
-				sendError(rsp, cause);
+				// Invoke service
+				serviceInvoker.call(actionName, in, opts, null, null).then(out -> {
+					sendResponse(req, rsp, out);
+				}).catchError(cause -> {
+					logger.error("Unable to invoke action!", cause);
+					sendError(rsp, cause);
+				});
 			});
 			return;
 		}
@@ -198,13 +211,21 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				if (urlParams != null) {
 					postParams.copyFrom(urlParams, true);
 				}
+				executor.execute(() -> {
+					
+					// Custom "before call" processor
+					// (eg. copy HTTP headers into the "params" variable)
+					if (beforeCall != null) {
+						beforeCall.onCall(route, req, rsp, in);
+					}
 
-				// Invoke service
-				serviceInvoker.call(actionName, postParams, opts, null, null).then(out -> {
-					sendResponse(req, rsp, out);
-				}).catchError(err -> {
-					logger.error("Unable to invoke action!", err);
-					sendError(rsp, err);
+					// Invoke service
+					serviceInvoker.call(actionName, postParams, opts, null, null).then(out -> {
+						sendResponse(req, rsp, out);
+					}).catchError(err -> {
+						logger.error("Unable to invoke action!", err);
+						sendError(rsp, err);
+					});
 				});
 			}
 		});
@@ -256,7 +277,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		if (afterCall != null) {
 			afterCall.onCall(route, req, rsp, data);
 		}
-		
+
 		// Disable cache
 		rsp.setHeader(CACHE_CONTROL, NO_CACHE);
 		if (data == null) {
@@ -382,5 +403,5 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 			}
 		}
 	}
-	
+
 }

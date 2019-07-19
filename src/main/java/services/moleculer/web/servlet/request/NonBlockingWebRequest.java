@@ -109,8 +109,7 @@ public class NonBlockingWebRequest extends AbstractWebRequest {
 
 			@Override
 			public final void onError(AsyncEvent event) throws IOException {
-				
-				// Do nothing
+				parser.close();
 			}
 
 			@Override

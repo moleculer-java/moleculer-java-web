@@ -31,11 +31,10 @@ import java.io.File;
 import java.lang.reflect.Method;
 import java.util.Enumeration;
 import java.util.LinkedList;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.servlet.ServletConfig;
+import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 
@@ -44,7 +43,6 @@ import org.springframework.context.support.ClassPathXmlApplicationContext;
 import org.springframework.context.support.FileSystemXmlApplicationContext;
 
 import services.moleculer.ServiceBroker;
-import services.moleculer.config.ServiceBrokerConfig;
 import services.moleculer.web.ApiGateway;
 import services.moleculer.web.servlet.websocket.ServletWebSocketRegistry;
 
@@ -62,15 +60,13 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 
 	protected ServiceBroker broker;
 	protected ApiGateway gateway;
-	protected ExecutorService executor;
-	protected ScheduledExecutorService scheduler;
-	
+
 	// --- WEBSOCKET REGISTRY ---
 
 	protected ServletWebSocketRegistry webSocketRegistry;
 
 	protected int webSocketCleanupSeconds = 15;
-	
+
 	// --- INIT / START ---
 
 	@Override
@@ -118,7 +114,7 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 				// Load app with Spring Boot
 				ctx = (ConfigurableApplicationContext) m.invoke(null, in);
 				context.set(ctx);
-				
+
 			} else {
 
 				// Start by using Spring XML config
@@ -144,16 +140,29 @@ public abstract class AbstractMoleculerServlet extends HttpServlet {
 			if (gateway == null) {
 				throw new ServletException("ApiGateway Service not defined!");
 			}
-			
-			// Get executor and scheduler
-			ServiceBrokerConfig cfg = broker.getConfig();
-			executor = cfg.getExecutor();
-			scheduler = cfg.getScheduler();
-			
+
 		} catch (ServletException servletException) {
 			throw servletException;
 		} catch (Exception fatal) {
 			throw new ServletException("Unable to load Moleculer Application!", fatal);
+		}
+	}
+
+	// --- LOG ERROR ---
+
+	protected void logError(String message, Throwable cause) {
+		if (broker != null) {
+			broker.getLogger(AbstractMoleculerServlet.class).error(message, cause);
+			return;
+		}
+		ServletContext ctx = getServletContext();
+		if (ctx != null) {
+			ctx.log(message, cause);
+			return;
+		}
+		System.err.println(message);
+		if (cause != null) {
+			cause.printStackTrace();
 		}
 	}
 

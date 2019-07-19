@@ -30,9 +30,11 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 
 import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
+import services.moleculer.config.ServiceBrokerConfig;
 import services.moleculer.context.CallOptions;
 import services.moleculer.service.ServiceInvoker;
 import services.moleculer.web.CallProcessor;
@@ -130,9 +132,11 @@ public class Mapping implements RequestProcessor, HttpConstants {
 		}
 
 		// Set first RequestProcessor in the WebMiddleware chain
-		ServiceInvoker serviceInvoker = broker.getConfig().getServiceInvoker();
+		ServiceBrokerConfig cfg = broker.getConfig();
+		ServiceInvoker serviceInvoker = cfg.getServiceInvoker();
+		ExecutorService executor = cfg.getExecutor();
 		lastProcessor = new ActionInvoker(actionName, pathPattern, isStatic, pathPrefix, indexes, names, opts,
-				serviceInvoker, templateEngine, route, beforeCall, afterCall);
+				serviceInvoker, templateEngine, route, beforeCall, afterCall, executor);
 	}
 
 	// --- MATCH TEST ---

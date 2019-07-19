@@ -27,8 +27,6 @@ package services.moleculer.web.netty;
 
 import static services.moleculer.web.common.GatewayUtils.sendError;
 
-import java.util.concurrent.ExecutorService;
-
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
@@ -60,7 +58,6 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 
 	protected final ApiGateway gateway;
 	protected final ServiceBroker broker;
-	protected final ExecutorService executor;
 
 	// --- PROCESSING VARIABLES ---
 
@@ -79,7 +76,6 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 		this.gateway = gateway;
 		this.broker = broker;
 		this.webSocketRegistry = nettyWebSocketRegistry;
-		this.executor = broker.getConfig().getExecutor();
 	}
 
 	// --- PROCESS INCOMING HTTP REQUEST ---
@@ -135,16 +131,8 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 					return;
 				}
 
-				// Normal HTTP message
-				executor.execute(() -> {
-					try {
-						req = new NettyWebRequest(ctx, httpRequest, httpHeaders, broker, path);
-						gateway.service(req, new NettyWebResponse(ctx, req));
-					} catch (Throwable cause) {
-						sendError(new NettyWebResponse(ctx, req), cause);
-						broker.getLogger(MoleculerHandler.class).error("Unable to process request!", cause);
-					}
-				});
+				req = new NettyWebRequest(ctx, httpRequest, httpHeaders, broker, path);
+				gateway.service(req, new NettyWebResponse(ctx, req));
 				return;
 			}
 
@@ -164,22 +152,14 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 				byteBuffer.readBytes(data);
 
 				// Push data into the stream
-				final byte[] packet = data;
-				executor.execute(() -> {
-					try {
-						if (req.parser == null) {
-							req.stream.sendData(packet);
-							if (request instanceof LastHttpContent) {
-								req.stream.sendClose();
-							}
-						} else {
-							req.parser.write(packet);
-						}
-					} catch (Throwable cause) {
-						sendError(new NettyWebResponse(ctx, req), cause);
-						broker.getLogger(MoleculerHandler.class).error("Unable to process request!", cause);
+				if (req.parser == null) {
+					req.stream.sendData(data);
+					if (request instanceof LastHttpContent) {
+						req.stream.sendClose();
 					}
-				});
+				} else {
+					req.parser.write(data);
+				}
 				return;
 			}
 
@@ -193,7 +173,7 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 
 					// Ignore I/O exception
 				} finally {
-					
+
 					// Deregister
 					webSocketRegistry.deregister(path, ctx);
 				}
@@ -227,13 +207,19 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 			}
 
 			// --- UNKOWN MESSAGES ---
-			
+
 			// Unknown package type
 			throw new IllegalStateException("Unknown package type: " + request);
 
 		} catch (Throwable cause) {
 			sendError(new NettyWebResponse(ctx, req), cause);
-			broker.getLogger(MoleculerHandler.class).error("Unable to process request!", cause);
+			if (broker == null) {
+				if (cause != null) {
+					cause.printStackTrace();
+				}
+			} else {
+				broker.getLogger(MoleculerHandler.class).error("Unable to process request!", cause);
+			}
 		}
 	}
 
