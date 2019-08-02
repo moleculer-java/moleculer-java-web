@@ -36,7 +36,7 @@
 	<dependency>
 		<groupId>com.github.berkesa</groupId>
 		<artifactId>moleculer-java-web</artifactId>
-		<version>1.0.3</version>
+		<version>1.0.4</version>
 		<scope>runtime</scope>
 	</dependency>
 </dependencies>
@@ -46,7 +46,7 @@
 
 ```gradle
 dependencies {
-	compile group: 'com.github.berkesa', name: 'moleculer-java-web', version: '1.0.3' 
+	compile group: 'com.github.berkesa', name: 'moleculer-java-web', version: '1.0.4' 
 }
 ```
 

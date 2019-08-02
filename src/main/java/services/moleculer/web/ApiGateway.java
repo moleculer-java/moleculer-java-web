@@ -164,7 +164,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 		}
 		webSocketRegistry.send(path, msg);
 	};
-	
+
 	// --- CONSTRUCTOR ---
 
 	public ApiGateway() {
@@ -647,10 +647,10 @@ public class ApiGateway extends Service implements RequestProcessor {
 		// Set Template Engine
 		this.templateEngine = templateEngine;
 
-		// Already started?
-		if (broker != null) {
+		// Set Template Engine int Routes
+		if (templateEngine != null) {
 			for (Route route : routes) {
-				if (templateEngine == null || route.getTemplateEngine() == null) {
+				if (route.getTemplateEngine() == null) {
 					route.setTemplateEngine(templateEngine);
 				}
 			}
@@ -702,7 +702,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	public void setWebSocketRegistry(WebSocketRegistry webSocketRegistry) {
 		this.webSocketRegistry = Objects.requireNonNull(webSocketRegistry);
 		if (webSocketFilter != null) {
-			this.webSocketRegistry.setWebSocketFilter(webSocketFilter);	
+			this.webSocketRegistry.setWebSocketFilter(webSocketFilter);
 		}
 	}
 

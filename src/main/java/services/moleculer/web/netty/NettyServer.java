@@ -119,6 +119,8 @@ public class NettyServer extends Service {
 
 	// --- INIT GATEWAY ---
 
+	private final Object gatewayLock = new Object();
+	
 	@Subscribe("$services.changed")
 	public Listener evt = payload -> {
 		if (gateway == null) {
@@ -130,7 +132,10 @@ public class NettyServer extends Service {
 						webSocketRegistry = new NettyWebSocketRegistry(broker, webSocketCleanupSeconds);
 					}
 					gateway.setWebSocketRegistry(webSocketRegistry);
-					logger.info("ApiGateway connected to Netty Server.");
+					logger.info("ApiGateway connected to Netty Server.");				
+					synchronized (gatewayLock) {
+						gatewayLock.notifyAll();
+					}
 				}
 			}
 		}
@@ -173,6 +178,11 @@ public class NettyServer extends Service {
 						p.addLast("ssl", createSslHandler(ch));
 					}
 					p.addLast("decoder", new HttpRequestDecoder());
+					while (gateway == null) {
+						synchronized (gatewayLock) {
+							gatewayLock.wait(200);
+						}
+					}
 					p.addLast("handler", new MoleculerHandler(gateway, broker, webSocketRegistry));
 				}
 
