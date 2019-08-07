@@ -151,9 +151,12 @@ public class ApiGateway extends Service implements RequestProcessor {
 			return;
 		}
 		String path = payload.get("path", "");
-		if (path == null) {
+		if (path == null || path.isEmpty()) {
 			logger.warn("Invalid websocket packet, the \"path\" parameter is required: " + payload);
 			return;
+		}
+		if (path.charAt(0) != '/') {
+			path = '/' + path;
 		}
 		Tree data = payload.get("data");
 		String msg;
@@ -647,7 +650,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 		// Set Template Engine
 		this.templateEngine = templateEngine;
 
-		// Set Template Engine int Routes
+		// Set Template Engine in Routes
 		if (templateEngine != null) {
 			for (Route route : routes) {
 				if (route.getTemplateEngine() == null) {
@@ -666,10 +669,10 @@ public class ApiGateway extends Service implements RequestProcessor {
 		// Set method
 		this.beforeCall = beforeCall;
 
-		// Already started?
-		if (broker != null) {
+		// Set "beforeCall" processor in Routes
+		if (beforeCall != null) {
 			for (Route route : routes) {
-				if (beforeCall == null || route.getBeforeCall() == null) {
+				if (route.getBeforeCall() == null) {
 					route.setBeforeCall(beforeCall);
 				}
 			}
@@ -685,10 +688,10 @@ public class ApiGateway extends Service implements RequestProcessor {
 		// Set method
 		this.afterCall = afterCall;
 
-		// Already started?
-		if (broker != null) {
+		// Set "afterCall" processor in Routes
+		if (afterCall != null) {
 			for (Route route : routes) {
-				if (afterCall == null || route.getAfterCall() == null) {
+				if (route.getAfterCall() == null) {
 					route.setAfterCall(afterCall);
 				}
 			}

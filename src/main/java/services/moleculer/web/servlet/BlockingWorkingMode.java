@@ -23,50 +23,38 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package services.moleculer.web.servlet.response;
+package services.moleculer.web.servlet;
 
-import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-public class BlockingWebResponse extends AbstractWebResponse {
+import services.moleculer.web.servlet.request.BlockingWebRequest;
+import services.moleculer.web.servlet.response.BlockingWebResponse;
 
-	// --- CONSTRUCTOR ---
+public class BlockingWorkingMode extends WorkingMode {
 
-	public BlockingWebResponse(HttpServletResponse rsp) throws IOException {
-		super(rsp);
+	public BlockingWorkingMode(MoleculerServlet servlet) {
+		super(servlet);
 	}
-
-	// --- THREAD BLOCKER ---
-
-	public void waitFor(long timeout) throws TimeoutException, InterruptedException {
-		synchronized (closed) {
-			if (!closed.get()) {
-				closed.wait(timeout);
-			}
-			if (!closed.get()) {
-				throw new TimeoutException("Request timeouted (" + timeout + "msec)!");
-			}
-		}
-	}
-
-	// --- END PROCESSING ---
 	
-	/**
-	 * Completes the synchronous operation that was started on the request.
-	 * 
-	 * @return return true, if any resources are released
-	 */
 	@Override
-	public boolean end() {
-		if (super.end()) {
-			synchronized (closed) {
-				closed.notifyAll();
+	public void service(HttpServletRequest request, HttpServletResponse response) throws Exception {
+		try {
+
+			// Blocking service
+			BlockingWebResponse bwr = new BlockingWebResponse(response);
+			servlet.gateway.service(new BlockingWebRequest(servlet.broker, request), bwr);
+			bwr.waitFor(servlet.timeout);
+
+		} catch (TimeoutException timeout) {
+			try {
+				response.sendError(408);
+				servlet.logError("Unexpected timeout exception occured!", timeout);
+			} catch (Throwable ignored) {
 			}
-			return true;
 		}
-		return false;
 	}
 
 }

@@ -31,7 +31,8 @@ import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 
-import services.moleculer.web.servlet.BlockingMoleculerServlet;
+import services.moleculer.web.servlet.BlockingWorkingMode;
+import services.moleculer.web.servlet.MoleculerServlet;
 
 public class BlockingServletTest extends AbstractTemplateTest {
 
@@ -54,7 +55,8 @@ public class BlockingServletTest extends AbstractTemplateTest {
 		publicContext.setContextPath("/");
 		
 		// Create blocking servlet
-		BlockingMoleculerServlet sc = new BlockingMoleculerServlet();
+		MoleculerServlet sc = new MoleculerServlet();
+		sc.setWorkingMode(new BlockingWorkingMode(sc));
 		ServletHolder sh = new ServletHolder(sc);
 		sh.setInitParameter("moleculer.config", "/services/moleculer/web/moleculer.config.xml");
 		publicContext.addServlet(sh, "/*");

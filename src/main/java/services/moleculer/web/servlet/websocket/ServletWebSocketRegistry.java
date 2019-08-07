@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Vector;
 
 import javax.servlet.ServletConfig;
@@ -37,11 +38,14 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.atmosphere.container.NettyCometSupport;
+import org.atmosphere.cpr.AsyncSupport;
 import org.atmosphere.cpr.AtmosphereFramework;
 import org.atmosphere.cpr.AtmosphereRequest;
 import org.atmosphere.cpr.AtmosphereRequestImpl;
 import org.atmosphere.cpr.AtmosphereResource;
 import org.atmosphere.cpr.AtmosphereResponseImpl;
+import org.atmosphere.cpr.DefaultAsyncSupportResolver;
 import org.atmosphere.util.ExecutorsFactory;
 import org.atmosphere.websocket.WebSocket;
 import org.atmosphere.websocket.WebSocketHandler;
@@ -66,28 +70,40 @@ public class ServletWebSocketRegistry extends WebSocketRegistry implements WebSo
 
 	protected AtmosphereFramework atmosphere = new AtmosphereFramework(false, false);
 
+	protected final String contextPath;
+	protected final int contextPathLength;
+
 	// --- CONSTRUCTOR ---
 
-	public ServletWebSocketRegistry(ServletConfig config, ServiceBroker broker, long cleanupSeconds, boolean async)
+	public ServletWebSocketRegistry(ServletConfig config, ServiceBroker broker, long cleanupSeconds)
 			throws ServletException {
 		super(broker, cleanupSeconds);
 
+		// Get context path
+		contextPath = config.getServletContext().getContextPath();
+		contextPathLength = contextPath.length();
+
 		// Set default properties (based on performance measurements)
 		final HashMap<String, String> map = new HashMap<>();
-		map.put("org.atmosphere.websocket.suppressJSR356", "true");
-		map.put("org.atmosphere.cpr.AtmosphereInterceptor.disableDefaults", "true");
-		map.put("org.atmosphere.cpr.Broadcaster.supportOutOfOrderBroadcast", "false");
-		map.put("org.atmosphere.cpr.Broadcaster.threadWaitTime", "0");
-		map.put("org.atmosphere.cpr.broadcasterCacheClass",
-				"services.moleculer.web.servlet.websocket.NullBroadcasterCache");
+		String value = config.getInitParameter("moleculer.websocket.disableDefaults");
+		if (value == null || "false".equals(value)) {
+			DefaultAsyncSupportResolver resolver = new DefaultAsyncSupportResolver(atmosphere.getAtmosphereConfig());
 
-		// Set async mode
-		if (async) {
-			atmosphere.setUseBlockingImplementation(false);
-			atmosphere.setUseServlet30(true);
-		} else {
-			atmosphere.setUseBlockingImplementation(true);
-			atmosphere.setUseServlet30(false);
+			@SuppressWarnings("rawtypes")
+			List<Class<? extends AsyncSupport>> containers = resolver.detectContainersPresent();
+			containers.remove(NettyCometSupport.class);
+			boolean hasContainers = containers.size() > 0;
+			map.put("org.atmosphere.websocket.suppressJSR356", Boolean.toString(hasContainers));
+
+			map.put("org.atmosphere.cpr.AtmosphereInterceptor.disableDefaults", "true");
+			map.put("org.atmosphere.cpr.Broadcaster.supportOutOfOrderBroadcast", "false");
+			map.put("org.atmosphere.cpr.Broadcaster.threadWaitTime", "0");
+			map.put("org.atmosphere.cpr.broadcasterCacheClass",
+					"services.moleculer.web.servlet.websocket.NullBroadcasterCache");
+
+			String threads = Integer.toString(Math.max(Runtime.getRuntime().availableProcessors() / 2, 3));
+			map.put("org.atmosphere.cpr.broadcaster.maxProcessingThreads", threads);
+			map.put("org.atmosphere.cpr.broadcaster.maxAsyncWriteThreads", threads);
 		}
 
 		// Init Atmosphere
@@ -156,7 +172,7 @@ public class ServletWebSocketRegistry extends WebSocketRegistry implements WebSo
 		if (atmosphereRequest == null) {
 			return;
 		}
-		String path = atmosphereRequest.getRequestURI();
+		String path = getRealPathInfo(atmosphereRequest);
 		if (webSocketFilter != null) {
 			WebRequest webRequest = new WebRequest() {
 
@@ -246,7 +262,7 @@ public class ServletWebSocketRegistry extends WebSocketRegistry implements WebSo
 	 */
 	@Override
 	public void onTextMessage(WebSocket webSocket, String data) throws IOException {
-		if (data != null && "!".endsWith(data)) {
+		if (data != null && "!".equals(data)) {
 			webSocket.write("!");
 		}
 	}
@@ -266,7 +282,8 @@ public class ServletWebSocketRegistry extends WebSocketRegistry implements WebSo
 		if (atmosphereRequest == null) {
 			return;
 		}
-		deregister(atmosphereRequest.getRequestURI(), toEnpoint(webSocket));
+		String path = getRealPathInfo(atmosphereRequest);
+		deregister(path, toEnpoint(webSocket));
 	}
 
 	protected Endpoint toEnpoint(WebSocket webSocket) {
@@ -275,7 +292,7 @@ public class ServletWebSocketRegistry extends WebSocketRegistry implements WebSo
 			@Override
 			public final void send(String message) {
 				try {
-					webSocket.write(message);					
+					webSocket.write(message);
 				} catch (Exception ignored) {
 					webSocket.close();
 				}
@@ -304,8 +321,16 @@ public class ServletWebSocketRegistry extends WebSocketRegistry implements WebSo
 			public Object getInternal() {
 				return webSocket;
 			}
-			
+
 		};
 	}
-	
+
+	protected String getRealPathInfo(AtmosphereRequest atmosphereRequest) {
+		String path = atmosphereRequest.getPathInfo();
+		if (contextPathLength > 1 && path.startsWith(contextPath)) {
+			return path.substring(contextPathLength);
+		}
+		return path;
+	}
+
 }

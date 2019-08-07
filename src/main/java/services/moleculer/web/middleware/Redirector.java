@@ -62,7 +62,7 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 	/**
 	 * URL of the redirection.
 	 */
-	protected String location = "/index.html";
+	protected String location = "index.html";
 
 	/**
 	 * Template of the HTML response.
@@ -81,7 +81,7 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 	 * @param path redirect FROM (eg. "/deleted-page.html")
 	 */
 	public Redirector(String path) {
-		this(path, "/index.html", 307);
+		this(path, "index.html", 307);
 	}
 
 	/**

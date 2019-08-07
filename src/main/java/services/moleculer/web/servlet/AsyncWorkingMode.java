@@ -23,50 +23,38 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package services.moleculer.web.servlet.response;
+package services.moleculer.web.servlet;
 
-import java.io.IOException;
-import java.util.concurrent.TimeoutException;
-
+import javax.servlet.AsyncContext;
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-public class BlockingWebResponse extends AbstractWebResponse {
+import services.moleculer.web.servlet.request.NonBlockingWebRequest;
+import services.moleculer.web.servlet.response.NonBlockingWebResponse;
 
-	// --- CONSTRUCTOR ---
+public class AsyncWorkingMode extends WorkingMode {
 
-	public BlockingWebResponse(HttpServletResponse rsp) throws IOException {
-		super(rsp);
+	public AsyncWorkingMode(MoleculerServlet servlet) {
+		super(servlet);
 	}
 
-	// --- THREAD BLOCKER ---
-
-	public void waitFor(long timeout) throws TimeoutException, InterruptedException {
-		synchronized (closed) {
-			if (!closed.get()) {
-				closed.wait(timeout);
-			}
-			if (!closed.get()) {
-				throw new TimeoutException("Request timeouted (" + timeout + "msec)!");
-			}
-		}
-	}
-
-	// --- END PROCESSING ---
-	
-	/**
-	 * Completes the synchronous operation that was started on the request.
-	 * 
-	 * @return return true, if any resources are released
-	 */
 	@Override
-	public boolean end() {
-		if (super.end()) {
-			synchronized (closed) {
-				closed.notifyAll();
+	public void service(HttpServletRequest request, HttpServletResponse response) throws Exception {
+		AsyncContext async = null;
+		try {
+
+			// Start async
+			async = request.startAsync(request, response);
+
+			// Process request
+			servlet.gateway.service(new NonBlockingWebRequest(servlet.broker, async, request), new NonBlockingWebResponse(async, response));
+
+		} catch (Throwable cause) {
+			if (async != null) {
+				async.complete();
 			}
-			return true;
+			throw cause;
 		}
-		return false;
 	}
 
 }

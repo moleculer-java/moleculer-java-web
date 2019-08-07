@@ -46,7 +46,8 @@ import services.moleculer.service.Action;
 import services.moleculer.service.Service;
 import services.moleculer.web.router.RestRoute;
 import services.moleculer.web.router.StaticRoute;
-import services.moleculer.web.servlet.AsyncMoleculerServlet;
+import services.moleculer.web.servlet.AsyncWorkingMode;
+import services.moleculer.web.servlet.MoleculerServlet;
 
 /**
  * "J2EE" server mode (run as Servlet).
@@ -70,7 +71,8 @@ public class JettyWebSocketTest extends TestCase {
 		servletContextHandler.setContextPath("/");
 
 		// Create non-blocking servlet
-		AsyncMoleculerServlet servlet = new AsyncMoleculerServlet();
+		MoleculerServlet servlet = new MoleculerServlet();
+		servlet.setWorkingMode(new AsyncWorkingMode(servlet));
 		ServletHolder servletHolder = new ServletHolder(servlet);
 
 		servletHolder.setInitParameter("moleculer.config", "/services/moleculer/web/moleculer.config.xml");

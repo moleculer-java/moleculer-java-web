@@ -1,7 +1,7 @@
 // ---------------- SAMPLE ----------------------
 //
 // Create websocket-handler instance: 
-// var ws = MoleculerWebsocket("/ws/chat", function(msg) {
+// var ws = MoleculerWebsocket("ws/chat", function(msg) {
 //      console.log("Message received:", msg);
 // }, {
 // 	heartbeatInterval: 5 * 1000,
@@ -26,7 +26,7 @@
 function MoleculerWebsocket(channel, handler, opts) {
 
 	if (!channel) {
-		channel = "/ws/common";
+		channel = "ws/common";
 	}
 
 	var webSocket = null;
@@ -40,8 +40,16 @@ function MoleculerWebsocket(channel, handler, opts) {
 	var heartbeatInterval = opts.heartbeatInterval != null ? opts.heartbeatInterval : 6 * 1000;
 	var heartbeatTimeout = opts.heartbeatTimeout != null ? opts.heartbeatTimeout : 1 * 1000;
 
+	function absolutize(url) {
+		var a = document.createElement("a");
+		a.style.display = "none";
+		document.body.appendChild(a);
+		a.href = url;
+		return a.href;
+	}
+	
 	function connect() {
-		var url = new URL(channel, window.location.href).href;
+		var url = absolutize(channel);
 		url = url.replace(/^http/, "ws");
 		if (opts.debug && console) { 
 			console.log("Connecting to " + url + "...");
@@ -154,7 +162,7 @@ function MoleculerWebsocket(channel, handler, opts) {
 	}
 
 	return {
-		channel,
+		channel: channel,
 		connect: connect,
 		disconnect: disconnect
 	}

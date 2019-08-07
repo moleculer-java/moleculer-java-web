@@ -23,50 +23,19 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package services.moleculer.web.servlet.response;
+package services.moleculer.web.servlet;
 
-import java.io.IOException;
-import java.util.concurrent.TimeoutException;
-
+import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-public class BlockingWebResponse extends AbstractWebResponse {
-
-	// --- CONSTRUCTOR ---
-
-	public BlockingWebResponse(HttpServletResponse rsp) throws IOException {
-		super(rsp);
-	}
-
-	// --- THREAD BLOCKER ---
-
-	public void waitFor(long timeout) throws TimeoutException, InterruptedException {
-		synchronized (closed) {
-			if (!closed.get()) {
-				closed.wait(timeout);
-			}
-			if (!closed.get()) {
-				throw new TimeoutException("Request timeouted (" + timeout + "msec)!");
-			}
-		}
-	}
-
-	// --- END PROCESSING ---
+public abstract class WorkingMode {
 	
-	/**
-	 * Completes the synchronous operation that was started on the request.
-	 * 
-	 * @return return true, if any resources are released
-	 */
-	@Override
-	public boolean end() {
-		if (super.end()) {
-			synchronized (closed) {
-				closed.notifyAll();
-			}
-			return true;
-		}
-		return false;
+	protected final MoleculerServlet servlet;
+	
+	public WorkingMode(MoleculerServlet servlet) {
+		this.servlet = servlet;
 	}
-
+	
+	public abstract void service(HttpServletRequest request, HttpServletResponse response) throws Exception;
+	
 }
