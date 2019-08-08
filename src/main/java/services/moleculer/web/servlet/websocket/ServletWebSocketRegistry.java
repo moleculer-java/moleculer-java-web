@@ -95,6 +95,12 @@ public class ServletWebSocketRegistry extends WebSocketRegistry implements WebSo
 			boolean hasContainers = containers.size() > 0;
 			map.put("org.atmosphere.websocket.suppressJSR356", Boolean.toString(hasContainers));
 
+			try {
+				Class.forName("org.glassfish.grizzly.websockets.WebSocket");
+				map.put("org.atmosphere.cpr.asyncSupport", "org.atmosphere.container.GlassFishServ30WebSocketSupport");
+			} catch (Throwable ignored) {
+			}
+
 			map.put("org.atmosphere.cpr.AtmosphereInterceptor.disableDefaults", "true");
 			map.put("org.atmosphere.cpr.Broadcaster.supportOutOfOrderBroadcast", "false");
 			map.put("org.atmosphere.cpr.Broadcaster.threadWaitTime", "0");

@@ -47,6 +47,7 @@ import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 import org.springframework.context.support.FileSystemXmlApplicationContext;
 
+import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
 import services.moleculer.web.ApiGateway;
 import services.moleculer.web.servlet.websocket.ServletWebSocketRegistry;
@@ -101,13 +102,16 @@ public class MoleculerServlet extends HttpServlet {
 				while (e.hasMoreElements()) {
 					String key = e.nextElement();
 					String value = config.getInitParameter(key);
+					if (key.startsWith("-D")) {
+						System.setProperty(key.substring(2), value);	
+					}
 					if (value != null) {
 						set.add(key + '=' + value);
 					}
 				}
 				String[] args = new String[set.size()];
 				set.toArray(args);
-
+				
 				// Class of the SpringApplication
 				String springAppName = "org.springframework.boot.SpringApplication";
 				Class<?> springAppClass = Class.forName(springAppName);
@@ -258,7 +262,10 @@ public class MoleculerServlet extends HttpServlet {
 
 		// Stop Atmosphere
 		if (webSocketRegistry != null) {
-			webSocketRegistry.stopped();
+			try {
+				webSocketRegistry.stopped();
+			} catch (Throwable ignored) {
+			}
 			webSocketRegistry = null;
 		}
 
@@ -269,6 +276,13 @@ public class MoleculerServlet extends HttpServlet {
 				ctx.stop();
 			} catch (Throwable ignored) {
 			}
+		}
+		
+		// Stop broker
+		Tree info = broker.getConfig().getServiceRegistry().getDescriptor();
+		Tree services = info.get("services");
+		if (services != null && !services.isNull() && services.size() > 0) {
+			broker.stop();
 		}
 	}
 
