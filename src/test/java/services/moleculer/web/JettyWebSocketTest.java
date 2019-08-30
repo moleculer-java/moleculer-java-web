@@ -45,8 +45,7 @@ import junit.framework.TestCase;
 import services.moleculer.ServiceBroker;
 import services.moleculer.service.Action;
 import services.moleculer.service.Service;
-import services.moleculer.web.router.RestRoute;
-import services.moleculer.web.router.StaticRoute;
+import services.moleculer.web.router.Route;
 import services.moleculer.web.servlet.MoleculerServlet;
 import services.moleculer.web.servlet.service.AsyncService;
 import services.moleculer.web.servlet.websocket.EndpointDeployer;
@@ -64,7 +63,8 @@ public class JettyWebSocketTest extends TestCase {
 	@Override
 	protected void setUp() throws Exception {
 
-		// Create Servlet Container
+		// --- TEST SERVLET CONTAINER ---
+		
 		server = new Server();
 		ServerConnector serverConnector = new ServerConnector(server);
 		serverConnector.setHost("127.0.0.1");
@@ -90,24 +90,23 @@ public class JettyWebSocketTest extends TestCase {
 
 		server.start();
 
+		// --- CREATE SERVICE BROKER ---
+		
 		ServiceBroker broker = servlet.getBroker();
 
 		// Open local REPL console
 		// broker.repl();
 
-		ApiGateway gateway = servlet.getGateway();
-
-		// REST services
-		RestRoute rest = new RestRoute();
-		rest.addAlias("/test", "test.send");
-		gateway.addRoute(rest);
-
-		// Static web content
-		StaticRoute route = new StaticRoute("/templates");
+		// --- ADD A ROUTE TO REST SERVICE ---
+		
+		Route route = new Route();
 		route.addAlias("/test", "test.send");
-		route.setEnableReloading(true);
+
+		ApiGateway gateway = servlet.getGateway();
 		gateway.addRoute(route);
 
+		// --- TEST MOLCEULER SERVICE ---
+		
 		// Moleculer Service, which sends a websocket message
 		broker.createService(new Service("test") {
 
@@ -125,6 +124,8 @@ public class JettyWebSocketTest extends TestCase {
 
 		});
 
+		// --- TEST CLIENT ---
+		
 		// Emulate web browser (see "websocket.js")
 		URI uri = new URI("ws://localhost:3000/ws/test/q");
 		client = new WebSocketClient(uri, new Draft_6455()) {

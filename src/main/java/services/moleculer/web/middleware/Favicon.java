@@ -27,6 +27,8 @@ package services.moleculer.web.middleware;
 
 import static services.moleculer.web.common.GatewayUtils.readAllBytes;
 
+import java.util.Objects;
+
 import io.datatree.Tree;
 import services.moleculer.service.Name;
 import services.moleculer.web.RequestProcessor;
@@ -40,7 +42,8 @@ public class Favicon extends HttpMiddleware implements HttpConstants {
 	// --- PROPERTIES ---
 
 	protected String iconPath;
-	protected int maxAge;
+	protected int maxAge = 60;
+	protected String iconURL = "/favicon.ico";
 
 	// --- CACHED IMAGE ---
 
@@ -83,7 +86,7 @@ public class Favicon extends HttpMiddleware implements HttpConstants {
 			 */
 			@Override
 			public void service(WebRequest req, WebResponse rsp) throws Exception {					
-				if ("/favicon.ico".equals(req.getPath())) {
+				if (iconURL.equals(req.getPath())) {
 					try {
 						rsp.setHeader(CONTENT_TYPE, "image/x-icon");						
 						if (maxAge > 0) {
@@ -117,8 +120,8 @@ public class Favicon extends HttpMiddleware implements HttpConstants {
 	}
 
 	public void setIconPath(String iconPath) {
+		this.iconPath = Objects.requireNonNull(iconPath);
 		this.image = null;
-		this.iconPath = iconPath;
 	}
 
 	public int getMaxAge() {
@@ -127,6 +130,14 @@ public class Favicon extends HttpMiddleware implements HttpConstants {
 
 	public void setMaxAge(int maxAge) {
 		this.maxAge = maxAge;
+	}
+
+	public String getIconURL() {
+		return iconURL;
+	}
+
+	public void setIconURL(String iconURL) {
+		this.iconURL = Objects.requireNonNull(iconURL);
 	}
 
 }

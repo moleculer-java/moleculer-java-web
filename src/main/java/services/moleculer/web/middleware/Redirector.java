@@ -53,12 +53,12 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 	 * Path to redirect (null = redirects all requests).
 	 */
 	protected String path;
-	
+
 	/**
 	 * Path to redirect (formatted and checked).
 	 */
 	protected String formattedPath = "";
-	
+
 	/**
 	 * URL of the redirection.
 	 */
@@ -78,7 +78,8 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 	/**
 	 * Redirects browser from "path" to "/index.html".
 	 * 
-	 * @param path redirect FROM (eg. "/deleted-page.html")
+	 * @param path
+	 *            redirect FROM (eg. "/deleted-page.html")
 	 */
 	public Redirector(String path) {
 		this(path, "index.html", 307);
@@ -87,19 +88,24 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 	/**
 	 * Redirects browser from "path" to "location" URI.
 	 * 
-	 * @param path redirect FROM (eg. "/deleted-page.html")
-	 * @param location redirect TO (eg. "/new-page.html")
+	 * @param path
+	 *            redirect FROM (eg. "/deleted-page.html")
+	 * @param location
+	 *            redirect TO (eg. "/new-page.html")
 	 */
 	public Redirector(String path, String location) {
 		this(path, location, 307);
 	}
-	
+
 	/**
 	 * Redirects browser from "path" to "location" URI.
 	 * 
-	 * @param path redirect FROM (eg. "/deleted-page.html")
-	 * @param location redirect TO (eg. "/new-page.html")
-	 * @param status status code (eg. 307 = Temporary Redirect)
+	 * @param path
+	 *            redirect FROM (eg. "/deleted-page.html")
+	 * @param location
+	 *            redirect TO (eg. "/new-page.html")
+	 * @param status
+	 *            status code (eg. 307 = Temporary Redirect)
 	 */
 	public Redirector(String path, String location, int status) {
 		setPath(path);
@@ -129,12 +135,12 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 			 */
 			@Override
 			public void service(WebRequest req, WebResponse rsp) throws Exception {
-				try {
 
-					// Check path
-					String p = req.getPath();
-					if ((formattedPath.isEmpty() && "/".equals(p)) || formattedPath.equals(p)) {
-						
+				// Check path
+				String p = req.getPath();
+				if ((formattedPath.isEmpty() && "/".equals(p)) || formattedPath.equals(p)) {
+					try {
+
 						// Create HTML body
 						String body = htmlTemplate.replace("{location}", location);
 						byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
@@ -144,16 +150,15 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 						rsp.setHeader(LOCATION, location);
 						rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_HTML);
 						rsp.setHeader(CONTENT_LENGTH, Integer.toString(bytes.length));
-						
+
 						// Send HTML body
 						rsp.send(bytes);
-						return;
+					} finally {
+						rsp.end();
 					}
-					next.service(req, rsp);
-					
-				} finally {
-					rsp.end();
+					return;
 				}
+				next.service(req, rsp);
 			}
 		};
 	}

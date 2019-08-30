@@ -46,7 +46,7 @@ import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 /**
- * Compresses body of response messages. WARNING: Using this middleware reduces
+ * Compresses body of REST responses. WARNING: Using this middleware reduces
  * the performance, so use it only on very slow networks.
  */
 @Name("Response Deflater")

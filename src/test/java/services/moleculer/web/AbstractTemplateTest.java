@@ -168,7 +168,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 		r2.use(new NotFound("<html>NOT FOUND</html>"));
 
 		// Add static page (html, images, javascript) folder
-		r2.use(new ServeStatic("/static", "/templates"));
+		r2.use(new ServeStatic("/static", "/www"));
 
 		// ...and a sample Redirector middleware
 		r2.use(new Redirector("/missing", "/index.html", 307));
@@ -195,7 +195,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 	public void testDataTreeTemplateEngine() throws Exception {
 		DataTreeEngine engine = new DataTreeEngine();
 		engine.setMessageLoader(new DefaultMessageLoader());
-		engine.setTemplatePath("templates");
+		engine.setTemplatePath("www");
 		engine.setDefaultExtension("datatree");
 		gw.setTemplateEngine(engine);
 		doTemplateTests("datatree");
@@ -206,7 +206,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 	public void testFreeMarkerTemplateEngine() throws Exception {
 		FreeMarkerEngine engine = new FreeMarkerEngine();
 		engine.setMessageLoader(new DefaultMessageLoader());
-		engine.setTemplatePath("templates");
+		engine.setTemplatePath("www");
 		engine.setDefaultExtension("freemarker");
 		gw.setTemplateEngine(engine);
 		doTemplateTests("freemarker");
@@ -217,7 +217,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 	public void testJadeTemplateEngine() throws Exception {
 		JadeEngine engine = new JadeEngine();
 		engine.setMessageLoader(new DefaultMessageLoader());
-		engine.setTemplatePath("templates");
+		engine.setTemplatePath("www");
 		engine.setDefaultExtension("jade");
 		gw.setTemplateEngine(engine);
 		doTemplateTests("jade");
@@ -228,7 +228,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 	public void testMustacheTemplateEngine() throws Exception {
 		MustacheEngine engine = new MustacheEngine();
 		engine.setMessageLoader(new DefaultMessageLoader());
-		engine.setTemplatePath("templates");
+		engine.setTemplatePath("www");
 		engine.setDefaultExtension("mustache");
 		gw.setTemplateEngine(engine);
 		doTemplateTests("mustache");
@@ -239,7 +239,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 	public void testHandlebarsTemplateEngine() throws Exception {
 		HandlebarsEngine engine = new HandlebarsEngine();
 		engine.setMessageLoader(new DefaultMessageLoader());
-		engine.setTemplatePath("templates");
+		engine.setTemplatePath("www");
 		engine.setDefaultExtension("handlebars");
 		gw.setTemplateEngine(engine);
 		doTemplateTests("handlebars");	
@@ -250,7 +250,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 	public void testPebbleTemplateEngine() throws Exception {
 		PebbleEngine engine = new PebbleEngine();
 		engine.setMessageLoader(new DefaultMessageLoader());
-		engine.setTemplatePath("templates");
+		engine.setTemplatePath("www");
 		engine.setDefaultExtension("pebble");
 		gw.setTemplateEngine(engine);
 		doTemplateTests("pebble");
@@ -261,7 +261,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 	public void testThymeleafTemplateEngine() throws Exception {
 		ThymeleafEngine engine = new ThymeleafEngine();
 		engine.setMessageLoader(new DefaultMessageLoader());
-		engine.setTemplatePath("templates");
+		engine.setTemplatePath("www");
 		engine.setDefaultExtension("thymeleaf");
 		gw.setTemplateEngine(engine);
 		doTemplateTests("thymeleaf");

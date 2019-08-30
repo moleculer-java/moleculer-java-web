@@ -16,8 +16,7 @@ import services.moleculer.config.ServiceBrokerConfig;
 import services.moleculer.service.Action;
 import services.moleculer.service.Service;
 import services.moleculer.web.netty.NettyServer;
-import services.moleculer.web.router.RestRoute;
-import services.moleculer.web.router.StaticRoute;
+import services.moleculer.web.router.Route;
 
 /**
  * "STANDALONE" server mode (without J2EE server / servlet container). Using Netty.
@@ -32,7 +31,8 @@ public class NettyWebSocketTest extends TestCase {
 	@Override
 	protected void setUp() throws Exception {
 
-		// Create service borker
+		// --- SERVICE BROKER ---
+		
 		ServiceBrokerConfig cfg = new ServiceBrokerConfig();
 		// cfg.setTransporter(new NatsTransporter());
 		// ...
@@ -41,27 +41,25 @@ public class NettyWebSocketTest extends TestCase {
 		// Open local REPL console
 		// broker.repl();
 
+		// --- NETTY WEBSERVER ---
+		
 		// Create standalone Netty server
 		NettyServer server = new NettyServer();
 		broker.createService(server);
 
-		// APIGateway is required
+		// --- ADD A ROUTE TO REST SERVICE ---
+		
+		Route route = new Route();
+		route.addAlias("/test", "test.send");
+
 		gateway = new ApiGateway();
 		gateway.setDebug(true);
+		gateway.addRoute(route);
+		
 		broker.createService(gateway);
-
-		// REST services
-		// Sample REST URL: http://localhost:3000/test
-		RestRoute services = new RestRoute();
-		services.addAlias("/test", "test.send");
-		gateway.addRoute(services);
-
-		// Static web content
-		// Index page URL: http://localhost:3000/index.html
-		StaticRoute pages = new StaticRoute("/templates");
-		pages.setEnableReloading(true);
-		gateway.addRoute(pages);
-
+		
+		// --- TEST MOLCEULER SERVICE ---
+			
 		// Moleculer Service, which sends a websocket message
 		broker.createService(new Service("test") {
 
@@ -82,6 +80,8 @@ public class NettyWebSocketTest extends TestCase {
 		});
 		broker.start();
 
+		// --- TEST CLIENT ---
+		
 		// Emulate web browser (see "websocket.js")
 		URI uri = new URI("ws://localhost:3000/ws/test");
 		client = new WebSocketClient(uri, new Draft_6455()) {

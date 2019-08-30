@@ -25,11 +25,15 @@
  */
 package services.moleculer.web.middleware;
 
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import io.datatree.Tree;
 import services.moleculer.service.Name;
 import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
+import services.moleculer.web.common.HttpConstants;
 
 /**
  * Implements server side https://www.w3.org/wiki/CORS support for Moleculer.
@@ -69,6 +73,11 @@ public class CorsHeaders extends HttpMiddleware {
 	 */
 	protected int maxAge;
 
+	/**
+	 * Add CORS headers to all responses? (false = add to REST responses only)
+	 */
+	protected boolean applyForAll;
+
 	// --- CONSTRUCTORS ---
 
 	public CorsHeaders() {
@@ -98,7 +107,7 @@ public class CorsHeaders extends HttpMiddleware {
 		setCredentials(credentials);
 		setMaxAge(maxAge);
 	}
-	
+
 	// --- CREATE NEW PROCESSOR ---
 
 	@Override
@@ -109,52 +118,120 @@ public class CorsHeaders extends HttpMiddleware {
 			 * Handles request of the HTTP client.
 			 * 
 			 * @param req
-			 *            WebRequest object that contains the request the client made of
-			 *            the ApiGateway
+			 *            WebRequest object that contains the request the client
+			 *            made of the ApiGateway
 			 * @param rsp
-			 *            WebResponse object that contains the response the ApiGateway
-			 *            returns to the client
+			 *            WebResponse object that contains the response the
+			 *            ApiGateway returns to the client
 			 * 
 			 * @throws Exception
-			 *             if an input or output error occurs while the ApiGateway is
-			 *             handling the HTTP request
+			 *             if an input or output error occurs while the
+			 *             ApiGateway is handling the HTTP request
 			 */
 			@Override
 			public void service(WebRequest req, WebResponse rsp) throws Exception {
 
-				// Add the Access-Control-Allow-Origin header
-				if (origin != null) {
-					rsp.setHeader("Access-Control-Allow-Origin", origin);
+				// Add CORS headers to all responses?
+				if (applyForAll) {
+					addHeaders(rsp);
+					next.service(req, rsp);
+					return;
 				}
 
-				// Add the Access-Control-Allow-Methods header
-				if (methods != null) {
-					rsp.setHeader("Access-Control-Allow-Methods", methods);
-				}
+				// Add CORS headers to REST responses only
+				next.service(req, new WebResponse() {
 
-				// Add the Access-Control-Allow-Headers header
-				if (allowedHeaders != null) {
-					rsp.setHeader("Access-Control-Allow-Headers", allowedHeaders);
-				}
+					// First body
+					AtomicBoolean firstBody = new AtomicBoolean(true);
 
-				// Add the Access-Control-Expose-Headers header
-				if (exposedHeaders != null) {
-					rsp.setHeader("Access-Control-Expose-Headers", exposedHeaders);
-				}
+					// Response finished
+					AtomicBoolean finished = new AtomicBoolean();
 
-				// Add the Access-Control-Allow-Credentials header
-				rsp.setHeader("Access-Control-Allow-Credentials", Boolean.toString(credentials));
+					@Override
+					public final void setStatus(int code) {
+						rsp.setStatus(code);
+					}
 
-				// Add the Access-Control-Max-Age header
-				if (maxAge > 0) {
-					rsp.setHeader("Access-Control-Max-Age", Integer.toString(maxAge));
-				}
-				
-				// Invoke next handler (eg. Moleculer Action)
-				next.service(req, rsp);
+					@Override
+					public final int getStatus() {
+						return rsp.getStatus();
+					}
+
+					@Override
+					public final void setHeader(String name, String value) {
+						rsp.setHeader(name, value);
+					}
+
+					@Override
+					public final String getHeader(String name) {
+						return rsp.getHeader(name);
+					}
+
+					@Override
+					public final void send(byte[] bytes) throws IOException {
+						if (firstBody.compareAndSet(true, false)) {
+							String contentType = rsp.getHeader(HttpConstants.CONTENT_TYPE);
+							if (contentType == null || contentType.startsWith("application/json")) {
+								addHeaders(rsp);
+							}
+						}
+						rsp.send(bytes);
+					}
+
+					@Override
+					public final boolean end() {
+						if (finished.compareAndSet(false, true)) {
+							return rsp.end();
+						}
+						return false;
+					}
+
+					@Override
+					public final void setProperty(String name, Object value) {
+						rsp.setProperty(name, value);
+					}
+
+					@Override
+					public final Object getProperty(String name) {
+						return rsp.getProperty(name);
+					}
+
+				});
 			}
 
 		};
+	}
+
+	protected void addHeaders(WebResponse rsp) {
+
+		// Add the Access-Control-Allow-Origin header
+		if (origin != null) {
+			rsp.setHeader("Access-Control-Allow-Origin", origin);
+		}
+
+		// Add the Access-Control-Allow-Methods header
+		if (methods != null) {
+			rsp.setHeader("Access-Control-Allow-Methods", methods);
+		}
+
+		// Add the Access-Control-Allow-Headers header
+		if (allowedHeaders != null) {
+			rsp.setHeader("Access-Control-Allow-Headers", allowedHeaders);
+		}
+
+		// Add the Access-Control-Expose-Headers header
+		if (exposedHeaders != null) {
+			rsp.setHeader("Access-Control-Expose-Headers", exposedHeaders);
+		}
+
+		// Add the Access-Control-Allow-Credentials header
+		rsp.setHeader("Access-Control-Allow-Credentials", Boolean.toString(credentials));
+
+		// Add the Access-Control-Max-Age header
+		if (maxAge > 0) {
+			rsp.setHeader("Access-Control-Max-Age", Integer.toString(maxAge));
+		}
+
 	}
 
 	// --- PROPERTY GETTERS AND SETTERS ---
@@ -205,6 +282,14 @@ public class CorsHeaders extends HttpMiddleware {
 
 	public void setMaxAge(int maxAge) {
 		this.maxAge = maxAge;
+	}
+
+	public boolean isApplyForAll() {
+		return applyForAll;
+	}
+
+	public void setApplyForAll(boolean addToAll) {
+		this.applyForAll = addToAll;
 	}
 
 }

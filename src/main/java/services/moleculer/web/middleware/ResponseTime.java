@@ -78,15 +78,16 @@ public class ResponseTime extends HttpMiddleware {
 			@Override
 			public void service(WebRequest req, WebResponse rsp) throws Exception {
 
-				// First body
-				AtomicBoolean firstBody = new AtomicBoolean(true);
-
-				// Start time
-				long start = System.currentTimeMillis();
-
 				// Invoke next handler / action
 				next.service(req, new WebResponse() {
 
+					// First body
+					AtomicBoolean firstBody = new AtomicBoolean(true);
+
+					// Start time
+					long start = System.currentTimeMillis();
+					
+					// Response finished
 					AtomicBoolean finished = new AtomicBoolean();
 
 					@Override
