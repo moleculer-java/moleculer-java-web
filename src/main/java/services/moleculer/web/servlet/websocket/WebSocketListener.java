@@ -23,38 +23,49 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package services.moleculer.web.servlet;
+package services.moleculer.web.servlet.websocket;
 
-import javax.servlet.AsyncContext;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import javax.websocket.CloseReason;
+import javax.websocket.Endpoint;
+import javax.websocket.EndpointConfig;
+import javax.websocket.Session;
 
-import services.moleculer.web.servlet.request.NonBlockingWebRequest;
-import services.moleculer.web.servlet.response.NonBlockingWebResponse;
+public class WebSocketListener extends Endpoint {
 
-public class AsyncWorkingMode extends WorkingMode {
-
-	public AsyncWorkingMode(MoleculerServlet servlet) {
-		super(servlet);
+	// --- VARIABLES ---
+	
+	protected ServletWebSocketRegistry registry;
+	
+	// --- ENDPOINT HANDLERS ---
+	
+	@Override
+	public void onOpen(Session session, EndpointConfig config) {
+		if (registry == null) {
+			try {
+				session.close();
+			} catch (Exception ignored) {
+			}
+			return;
+		}
+		registry.onOpen(session);
 	}
 
 	@Override
-	public void service(HttpServletRequest request, HttpServletResponse response) throws Exception {
-		AsyncContext async = null;
-		try {
+	public void onError(Session session, Throwable thr) {
+		onClose(session, null);
+	}
 
-			// Start async
-			async = request.startAsync(request, response);
-
-			// Process request
-			servlet.gateway.service(new NonBlockingWebRequest(servlet.broker, async, request), new NonBlockingWebResponse(async, response));
-
-		} catch (Throwable cause) {
-			if (async != null) {
-				async.complete();
-			}
-			throw cause;
+	@Override
+	public void onClose(Session session, CloseReason closeReason) {
+		if (registry != null) {
+			registry.onClose(session);
 		}
 	}
 
+	// --- SETTERS ---
+	
+	public void setServletWebSocketRegistry(ServletWebSocketRegistry registry) {
+		this.registry = registry;
+	}
+	
 }

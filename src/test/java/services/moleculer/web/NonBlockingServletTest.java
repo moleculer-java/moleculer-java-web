@@ -31,8 +31,8 @@ import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 
-import services.moleculer.web.servlet.AsyncWorkingMode;
 import services.moleculer.web.servlet.MoleculerServlet;
+import services.moleculer.web.servlet.service.AsyncService;
 
 public class NonBlockingServletTest extends AbstractTemplateTest {
 
@@ -56,7 +56,7 @@ public class NonBlockingServletTest extends AbstractTemplateTest {
 		
 		// Create non-blocking servlet
 		MoleculerServlet sc = new MoleculerServlet();
-		sc.setWorkingMode(new AsyncWorkingMode(sc));
+		sc.setWorkingMode(new AsyncService());
 		ServletHolder sh = new ServletHolder(sc);
 		sh.setInitParameter("moleculer.config", "/services/moleculer/web/moleculer.config.xml");
 		publicContext.addServlet(sh, "/*");
@@ -66,8 +66,8 @@ public class NonBlockingServletTest extends AbstractTemplateTest {
 		server.addConnector(pContext);
 		server.start();
 				
-		this.br = sc.getBroker();
-		this.gw = sc.getGateway();
+		br = sc.getBroker();
+		gw = sc.getGateway();
 		
 		super.setUp();
 	}

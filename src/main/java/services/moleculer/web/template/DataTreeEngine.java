@@ -44,6 +44,7 @@ import io.datatree.templates.TemplateEngine;
  * </pre>
  * 
  * @see FreeMarkerEngine
+ * @see HandlebarsEngine
  * @see JadeEngine
  * @see MustacheEngine
  * @see PebbleEngine

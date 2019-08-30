@@ -30,6 +30,7 @@ import static services.moleculer.web.common.GatewayUtils.setCookie;
 
 import java.net.HttpCookie;
 import java.util.Objects;
+import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 import io.datatree.Tree;
@@ -67,7 +68,11 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 	protected AtomicLong rnd = new AtomicLong(System.nanoTime());
 
 	protected AtomicLong seq = new AtomicLong();
-	
+
+	// --- CACHE ---
+
+	protected WeakHashMap<String, HttpCookie> cache = new WeakHashMap<>(512);
+
 	// --- CONSTRUCTORS ---
 
 	public SessionCookie() {
@@ -115,20 +120,22 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 					// Generate new sessionID
 					sessionID = nextID();
 
-					// Set new cookie
+				} else {
+
+					// Get the previous sessionID
+					sessionID = cookie.getValue();
+				}
+
+				// Write cookie into response
+				cookie = cache.get(sessionID);
+				if (cookie == null) {
 					cookie = new HttpCookie(cookieName, sessionID);
 					cookie.setPath(path);
 					if (maxAge > 0) {
 						cookie.setMaxAge(maxAge);
 					}
-
-				} else {
-
-					// Get the value
-					sessionID = cookie.getValue();
+					cache.put(sessionID, cookie);
 				}
-
-				// Write cookie into response
 				setCookie(req, rsp, cookie);
 
 				// Store sessionID in request
@@ -167,6 +174,9 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 	}
 
 	public void setCookieName(String cookieName) {
+		if (!this.cookieName.equals(cookieName)) {
+			cache.clear();
+		}
 		this.cookieName = Objects.requireNonNull(cookieName);
 	}
 
@@ -175,6 +185,9 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 	}
 
 	public void setPath(String path) {
+		if (!this.path.equals(path)) {
+			cache.clear();
+		}
 		this.path = path;
 	}
 

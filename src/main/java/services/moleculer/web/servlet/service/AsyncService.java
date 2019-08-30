@@ -23,37 +23,41 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package services.moleculer.web.servlet;
+package services.moleculer.web.servlet.service;
 
-import java.util.concurrent.TimeoutException;
-
+import javax.servlet.AsyncContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import services.moleculer.web.servlet.request.BlockingWebRequest;
-import services.moleculer.web.servlet.response.BlockingWebResponse;
+import services.moleculer.ServiceBroker;
+import services.moleculer.web.ApiGateway;
+import services.moleculer.web.servlet.request.NonBlockingWebRequest;
+import services.moleculer.web.servlet.response.NonBlockingWebResponse;
 
-public class BlockingWorkingMode extends WorkingMode {
+/**
+ * Non-blocking request processing mode.
+ */
+public class AsyncService implements ServiceMode {
 
-	public BlockingWorkingMode(MoleculerServlet servlet) {
-		super(servlet);
-	}
-	
 	@Override
-	public void service(HttpServletRequest request, HttpServletResponse response) throws Exception {
+	public void service(ServiceBroker broker, ApiGateway gateway, HttpServletRequest request,
+			HttpServletResponse response) throws Exception {
+		AsyncContext async = null;
 		try {
 
-			// Blocking service
-			BlockingWebResponse bwr = new BlockingWebResponse(response);
-			servlet.gateway.service(new BlockingWebRequest(servlet.broker, request), bwr);
-			bwr.waitFor(servlet.timeout);
+			// Start async
+			async = request.startAsync(request, response);
 
-		} catch (TimeoutException timeout) {
-			try {
-				response.sendError(408);
-				servlet.logError("Unexpected timeout exception occured!", timeout);
-			} catch (Throwable ignored) {
+			// Process request
+			gateway.service(new NonBlockingWebRequest(broker, async), new NonBlockingWebResponse(async));
+
+		} catch (Throwable cause) {
+
+			// End async
+			if (async != null) {
+				async.complete();
 			}
+			throw cause;
 		}
 	}
 

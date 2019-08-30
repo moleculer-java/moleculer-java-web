@@ -23,19 +23,44 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package services.moleculer.web.servlet;
+package services.moleculer.web.servlet.service;
+
+import java.util.concurrent.TimeoutException;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-public abstract class WorkingMode {
+import services.moleculer.ServiceBroker;
+import services.moleculer.web.ApiGateway;
+import services.moleculer.web.servlet.request.BlockingWebRequest;
+import services.moleculer.web.servlet.response.BlockingWebResponse;
+
+/**
+ * Blocking request processing mode.
+ */
+public class BlockingService implements ServiceMode {
+
+	protected final long timeout;
 	
-	protected final MoleculerServlet servlet;
-	
-	public WorkingMode(MoleculerServlet servlet) {
-		this.servlet = servlet;
+	public BlockingService(long timeout) {
+		this.timeout = timeout;
 	}
 	
-	public abstract void service(HttpServletRequest request, HttpServletResponse response) throws Exception;
-	
+	@Override
+	public void service(ServiceBroker broker, ApiGateway gateway, HttpServletRequest request, HttpServletResponse response) throws Exception {
+		try {
+
+			// Blocking service
+			BlockingWebResponse bwr = new BlockingWebResponse(response);
+			gateway.service(new BlockingWebRequest(broker, request), bwr);
+			bwr.waitFor(timeout);
+
+		} catch (TimeoutException timeout) {
+			try {
+				response.sendError(408);
+			} catch (Throwable ignored) {
+			}
+		}
+	}
+
 }

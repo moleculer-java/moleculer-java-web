@@ -41,6 +41,7 @@ import services.moleculer.ServiceBroker;
 import services.moleculer.service.Action;
 import services.moleculer.service.Service;
 import services.moleculer.util.CommonUtils;
+import services.moleculer.web.common.HttpConstants;
 import services.moleculer.web.middleware.BasicAuthenticator;
 import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.middleware.Favicon;
@@ -59,10 +60,12 @@ import services.moleculer.web.router.MappingPolicy;
 import services.moleculer.web.router.Route;
 import services.moleculer.web.template.DataTreeEngine;
 import services.moleculer.web.template.FreeMarkerEngine;
+import services.moleculer.web.template.HandlebarsEngine;
 import services.moleculer.web.template.JadeEngine;
 import services.moleculer.web.template.MustacheEngine;
 import services.moleculer.web.template.PebbleEngine;
 import services.moleculer.web.template.ThymeleafEngine;
+import services.moleculer.web.template.languages.DefaultMessageLoader;
 
 public abstract class AbstractTemplateTest extends TestCase {
 
@@ -76,7 +79,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 
 			@SuppressWarnings("unused")
 			public Action html = ctx -> {
-
+				
 				Tree rsp = new Tree();
 				rsp.put("a", 1);
 				rsp.put("b", true);
@@ -91,7 +94,16 @@ public abstract class AbstractTemplateTest extends TestCase {
 					row.put("third", i);
 				}
 
-				rsp.getMeta().put("$template", "test");
+				// Get requested language/locale from
+				// the input parameters (from the URL)
+				String locale = ctx.params.get("locale", "en");
+
+				// Set language/locale of the template
+				Tree meta = rsp.getMeta();
+				meta.put(HttpConstants.META_LOCALE, locale);
+				
+				// Set template file (test.xxx)
+				meta.put(HttpConstants.META_TEMPLATE, "test");
 				return rsp;
 			};
 		});
@@ -140,7 +152,8 @@ public abstract class AbstractTemplateTest extends TestCase {
 		ResponseDeflater deflater = new ResponseDeflater();
 		r1.use(deflater);
 
-		r1.addAlias(Alias.GET, "/html", "test.html");
+		// Template engine test with locale test
+		r1.addAlias(Alias.GET, "/html/:locale", "test.html");
 		r1.use(new SessionCookie("SID", "/html"));
 
 		gw.addRoute(r1);
@@ -181,54 +194,77 @@ public abstract class AbstractTemplateTest extends TestCase {
 	@Test
 	public void testDataTreeTemplateEngine() throws Exception {
 		DataTreeEngine engine = new DataTreeEngine();
+		engine.setMessageLoader(new DefaultMessageLoader());
 		engine.setTemplatePath("templates");
 		engine.setDefaultExtension("datatree");
 		gw.setTemplateEngine(engine);
+		doTemplateTests("datatree");
 		doTemplateTests("datatree");
 	}
 
 	@Test
 	public void testFreeMarkerTemplateEngine() throws Exception {
 		FreeMarkerEngine engine = new FreeMarkerEngine();
+		engine.setMessageLoader(new DefaultMessageLoader());
 		engine.setTemplatePath("templates");
 		engine.setDefaultExtension("freemarker");
 		gw.setTemplateEngine(engine);
+		doTemplateTests("freemarker");
 		doTemplateTests("freemarker");
 	}
 
 	@Test
 	public void testJadeTemplateEngine() throws Exception {
 		JadeEngine engine = new JadeEngine();
+		engine.setMessageLoader(new DefaultMessageLoader());
 		engine.setTemplatePath("templates");
 		engine.setDefaultExtension("jade");
 		gw.setTemplateEngine(engine);
+		doTemplateTests("jade");
 		doTemplateTests("jade");
 	}
 
 	@Test
 	public void testMustacheTemplateEngine() throws Exception {
 		MustacheEngine engine = new MustacheEngine();
+		engine.setMessageLoader(new DefaultMessageLoader());
 		engine.setTemplatePath("templates");
 		engine.setDefaultExtension("mustache");
 		gw.setTemplateEngine(engine);
 		doTemplateTests("mustache");
+		doTemplateTests("mustache");
 	}
 
 	@Test
+	public void testHandlebarsTemplateEngine() throws Exception {
+		HandlebarsEngine engine = new HandlebarsEngine();
+		engine.setMessageLoader(new DefaultMessageLoader());
+		engine.setTemplatePath("templates");
+		engine.setDefaultExtension("handlebars");
+		gw.setTemplateEngine(engine);
+		doTemplateTests("handlebars");	
+		doTemplateTests("handlebars");
+	}
+	
+	@Test
 	public void testPebbleTemplateEngine() throws Exception {
 		PebbleEngine engine = new PebbleEngine();
+		engine.setMessageLoader(new DefaultMessageLoader());
 		engine.setTemplatePath("templates");
 		engine.setDefaultExtension("pebble");
 		gw.setTemplateEngine(engine);
+		doTemplateTests("pebble");
 		doTemplateTests("pebble");
 	}
 
 	@Test
 	public void testThymeleafTemplateEngine() throws Exception {
 		ThymeleafEngine engine = new ThymeleafEngine();
+		engine.setMessageLoader(new DefaultMessageLoader());
 		engine.setTemplatePath("templates");
 		engine.setDefaultExtension("thymeleaf");
 		gw.setTemplateEngine(engine);
+		doTemplateTests("thymeleaf");
 		doTemplateTests("thymeleaf");
 	}
 
@@ -354,18 +390,25 @@ public abstract class AbstractTemplateTest extends TestCase {
 
 	protected void doTemplateTests(String name) throws Exception {
 
-		HttpGet get = new HttpGet("http://localhost:3000/html");
+		HttpGet get = new HttpGet("http://localhost:3000/html/en");
 		HttpResponse rsp = cl.execute(get, null).get();
 		String header = rsp.getLastHeader("Set-Cookie").getValue();
 
-		// JSESSIONID="1|1c4xy2u8fjab3";$Path="/"
-		assertTrue(header.startsWith("SID=\""));
-		assertTrue(header.endsWith("\";$Path=\"/html\""));
+		// SID="1|1c4xy2u8fjab3";$Path="/"
+		assertTrue(header.startsWith("SID=\"1|"));
+		assertTrue(header.endsWith(";$Path=\"/html\""));
 
 		assertEquals(200, rsp.getStatusLine().getStatusCode());
 		byte[] bytes = CommonUtils.readFully(rsp.getEntity().getContent());
 		String html = new String(bytes, StandardCharsets.UTF_8);
 
+		// #1.) Multilanguage (default language)
+		assertTrue(html.contains("<li>Ok"));
+		assertTrue(html.contains("<li>Hello!"));
+		assertTrue(html.contains("<li>Goodbye!"));
+		assertTrue(html.contains("<li>How are you?"));
+		
+		// Table
 		assertTrue(html.contains("<h1>header</h1>"));
 		assertTrue(html.contains(name));
 		if ("thymeleaf".equals(name)) {
@@ -398,6 +441,30 @@ public abstract class AbstractTemplateTest extends TestCase {
 		assertEquals("1", t.get("a", ""));
 		assertEquals("2", t.get("b", ""));
 		assertEquals("3", t.get("c", ""));
+		
+		// #2.) Multilanguage (French language)
+		get = new HttpGet("http://localhost:3000/html/fr");
+		rsp = cl.execute(get, null).get();
+		assertEquals(200, rsp.getStatusLine().getStatusCode());
+		bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+		html = new String(bytes, StandardCharsets.UTF_8);
+		
+		assertTrue(html.contains("<li>Ok"));
+		assertTrue(html.contains("<li>Bonjour!"));
+		assertTrue(html.contains("<li>Au revoir!"));
+		assertTrue(html.contains("<li>Comment allez-vous?"));
+
+		// #3.) Multilanguage (Canadian French)
+		get = new HttpGet("http://localhost:3000/html/fr-ca");
+		rsp = cl.execute(get, null).get();
+		assertEquals(200, rsp.getStatusLine().getStatusCode());
+		bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+		html = new String(bytes, StandardCharsets.UTF_8);
+		
+		assertTrue(html.contains("<li>Ok"));
+		assertTrue(html.contains("<li>Bonjour!"));
+		assertTrue(html.contains("<li>Au revoir!"));
+		assertTrue(html.contains("<li>Comment vas-tu?"));		
 	}
 
 }

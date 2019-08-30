@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2017 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2019 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -271,6 +271,11 @@ public class Route {
 		}
 		for (String whiteListEntry : whiteListEntries) {
 			if (whiteListEntry != null && !whiteListEntry.isEmpty()) {
+				if (whiteListEntry.equals("*") || whiteListEntry.equals("/*") || whiteListEntry.equals("/*.*")) {
+					list.clear();
+					list.addLast("/*");
+					break;
+				}
 				if (whiteListEntry.indexOf('.') == -1) {
 					whiteListEntry = whiteListEntry + "*";
 				}
@@ -313,8 +318,6 @@ public class Route {
 	public void setAfterCall(CallProcessor afterCall) {
 		this.afterCall = afterCall;
 	}
-
-	// --- READ-ONLY PROPERTY GETTERS ---
 
 	public String getPath() {
 		return path;

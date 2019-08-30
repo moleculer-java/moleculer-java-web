@@ -34,6 +34,7 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.handler.HandlerCollection;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
+import org.eclipse.jetty.websocket.jsr356.server.deploy.WebSocketServerContainerInitializer;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.handshake.ServerHandshake;
@@ -46,8 +47,9 @@ import services.moleculer.service.Action;
 import services.moleculer.service.Service;
 import services.moleculer.web.router.RestRoute;
 import services.moleculer.web.router.StaticRoute;
-import services.moleculer.web.servlet.AsyncWorkingMode;
 import services.moleculer.web.servlet.MoleculerServlet;
+import services.moleculer.web.servlet.service.AsyncService;
+import services.moleculer.web.servlet.websocket.EndpointDeployer;
 
 /**
  * "J2EE" server mode (run as Servlet).
@@ -67,12 +69,15 @@ public class JettyWebSocketTest extends TestCase {
 		ServerConnector serverConnector = new ServerConnector(server);
 		serverConnector.setHost("127.0.0.1");
 		serverConnector.setPort(3000);
-		ServletContextHandler servletContextHandler = new ServletContextHandler(ServletContextHandler.SESSIONS);
+		ServletContextHandler servletContextHandler = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
 		servletContextHandler.setContextPath("/");
+
+		WebSocketServerContainerInitializer.configureContext(servletContextHandler);
+		servletContextHandler.addEventListener(new EndpointDeployer());
 
 		// Create non-blocking servlet
 		MoleculerServlet servlet = new MoleculerServlet();
-		servlet.setWorkingMode(new AsyncWorkingMode(servlet));
+		servlet.setWorkingMode(new AsyncService());
 		ServletHolder servletHolder = new ServletHolder(servlet);
 
 		servletHolder.setInitParameter("moleculer.config", "/services/moleculer/web/moleculer.config.xml");
@@ -86,10 +91,10 @@ public class JettyWebSocketTest extends TestCase {
 		server.start();
 
 		ServiceBroker broker = servlet.getBroker();
-		
+
 		// Open local REPL console
 		// broker.repl();
-		
+
 		ApiGateway gateway = servlet.getGateway();
 
 		// REST services
@@ -110,7 +115,7 @@ public class JettyWebSocketTest extends TestCase {
 			public Action send = ctx -> {
 
 				Tree packet = new Tree();
-				packet.put("path", "/ws/test");
+				packet.put("path", "/ws/test/q");
 				packet.put("data", 123);
 
 				ctx.broadcast("websocket.send", packet);
@@ -121,7 +126,7 @@ public class JettyWebSocketTest extends TestCase {
 		});
 
 		// Emulate web browser (see "websocket.js")
-		URI uri = new URI("ws://localhost:3000/ws/test");
+		URI uri = new URI("ws://localhost:3000/ws/test/q");
 		client = new WebSocketClient(uri, new Draft_6455()) {
 
 			@Override

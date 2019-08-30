@@ -1,3 +1,10 @@
 <h1>header</h1>
 <p>thymeleaf</p>
 <p th:text="${d.e}">-</p>
+<h1>Localized messages:<h1>
+<ul>
+<li th:text="${msg.ok}">-</li>
+<li th:text="${msg.greetings}">-</li>
+<li th:text="${msg.farewell}">-</li>
+<li th:text="${msg.inquiry}">-</li>
+</ul>

@@ -25,50 +25,26 @@
  */
 package services.moleculer.web.servlet.websocket;
 
-import java.io.IOException;
-import java.util.Enumeration;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Vector;
+import java.util.Map;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.atmosphere.container.NettyCometSupport;
-import org.atmosphere.cpr.AsyncSupport;
-import org.atmosphere.cpr.AtmosphereFramework;
-import org.atmosphere.cpr.AtmosphereRequest;
-import org.atmosphere.cpr.AtmosphereRequestImpl;
-import org.atmosphere.cpr.AtmosphereResource;
-import org.atmosphere.cpr.AtmosphereResponseImpl;
-import org.atmosphere.cpr.DefaultAsyncSupportResolver;
-import org.atmosphere.util.ExecutorsFactory;
-import org.atmosphere.websocket.WebSocket;
-import org.atmosphere.websocket.WebSocketHandler;
-import org.atmosphere.websocket.WebSocketProcessor.WebSocketException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import javax.websocket.MessageHandler;
+import javax.websocket.Session;
 
 import services.moleculer.ServiceBroker;
-import services.moleculer.config.ServiceBrokerConfig;
 import services.moleculer.stream.PacketStream;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebSocketRegistry;
-import services.moleculer.web.common.Endpoint;
+import services.moleculer.web.common.HttpConstants;
 
-public class ServletWebSocketRegistry extends WebSocketRegistry implements WebSocketHandler {
-
-	// --- LOGGER ---
-
-	private static final Logger logger = LoggerFactory.getLogger(ServletWebSocketRegistry.class);
+public class ServletWebSocketRegistry extends WebSocketRegistry {
 
 	// --- VARIABLES ---
-
-	protected AtmosphereFramework atmosphere = new AtmosphereFramework(false, false);
 
 	protected final String contextPath;
 	protected final int contextPathLength;
@@ -83,256 +59,135 @@ public class ServletWebSocketRegistry extends WebSocketRegistry implements WebSo
 		contextPath = config.getServletContext().getContextPath();
 		contextPathLength = contextPath.length();
 
-		// Set default properties (based on performance measurements)
-		final HashMap<String, String> map = new HashMap<>();
-		String value = config.getInitParameter("moleculer.websocket.disableDefaults");
-		if (value == null || "false".equals(value)) {
-			DefaultAsyncSupportResolver resolver = new DefaultAsyncSupportResolver(atmosphere.getAtmosphereConfig());
-
-			@SuppressWarnings("rawtypes")
-			List<Class<? extends AsyncSupport>> containers = resolver.detectContainersPresent();
-			containers.remove(NettyCometSupport.class);
-			boolean hasContainers = containers.size() > 0;
-			map.put("org.atmosphere.websocket.suppressJSR356", Boolean.toString(hasContainers));
-
-			try {
-				Class.forName("org.glassfish.grizzly.websockets.WebSocket");
-				map.put("org.atmosphere.cpr.asyncSupport", "org.atmosphere.container.GlassFishServ30WebSocketSupport");
-			} catch (Throwable ignored) {
-			}
-
-			map.put("org.atmosphere.cpr.AtmosphereInterceptor.disableDefaults", "true");
-			map.put("org.atmosphere.cpr.Broadcaster.supportOutOfOrderBroadcast", "false");
-			map.put("org.atmosphere.cpr.Broadcaster.threadWaitTime", "0");
-			map.put("org.atmosphere.cpr.broadcasterCacheClass",
-					"services.moleculer.web.servlet.websocket.NullBroadcasterCache");
-
-			String threads = Integer.toString(Math.max(Runtime.getRuntime().availableProcessors() / 2, 3));
-			map.put("org.atmosphere.cpr.broadcaster.maxProcessingThreads", threads);
-			map.put("org.atmosphere.cpr.broadcaster.maxAsyncWriteThreads", threads);
+		// Link WebSocket endpoints to this registry
+		ServletContext ctx = config.getServletContext();
+		EndpointConfigurator configurator = (EndpointConfigurator) ctx.getAttribute("moleculer.endpoint.configurator");
+		if (configurator != null) {
+			configurator.setServletWebSocketRegistry(this);
 		}
-
-		// Init Atmosphere
-		ServletConfig wrapper = new ServletConfig() {
-
-			@Override
-			public String getServletName() {
-				return config.getServletName();
-			}
-
-			@Override
-			public ServletContext getServletContext() {
-				return config.getServletContext();
-			}
-
-			@Override
-			public Enumeration<String> getInitParameterNames() {
-				Vector<String> names = new Vector<>(map.keySet());
-				Enumeration<String> e = config.getInitParameterNames();
-				while (e.hasMoreElements()) {
-					String name = e.nextElement();
-					if (!names.contains(name)) {
-						names.add(name);
-					}
-				}
-				return names.elements();
-			}
-
-			@Override
-			public String getInitParameter(String name) {
-				String value = config.getInitParameter(name);
-				if (value != null) {
-					return value;
-				}
-				return map.get(name);
-			}
-
-		};
-		atmosphere.init(wrapper);
-		atmosphere.addWebSocketHandler(this);
-
-		// Use common executor and scheduler
-		ServiceBrokerConfig cfg = broker.getConfig();
-		atmosphere.getAtmosphereConfig().properties().put(ExecutorsFactory.BROADCASTER_THREAD_POOL, cfg.getExecutor());
-		atmosphere.getAtmosphereConfig().properties().put(ExecutorsFactory.SCHEDULER_THREAD_POOL, cfg.getScheduler());
-	}
-
-	public void stopped() {
-		atmosphere.destroy();
-		super.stopped();
-	}
-
-	public void service(HttpServletRequest req, HttpServletResponse rsp) throws IOException, ServletException {
-		atmosphere.doCometSupport(AtmosphereRequestImpl.wrap(req), AtmosphereResponseImpl.wrap(rsp));
+		ctx.setAttribute("moleculer.servlet.registry", this);
 	}
 
 	// --- WEBSOCKET HANDLERS ---
 
-	@Override
-	public void onOpen(WebSocket webSocket) throws IOException {
-		AtmosphereResource resource = webSocket.resource();
-		if (resource == null) {
-			return;
-		}
-		AtmosphereRequest atmosphereRequest = resource.getRequest();
-		if (atmosphereRequest == null) {
-			return;
-		}
-		String path = getRealPathInfo(atmosphereRequest);
+	protected void onOpen(Session session) {
+
+		// Get "pathInfo"
+		String pathInfo = getPathInfo(session);
+
+		// Check access
 		if (webSocketFilter != null) {
-			WebRequest webRequest = new WebRequest() {
+			boolean accept = webSocketFilter.onConnect(new WebRequest() {
 
 				@Override
-				public final boolean isMultipart() {
+				public boolean isMultipart() {
 					return false;
 				}
 
 				@Override
-				public final String getQuery() {
-					return atmosphereRequest.getQueryString();
+				public String getQuery() {
+					return session.getQueryString();
 				}
 
 				@Override
-				public final String getPath() {
-					return path;
+				public String getPath() {
+					return pathInfo;
 				}
 
 				@Override
-				public final String getMethod() {
-					return atmosphereRequest.getMethod();
+				public String getMethod() {
+					return "GET";
 				}
 
 				@Override
-				public final Iterator<String> getHeaders() {
-					Enumeration<String> headers = atmosphereRequest.getHeaderNames();
-					return new Iterator<String>() {
+				public Iterator<String> getHeaders() {
+					return getHeaderMap().keySet().iterator();
+				}
 
-						@Override
-						public final boolean hasNext() {
-							return headers.hasMoreElements();
+				@Override
+				public String getHeader(String name) {
+					return getHeader(name);
+				}
+
+				@Override
+				public String getContentType() {
+					return getHeader(HttpConstants.CONTENT_TYPE, "text/plain");
+				}
+
+				@Override
+				public int getContentLength() {
+					try {
+						return Integer.parseInt(getHeader(HttpConstants.CONTENT_LENGTH, "-1"));
+					} catch (Exception ignored) {
+					}
+					return -1;
+				}
+
+				@Override
+				public PacketStream getBody() {
+					return new PacketStream(null, null);
+				}
+
+				@Override
+				public String getAddress() {
+					return "0.0.0.0";
+				}
+
+				@SuppressWarnings("unchecked")
+				private Map<String, List<String>> getHeaderMap() {
+					Map<String, Object> props = session.getUserProperties();
+					if (props == null) {
+						return Collections.emptyMap();
+					}
+					return (Map<String, List<String>>) props.get("moleculer.headers");
+				}
+
+				private String getHeader(String name, String defaultValue) {
+					Map<String, List<String>> map = getHeaderMap();
+					if (map.isEmpty()) {
+						return defaultValue;
+					}
+					for (String key : map.keySet()) {
+						if (name.equalsIgnoreCase(key)) {
+							List<String> list = map.get(key);
+							if (list != null && !list.isEmpty()) {
+								return list.get(0);
+							}
 						}
-
-						@Override
-						public final String next() {
-							return headers.nextElement();
-						}
-
-					};
+					}
+					return defaultValue;
 				}
 
-				@Override
-				public final String getHeader(String name) {
-					return atmosphereRequest.getHeader(name);
-				}
-
-				@Override
-				public final String getContentType() {
-					return atmosphereRequest.getContentType();
-				}
-
-				@Override
-				public final int getContentLength() {
-					return atmosphereRequest.getContentLength();
-				}
-
-				@Override
-				public final PacketStream getBody() {
-					return null;
-				}
-
-				@Override
-				public final String getAddress() {
-					return atmosphereRequest.getRemoteAddr();
-				}
-
-			};
-			boolean accept = webSocketFilter.onConnect(webRequest);
+			});
 			if (!accept) {
-				resource.close();
-				logger.info(
-						"Inbound WebSocket connection closed due to rejection of the WebSocket Filter: " + webSocket);
+				try {
+					session.close();
+				} catch (Exception ignored) {
+				}
 				return;
 			}
 		}
-		register(path, toEnpoint(webSocket));
-	}
 
-	@Override
-	public void onByteMessage(WebSocket webSocket, byte[] data, int offset, int length) throws IOException {
+		// Register
+		ServletEndpoint endpoint = new ServletEndpoint(session, true);
+		register(pathInfo, endpoint);
 
-		// Not implemented (use REST)
-	}
+		// Add heartbeat handler
+		session.addMessageHandler(new MessageHandler.Whole<String>() {
 
-	/**
-	 * Ping-pong simulation with a special message ("!").
-	 */
-	@Override
-	public void onTextMessage(WebSocket webSocket, String data) throws IOException {
-		if (data != null && "!".equals(data)) {
-			webSocket.write("!");
-		}
-	}
-
-	@Override
-	public void onClose(WebSocket webSocket) {
-		onError(webSocket, null);
-	}
-
-	@Override
-	public void onError(WebSocket webSocket, WebSocketException t) {
-		AtmosphereResource resource = webSocket.resource();
-		if (resource == null) {
-			return;
-		}
-		AtmosphereRequest atmosphereRequest = resource.getRequest();
-		if (atmosphereRequest == null) {
-			return;
-		}
-		String path = getRealPathInfo(atmosphereRequest);
-		deregister(path, toEnpoint(webSocket));
-	}
-
-	protected Endpoint toEnpoint(WebSocket webSocket) {
-		return new Endpoint() {
-
-			@Override
-			public final void send(String message) {
-				try {
-					webSocket.write(message);
-				} catch (Exception ignored) {
-					webSocket.close();
-				}
+			public void onMessage(String text) {
+				endpoint.send("!");
 			}
 
-			@Override
-			public final boolean isOpen() {
-				return webSocket.isOpen();
-			}
-
-			@Override
-			public int hashCode() {
-				return webSocket.hashCode();
-			}
-
-			@Override
-			public boolean equals(Object obj) {
-				if (obj == null || !(obj instanceof Endpoint)) {
-					return false;
-				}
-				Endpoint e = (Endpoint) obj;
-				return e.getInternal() == webSocket;
-			}
-
-			@Override
-			public Object getInternal() {
-				return webSocket;
-			}
-
-		};
+		});
 	}
 
-	protected String getRealPathInfo(AtmosphereRequest atmosphereRequest) {
-		String path = atmosphereRequest.getPathInfo();
+	protected void onClose(Session session) {
+		deregister(getPathInfo(session), new ServletEndpoint(session, false));
+	}
+
+	protected String getPathInfo(Session session) {
+		String path = session.getRequestURI().getPath();
 		if (contextPathLength > 1 && path.startsWith(contextPath)) {
 			return path.substring(contextPathLength);
 		}

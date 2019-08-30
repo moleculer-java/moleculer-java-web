@@ -30,6 +30,9 @@ import static services.moleculer.web.common.GatewayUtils.sendError;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.StringTokenizer;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -44,12 +47,14 @@ import services.moleculer.context.CallOptions;
 import services.moleculer.context.CallOptions.Options;
 import services.moleculer.service.ServiceInvoker;
 import services.moleculer.stream.PacketStream;
+import services.moleculer.util.CheckedTree;
 import services.moleculer.web.CallProcessor;
 import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 import services.moleculer.web.template.AbstractTemplateEngine;
+import services.moleculer.web.template.languages.MessageLoader;
 
 public class ActionInvoker implements RequestProcessor, HttpConstants {
 
@@ -75,11 +80,16 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 	protected final ServiceInvoker serviceInvoker;
 	protected final TreeWriter jsonSerializer;
-	protected final AbstractTemplateEngine templateEngine;
 	protected final Route route;
 	protected final CallProcessor beforeCall;
 	protected final CallProcessor afterCall;
 	protected final ExecutorService executor;
+	protected final AbstractTemplateEngine templateEngine;
+	protected final MessageLoader messageLoader;
+
+	// --- MESSAGE-FILE CACHE ---
+
+	protected final ConcurrentHashMap<String, CachedMessages> messageCache = new ConcurrentHashMap<>();
 
 	// --- CONSTRUCTOR ---
 
@@ -100,6 +110,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		this.beforeCall = beforeCall;
 		this.afterCall = afterCall;
 		this.executor = executor;
+		this.messageLoader = templateEngine == null ? null : templateEngine.getMessageLoader();
 	}
 
 	// --- PROCESS (SERVLET OR NETTY) HTTP REQUEST ---
@@ -149,7 +160,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		// Multipart request
 		if (req.isMultipart()) {
 			executor.execute(() -> {
-				
+
 				// Custom "before call" processor
 				// (eg. copy HTTP headers into the "params" variable)
 				if (beforeCall != null) {
@@ -171,7 +182,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		int contentLength = req.getContentLength();
 		if (contentLength == 0) {
 			executor.execute(() -> {
-				
+
 				// Custom "before call" processor
 				// (eg. copy HTTP headers into the "params" variable)
 				if (beforeCall != null) {
@@ -205,14 +216,14 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 			if (close && !faulty.get()) {
 
 				// Parse body
-				Tree postParams = parsePostBody(body);
+				Tree postParams = parsePostBody(body, req.getContentType());
 
 				// Merge with URL parameters
 				if (urlParams != null) {
 					postParams.copyFrom(urlParams, true);
 				}
 				executor.execute(() -> {
-					
+
 					// Custom "before call" processor
 					// (eg. copy HTTP headers into the "params" variable)
 					if (beforeCall != null) {
@@ -233,7 +244,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 	// --- PARSE BODY OF THE GET / POST REQUEST ---
 
-	protected Tree parsePostBody(byte[] bytes) throws Exception {
+	protected Tree parsePostBody(byte[] bytes, String contentType) throws Exception {
 		Tree params;
 		if (bytes.length == 0) {
 			params = new Tree();
@@ -246,7 +257,29 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 			} else {
 
 				// QueryString body
-				params = parseQueryString(new String(bytes, StandardCharsets.UTF_8));
+				String txt = new String(bytes, StandardCharsets.UTF_8);
+				if (contentType == null || contentType.contains("x-www")) {
+					params = parseQueryString(txt);
+				} else {
+					params = parseTextPlain(txt);
+				}
+			}
+		}
+		return params;
+	}
+
+	// --- PARSE TEXT/PLAIN ENCODED REQUEST ---
+
+	protected Tree parseTextPlain(String query) throws UnsupportedEncodingException {
+		Tree params = new Tree();
+		StringTokenizer st = new StringTokenizer(query, "\r\n");
+		String pair;
+		int i;
+		while (st.hasMoreTokens()) {
+			pair = st.nextToken();
+			i = pair.indexOf("=");
+			if (i > -1) {
+				params.put(pair.substring(0, i).trim(), pair.substring(i + 1).trim());
 			}
 		}
 		return params;
@@ -261,8 +294,8 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		for (String pair : pairs) {
 			i = pair.indexOf("=");
 			if (i > -1) {
-				params.put(URLDecoder.decode(pair.substring(0, i), "UTF-8"),
-						URLDecoder.decode(pair.substring(i + 1), "UTF-8"));
+				params.put(URLDecoder.decode(pair.substring(0, i), "UTF-8").trim(),
+						URLDecoder.decode(pair.substring(i + 1), "UTF-8").trim());
 			}
 		}
 		return params;
@@ -377,7 +410,12 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 						rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_HTML);
 					}
 
-					// Invoke TemplateEngine
+					// Insert language variables by locale
+					if (messageLoader != null) {
+						data = insertMessages(data, meta);
+					}
+
+					// Invoke template engine
 					body = templateEngine.transform(templatePath, data);
 
 				} else {
@@ -402,6 +440,25 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				rsp.end();
 			}
 		}
+	}
+
+	// --- INSERT MULTILANGUAGE BLOCK INTO DATA ---
+
+	@SuppressWarnings("unchecked")
+	protected Tree insertMessages(Tree data, Tree meta) {
+		String locale = meta.get(META_LOCALE, "");
+		long lastModified = messageLoader.getLastModified(locale);
+		CachedMessages cachedMessages = messageCache.get(locale);
+		if (cachedMessages == null || cachedMessages.lastModified != lastModified) {
+			Tree messages = messageLoader.loadMessages(locale);
+			Map<String, Object> messageMap = messages == null ? null : (Map<String, Object>) messages.asObject();
+			cachedMessages = new CachedMessages(messageMap, lastModified);
+			messageCache.put(locale, cachedMessages);
+		}
+		if (cachedMessages.messageMap == null) {
+			return data;
+		}
+		return new CheckedTree(new MergedMap((Map<String, Object>) data.asObject(), cachedMessages.messageMap));
 	}
 
 }

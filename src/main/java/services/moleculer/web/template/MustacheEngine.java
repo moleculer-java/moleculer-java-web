@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2019 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -48,6 +48,7 @@ import io.datatree.Tree;
  * 
  * @see DataTreeEngine
  * @see FreeMarkerEngine
+ * @see HandlebarsEngine
  * @see JadeEngine
  * @see PebbleEngine
  * @see ThymeleafEngine
@@ -55,10 +56,6 @@ import io.datatree.Tree;
 public class MustacheEngine extends AbstractTemplateEngine {
 
 	// --- VARIABLES ---
-
-	protected boolean reloadable;
-
-	protected int writeBufferSize = 2048;
 
 	protected DefaultMustacheFactory factory;
 
@@ -87,7 +84,7 @@ public class MustacheEngine extends AbstractTemplateEngine {
 			factory.compile(templatePath).execute(out, data.asObject());
 
 		}
-		return out.toString().getBytes(loader.charset);
+		return out.toString().getBytes(charset);
 	}
 
 	// --- ROOT PATH OF TEMPLATES ---

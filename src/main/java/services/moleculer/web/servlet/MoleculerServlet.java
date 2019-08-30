@@ -50,6 +50,8 @@ import org.springframework.context.support.FileSystemXmlApplicationContext;
 import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
 import services.moleculer.web.ApiGateway;
+import services.moleculer.web.servlet.service.BlockingService;
+import services.moleculer.web.servlet.service.ServiceMode;
 import services.moleculer.web.servlet.websocket.ServletWebSocketRegistry;
 
 public class MoleculerServlet extends HttpServlet {
@@ -69,13 +71,13 @@ public class MoleculerServlet extends HttpServlet {
 
 	// --- WEBSOCKET REGISTRY ---
 
-	private ServletWebSocketRegistry webSocketRegistry;
+	protected ServletWebSocketRegistry webSocketRegistry;
 
-	private int webSocketCleanupSeconds = 15;
+	protected int webSocketCleanupSeconds = 15;
 
 	// --- WORKING MODE (SYNC / ASYNC) ---
 
-	private WorkingMode workingMode;
+	protected ServiceMode serviceMode;
 
 	// --- OTHER VARIABLES ---
 
@@ -103,7 +105,7 @@ public class MoleculerServlet extends HttpServlet {
 					String key = e.nextElement();
 					String value = config.getInitParameter(key);
 					if (key.startsWith("-D")) {
-						System.setProperty(key.substring(2), value);	
+						System.setProperty(key.substring(2), value);
 					}
 					if (value != null) {
 						set.add(key + '=' + value);
@@ -111,7 +113,7 @@ public class MoleculerServlet extends HttpServlet {
 				}
 				String[] args = new String[set.size()];
 				set.toArray(args);
-				
+
 				// Class of the SpringApplication
 				String springAppName = "org.springframework.boot.SpringApplication";
 				Class<?> springAppClass = Class.forName(springAppName);
@@ -161,20 +163,25 @@ public class MoleculerServlet extends HttpServlet {
 			webSocketRegistry = new ServletWebSocketRegistry(config, broker, webSocketCleanupSeconds);
 			gateway.setWebSocketRegistry(webSocketRegistry);
 
-			// Autodetect working mode
-			if (workingMode == null) {
-				boolean asyncSupported = false;
-				try {
-					Class.forName("javax.servlet.ReadListener");
-					asyncSupported = true;
-				} catch (Throwable notFound) {
+			// Blocking timeout
+			String blockingTimeout = config.getInitParameter("moleculer.blocking.timeout");
+			timeout = blockingTimeout == null ? 60000 * 3 : Long.parseLong(blockingTimeout);
+			
+			// Get or autodetect service mode
+			if (serviceMode == null) {
+				String forceBlocking = config.getInitParameter("moleculer.force.blocking");
+				if (forceBlocking == null || !"true".equals(forceBlocking)) {
+					try {
+						Class.forName("javax.servlet.ReadListener");
+						serviceMode = (ServiceMode) Class.forName("services.moleculer.web.servlet.service.AsyncService")
+								.newInstance();
+						logInfo("Moleculer is using non-blocking request processor.");
+					} catch (Throwable notFound) {
+					}
 				}
-				config.getServletContext().log("Moleculer running with "
-						+ (asyncSupported ? "non-blocking" : "blocking") + " request processor.");
-				if (asyncSupported) {
-					workingMode = new AsyncWorkingMode(this);
-				} else {
-					workingMode = new BlockingWorkingMode(this);
+				if (serviceMode == null) {
+					serviceMode = new BlockingService(timeout);
+					logInfo("Moleculer is using blocking request processor (blocking timeout: " + timeout + " msec).");
 				}
 			}
 
@@ -193,28 +200,24 @@ public class MoleculerServlet extends HttpServlet {
 		HttpServletResponse response = (HttpServletResponse) rsp;
 		try {
 
-			// WebSocket handling
-			if (request.getHeader("Upgrade") != null) {
-				webSocketRegistry.service(request, response);
-				return;
-			}
-
 			// Process GET/POST/PUT/etc. requests
-			workingMode.service(request, response);
+			serviceMode.service(broker, gateway, request, response);
 
 		} catch (IllegalStateException illegalState) {
 
 			// Switching back to blocking mode
-			if (workingMode instanceof AsyncWorkingMode) {
-				req.getServletContext().log("Switching back to blocking mode.");
-				workingMode = new BlockingWorkingMode(this);
+			if (serviceMode.getClass().getName().contains("Async")) {
+				logInfo("IllegalStateException occured, switching back to blocking mode "
+						+ " (hint: set the 'moleculer.force.blocking' Servlet parameter to 'true').");
+				serviceMode = new BlockingService(timeout);
 
 				// Repeat processing
 				try {
-					workingMode.service(request, response);
+					serviceMode.service(broker, gateway, request, response);
 				} catch (Throwable cause) {
 					handleError(response, cause);
-				};
+				}
+
 			} else {
 				handleError(response, illegalState);
 			}
@@ -238,6 +241,19 @@ public class MoleculerServlet extends HttpServlet {
 		}
 	}
 
+	protected void logInfo(String message) {
+		if (broker != null) {
+			broker.getLogger(MoleculerServlet.class).info(message);
+			return;
+		}
+		ServletContext ctx = getServletContext();
+		if (ctx != null) {
+			ctx.log(message);
+			return;
+		}
+		System.out.println(message);
+	}
+	
 	protected void logError(String message, Throwable cause) {
 		if (broker != null) {
 			broker.getLogger(MoleculerServlet.class).error(message, cause);
@@ -260,7 +276,7 @@ public class MoleculerServlet extends HttpServlet {
 	public void destroy() {
 		super.destroy();
 
-		// Stop Atmosphere
+		// Stop cleanup timer
 		if (webSocketRegistry != null) {
 			try {
 				webSocketRegistry.stopped();
@@ -277,12 +293,14 @@ public class MoleculerServlet extends HttpServlet {
 			} catch (Throwable ignored) {
 			}
 		}
-		
-		// Stop broker
-		Tree info = broker.getConfig().getServiceRegistry().getDescriptor();
-		Tree services = info.get("services");
-		if (services != null && !services.isNull() && services.size() > 0) {
-			broker.stop();
+
+		// Stop broker (if required)
+		if (broker != null) {
+			Tree info = broker.getConfig().getServiceRegistry().getDescriptor();
+			Tree services = info.get("services");
+			if (services != null && !services.isNull() && services.size() > 0) {
+				broker.stop();
+			}
 		}
 	}
 
@@ -298,8 +316,8 @@ public class MoleculerServlet extends HttpServlet {
 
 	// --- SETTERS (FOR TESTING) ---
 
-	public void setWorkingMode(WorkingMode workingMode) {
-		this.workingMode = workingMode;
+	public void setWorkingMode(ServiceMode serviceMode) {
+		this.serviceMode = serviceMode;
 	}
 
 }

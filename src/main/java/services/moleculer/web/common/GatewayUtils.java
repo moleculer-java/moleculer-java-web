@@ -28,6 +28,7 @@ package services.moleculer.web.common;
 import static services.moleculer.util.CommonUtils.readFully;
 
 import java.io.File;
+import java.io.InputStream;
 import java.net.HttpCookie;
 import java.net.URI;
 import java.net.URL;
@@ -204,14 +205,32 @@ public final class GatewayUtils implements HttpConstants {
 	}
 
 	public static final long getFileSize(String path) {
+		InputStream in = null;
 		try {
 			URL url = getFileURL(path);
-			if (url != null && "file".equals(url.getProtocol())) {
-				File file = new File(new URI(url.toString()));
-				return file.length();
+			if (url != null) {
+				if ("file".equals(url.getProtocol())) {
+					File file = new File(new URI(url.toString()));
+					return file.length();
+				}
+				byte[] tmp = new byte[10240];
+				int len;
+				long total = 0;
+				in = url.openStream();
+				while ((len = in.read(tmp)) != -1) {
+					total += len;
+				}
+				return total;
 			}
 		} catch (Exception ignored) {
 			logger.debug("Unable to get file size: " + path);
+		} finally {
+			if (in != null) {
+				try {
+					in.close();					
+				} catch (Exception ignored) {
+				}
+			}
 		}
 		return -1;
 	}

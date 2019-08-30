@@ -1,3 +1,10 @@
 <h1>header</h1>
 <p>pebble</p>
 <p>D.E: {{d.e}}</p>
+<h1>Localized messages:<h1>
+<ul>
+<li>{{msg.ok}}
+<li>{{msg.greetings}}
+<li>{{msg.farewell}}
+<li>{{msg.inquiry}}
+</ul>

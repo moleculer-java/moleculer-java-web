@@ -168,14 +168,23 @@ public class ApiGateway extends Service implements RequestProcessor {
 		webSocketRegistry.send(path, msg);
 	};
 
-	// --- CONSTRUCTOR ---
+	// --- CONSTRUCTORS ---
 
 	public ApiGateway() {
+		this((String[]) null);
+	}
+
+	public ApiGateway(String... whiteListEntries) {
 
 		// Init locks for static/dynamic mappings
 		ReentrantReadWriteLock lock = new ReentrantReadWriteLock(false);
 		readLock = lock.readLock();
 		writeLock = lock.writeLock();
+
+		// Add basic route for REST services ("service1*", "service2.action")
+		if (whiteListEntries != null && whiteListEntries.length > 0) {
+			addRoute(new Route()).addToWhiteList(whiteListEntries);
+		}
 	}
 
 	// --- START GATEWAY INSTANCE ---
@@ -558,7 +567,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 		if (templateEngine != null && route.getTemplateEngine() == null) {
 			route.setTemplateEngine(templateEngine);
 		}
-
+		
 		// Set "beforeCall" hook
 		if (beforeCall != null && route.getBeforeCall() == null) {
 			route.setBeforeCall(beforeCall);
@@ -650,7 +659,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 		// Set Template Engine
 		this.templateEngine = templateEngine;
 
-		// Set Template Engine in Routes
+		// Set Template Engine of Routes
 		if (templateEngine != null) {
 			for (Route route : routes) {
 				if (route.getTemplateEngine() == null) {
@@ -669,7 +678,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 		// Set method
 		this.beforeCall = beforeCall;
 
-		// Set "beforeCall" processor in Routes
+		// Set "beforeCall" processor of Routes
 		if (beforeCall != null) {
 			for (Route route : routes) {
 				if (route.getBeforeCall() == null) {
@@ -688,7 +697,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 		// Set method
 		this.afterCall = afterCall;
 
-		// Set "afterCall" processor in Routes
+		// Set "afterCall" processor of Routes
 		if (afterCall != null) {
 			for (Route route : routes) {
 				if (route.getAfterCall() == null) {
