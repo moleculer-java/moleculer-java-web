@@ -23,19 +23,19 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package services.moleculer.web.servlet;
+package services.moleculer.web.servlet.service;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-public abstract class WorkingMode {
+import services.moleculer.ServiceBroker;
+import services.moleculer.web.ApiGateway;
+
+/**
+ * Blocking or non-blocking request processing mode.
+ */
+public interface ServiceMode {
 	
-	protected final MoleculerServlet servlet;
-	
-	public WorkingMode(MoleculerServlet servlet) {
-		this.servlet = servlet;
-	}
-	
-	public abstract void service(HttpServletRequest request, HttpServletResponse response) throws Exception;
+	void service(ServiceBroker broker, ApiGateway gateway, HttpServletRequest request, HttpServletResponse response) throws Exception;
 	
 }

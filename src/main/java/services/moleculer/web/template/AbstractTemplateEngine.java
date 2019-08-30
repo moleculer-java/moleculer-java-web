@@ -25,8 +25,8 @@
  */
 package services.moleculer.web.template;
 
-import static services.moleculer.web.common.GatewayUtils.readAllBytes;
 import static services.moleculer.web.common.GatewayUtils.getLastModifiedTime;
+import static services.moleculer.web.common.GatewayUtils.readAllBytes;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -34,6 +34,8 @@ import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 
 import io.datatree.Tree;
+import services.moleculer.web.template.languages.DefaultMessageLoader;
+import services.moleculer.web.template.languages.MessageLoader;
 
 /**
  * Abstract superclass of all server-side template engines (HTML renderers).
@@ -60,7 +62,16 @@ public abstract class AbstractTemplateEngine {
 	protected boolean reloadable;
 
 	protected ExecutorService executor;
+	
+	// --- MESSAGE HANDLER ---
 
+	/**
+	 * Language/message loader (I18N).
+	 * 
+	 * @see DefaultMessageLoader
+	 */
+	protected MessageLoader messageLoader;
+	
 	// --- TRANSFORM JSON TO HTML ---
 
 	public abstract byte[] transform(String templatePath, Tree data) throws Exception;
@@ -137,7 +148,17 @@ public abstract class AbstractTemplateEngine {
 	public void setExecutor(ExecutorService executor) {
 		this.executor = executor;
 	}
+	
+	// --- MESSAGE LOADER ---
+	
+	public MessageLoader getMessageLoader() {
+		return messageLoader;
+	}
 
+	public void setMessageLoader(MessageLoader messageLoader) {
+		this.messageLoader = messageLoader;
+	}
+	
 	// --- PROTECTED UTILS ---
 
 	protected static long getLastModifiedMillis(String parent, String name, String extension, boolean reloadable) {

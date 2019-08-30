@@ -45,26 +45,27 @@ public class NonBlockingWebRequest extends AbstractWebRequest {
 
 	// --- CONSTRUCTOR ---
 
-	public NonBlockingWebRequest(ServiceBroker broker, AsyncContext async, HttpServletRequest req) throws IOException {
-		super(req);
+	public NonBlockingWebRequest(ServiceBroker broker, AsyncContext async) throws IOException {
+		super((HttpServletRequest) async.getRequest());
 
 		// Create body stream
 		if (multipart) {
 			createMultipartStream(broker, async);
 		} else {
-			createStream(broker);
+			createStream(broker, async);
 		}
 	}
 
 	// --- NORMAL POST ---
 
-	protected void createStream(ServiceBroker broker) throws IOException {
-		ServletInputStream in = req.getInputStream();
+	protected void createStream(ServiceBroker broker, AsyncContext async) throws IOException {
 		stream = broker.createStream();
+		ServletInputStream in = req.getInputStream();
 		in.setReadListener(new ReadListener() {
 
 			@Override
 			public final void onError(Throwable cause) {
+				cause.printStackTrace();
 				stream.sendError(cause);
 			}
 
@@ -135,7 +136,7 @@ public class NonBlockingWebRequest extends AbstractWebRequest {
 				}
 				final byte buffer[] = new byte[len];
 				while (in.isReady() && (len = in.read(buffer)) != -1) {
-					if (len > 0) {
+					if (len > 0) {		
 						parser.write(buffer, 0, len);
 					}
 				}
@@ -143,6 +144,7 @@ public class NonBlockingWebRequest extends AbstractWebRequest {
 
 			@Override
 			public final void onError(Throwable t) {
+				t.printStackTrace();
 				try {
 					stream.sendError(t);
 				} catch (Exception ignored) {
@@ -159,7 +161,6 @@ public class NonBlockingWebRequest extends AbstractWebRequest {
 
 			@Override
 			public final void onAllDataRead() throws IOException {
-				
 				// Do nothing
 			}
 

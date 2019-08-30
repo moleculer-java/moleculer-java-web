@@ -23,37 +23,43 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package services.moleculer.web.servlet;
+package services.moleculer.web.servlet.service;
 
-import javax.servlet.AsyncContext;
+import java.util.concurrent.TimeoutException;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import services.moleculer.web.servlet.request.NonBlockingWebRequest;
-import services.moleculer.web.servlet.response.NonBlockingWebResponse;
+import services.moleculer.ServiceBroker;
+import services.moleculer.web.ApiGateway;
+import services.moleculer.web.servlet.request.BlockingWebRequest;
+import services.moleculer.web.servlet.response.BlockingWebResponse;
 
-public class AsyncWorkingMode extends WorkingMode {
+/**
+ * Blocking request processing mode.
+ */
+public class BlockingService implements ServiceMode {
 
-	public AsyncWorkingMode(MoleculerServlet servlet) {
-		super(servlet);
+	protected final long timeout;
+	
+	public BlockingService(long timeout) {
+		this.timeout = timeout;
 	}
-
+	
 	@Override
-	public void service(HttpServletRequest request, HttpServletResponse response) throws Exception {
-		AsyncContext async = null;
+	public void service(ServiceBroker broker, ApiGateway gateway, HttpServletRequest request, HttpServletResponse response) throws Exception {
 		try {
 
-			// Start async
-			async = request.startAsync(request, response);
+			// Blocking service
+			BlockingWebResponse bwr = new BlockingWebResponse(response);
+			gateway.service(new BlockingWebRequest(broker, request), bwr);
+			bwr.waitFor(timeout);
 
-			// Process request
-			servlet.gateway.service(new NonBlockingWebRequest(servlet.broker, async, request), new NonBlockingWebResponse(async, response));
-
-		} catch (Throwable cause) {
-			if (async != null) {
-				async.complete();
+		} catch (TimeoutException timeout) {
+			try {
+				response.sendError(408);
+			} catch (Throwable ignored) {
 			}
-			throw cause;
 		}
 	}
 

@@ -104,5 +104,10 @@ public interface HttpConstants {
 	 * Location in header for redirects.
 	 */
 	public static final String META_LOCATION = "$location";
+
+	/**
+	 * Locale (~= language) of the generated HTML page.
+	 */
+	public static final String META_LOCALE = "$locale";
 	
 }

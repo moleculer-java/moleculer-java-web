@@ -117,6 +117,15 @@ public class NettyServer extends Service {
 
 	protected NettyWebSocketRegistry webSocketRegistry;
 
+	// --- CONSTRUCTORS ---
+	
+	public NettyServer() {
+	}
+
+	public NettyServer(int port) {
+		this.port = port;
+	}
+
 	// --- INIT GATEWAY ---
 
 	private final Object gatewayLock = new Object();

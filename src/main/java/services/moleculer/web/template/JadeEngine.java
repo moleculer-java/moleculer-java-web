@@ -49,6 +49,7 @@ import io.datatree.Tree;
  * 
  * @see DataTreeEngine
  * @see FreeMarkerEngine
+ * @see HandlebarsEngine
  * @see MustacheEngine
  * @see PebbleEngine
  * @see ThymeleafEngine

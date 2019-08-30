@@ -46,25 +46,15 @@ public class NonBlockingWebResponse extends AbstractWebResponse {
 	protected final AtomicReference<Throwable> error = new AtomicReference<>();
 
 	protected final LinkedList<byte[]> queue = new LinkedList<>();
-
+	
+	protected final SharedListener sharedListener;
+	
 	// --- CONSTRUCTOR ---
 
-	public NonBlockingWebResponse(AsyncContext async, HttpServletResponse rsp) throws IOException {
-		super(rsp);
+	public NonBlockingWebResponse(AsyncContext async) throws IOException {
+		super((HttpServletResponse) async.getResponse());
+		sharedListener = new SharedListener(async);
 		this.async = async;
-		out.setWriteListener(new WriteListener() {
-
-			@Override
-			public void onWritePossible() throws IOException {
-				sendPacket();
-			}
-
-			@Override
-			public void onError(Throwable t) {
-				error.set(t);
-			}
-
-		});
 	}
 
 	// --- ASYNC WRITE ---
@@ -125,9 +115,10 @@ public class NonBlockingWebResponse extends AbstractWebResponse {
 			while (out.isReady() && !queue.isEmpty()) {
 				bytes = queue.removeFirst();
 				if (bytes == END_MARKER) {
-					try {			
+					try {
 						out.close();
 					} catch (Exception ignored) {
+						ignored.printStackTrace();
 					} finally {
 						async.complete();
 					}
@@ -135,7 +126,45 @@ public class NonBlockingWebResponse extends AbstractWebResponse {
 				}
 				out.write(bytes);
 			}
+			if (!out.isReady() && !queue.isEmpty()) {
+				out.setWriteListener(sharedListener);
+			}
 		}
 	}
 
+	// --- LISTENER ---
+	
+	protected class SharedListener implements WriteListener {
+
+		private final AsyncContext ctx;
+		
+		private SharedListener(AsyncContext ctx) {
+			this.ctx = ctx;
+		}
+		
+		@Override
+		public void onWritePossible() throws IOException {
+			sendPacket();
+		}
+
+		@Override
+		public void onError(Throwable t) {
+			error.set(t);
+		}
+
+		@Override
+		public int hashCode() {
+			return async.hashCode();
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (obj != null && obj instanceof SharedListener) {
+				return ((SharedListener) obj).ctx == ctx;
+			}
+			return false;
+		}
+
+	}
+	
 }

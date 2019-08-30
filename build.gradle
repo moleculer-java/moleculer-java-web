@@ -85,7 +85,7 @@ dependencies {
     // =============== MOLECULER ===============
 
 	// Moleculer core (required)
-	compile group: 'com.github.berkesa', name: 'moleculer-java', version: '1.1.1'
+	compile group: 'com.github.berkesa', name: 'moleculer-java', version: '1.1.2'
 	
 	// Moleculer developer console (optional)
     compile group: 'com.github.berkesa', name: 'moleculer-java-repl', version: '1.0.6'
@@ -123,17 +123,7 @@ dependencies {
 	// https://mvnrepository.com/artifact/io.netty/netty-codec-http
 	compile group: 'io.netty', name: 'netty-codec-http', version: '4.1.38.Final'
 
-	// --- SERVLET API ---
-
-	// https://mvnrepository.com/artifact/javax.servlet/javax.servlet-api
-	compile group: 'javax.servlet', name: 'javax.servlet-api', version: '3.1.0'
-
-	// --- WEBSOCKET API (FOR SERVLETS) ---
-
-	// https://mvnrepository.com/artifact/org.atmosphere/atmosphere-runtime
-	compile group: 'org.atmosphere', name: 'atmosphere-runtime', version: '2.5.4'
-
-	// --- WEBSOCKET API (CLIENT FOR TESTING) ---
+	// --- WEBSOCKET API ---
 		
 	// https://mvnrepository.com/artifact/org.java-websocket/Java-WebSocket
 	compile group: 'org.java-websocket', name: 'Java-WebSocket', version: '1.4.0'
@@ -191,6 +181,11 @@ dependencies {
 	// https://mvnrepository.com/artifact/com.mitchellbosecke/pebble
 	compile group: 'com.mitchellbosecke', name: 'pebble', version: '2.4.0'
 
+	// --- HANDLEBARS ---
+	
+	// https://mvnrepository.com/artifact/com.github.jknack/handlebars
+	compile group: 'com.github.jknack', name: 'handlebars', version: '4.1.2'
+ 
 }
 
 sourceCompatibility = 1.8
@@ -198,8 +193,8 @@ targetCompatibility = 1.8
 
 group = 'com.github.berkesa'
 
-// version = '1.0.6-SNAPSHOT'
-version = '1.0.6'
+version = '1.1.0-SNAPSHOT'
+// version = '1.1.0'
 
 modifyPom {
     project {
@@ -227,7 +222,7 @@ modifyPom {
             dependency {
                 groupId 'com.github.berkesa'
                 artifactId 'moleculer-java'
-                version '1.1.1'
+                version '1.1.2'
                 scope 'runtime'
             }
             dependency {
@@ -246,12 +241,6 @@ modifyPom {
                 groupId 'io.netty'
                 artifactId 'netty-codec-http'
                 version '4.1.36.Final'
-                scope 'runtime'
-            }
-            dependency {
-                groupId 'org.atmosphere'
-                artifactId 'atmosphere-runtime'
-                version '2.5.4'
                 scope 'runtime'
             }
         }
@@ -286,5 +275,5 @@ compileJava {
 
 jar {
     baseName = 'moleculer-web'
-    version =  '1.0.6'
+    version =  '1.1.0'
 }

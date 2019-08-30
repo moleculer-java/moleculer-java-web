@@ -61,6 +61,7 @@ import services.moleculer.util.CheckedTree;
  * </pre>
  * 
  * @see DataTreeEngine
+ * @see HandlebarsEngine
  * @see JadeEngine
  * @see MustacheEngine
  * @see PebbleEngine

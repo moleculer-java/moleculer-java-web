@@ -42,6 +42,8 @@ import org.thymeleaf.templateresource.ITemplateResource;
 import org.thymeleaf.templateresource.StringTemplateResource;
 import org.thymeleaf.util.FastStringWriter;
 
+import static services.moleculer.web.common.HttpConstants.META_LOCALE;
+
 import io.datatree.Tree;
 
 /**
@@ -54,6 +56,7 @@ import io.datatree.Tree;
  * 
  * @see DataTreeEngine
  * @see FreeMarkerEngine
+ * @see HandlebarsEngine
  * @see JadeEngine
  * @see MustacheEngine
  * @see PebbleEngine
@@ -190,7 +193,7 @@ public class ThymeleafEngine extends AbstractTemplateEngine {
 			if (locale == null) {
 				Tree meta = data.getMeta(false);
 				if (meta != null) {
-					String loc = meta.get("$locale", (String) null);
+					String loc = meta.get(META_LOCALE, (String) null);
 					if (loc != null) {
 						locale = localeCache.get(loc);
 						if (locale == null) {
