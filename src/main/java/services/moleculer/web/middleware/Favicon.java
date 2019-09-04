@@ -41,9 +41,25 @@ public class Favicon extends HttpMiddleware implements HttpConstants {
 
 	// --- PROPERTIES ---
 
+	/**
+	 * Relative icon file path.
+	 */
 	protected String iconPath;
+
+	/**
+	 * Max-age header's value (0 = no max-age header).
+	 */
 	protected int maxAge = 60;
+
+	/**
+	 * Relative URL of the Favicon.
+	 */
 	protected String iconURL = "/favicon.ico";
+
+	/**
+	 * Use ETag headers
+	 */
+	protected boolean useETags = true;
 
 	// --- CACHED IMAGE ---
 
@@ -71,41 +87,77 @@ public class Favicon extends HttpMiddleware implements HttpConstants {
 		return new RequestProcessor() {
 
 			/**
+			 * Current ETag.
+			 */
+			String etag = Long.toHexString(System.currentTimeMillis());
+
+			/**
 			 * Handles request of the HTTP client.
 			 * 
 			 * @param req
-			 *            WebRequest object that contains the request the client made of
-			 *            the ApiGateway
+			 *            WebRequest object that contains the request the client
+			 *            made of the ApiGateway
 			 * @param rsp
-			 *            WebResponse object that contains the response the ApiGateway
-			 *            returns to the client
+			 *            WebResponse object that contains the response the
+			 *            ApiGateway returns to the client
 			 * 
 			 * @throws Exception
-			 *             if an input or output error occurs while the ApiGateway is
-			 *             handling the HTTP request
+			 *             if an input or output error occurs while the
+			 *             ApiGateway is handling the HTTP request
 			 */
 			@Override
-			public void service(WebRequest req, WebResponse rsp) throws Exception {					
+			public void service(WebRequest req, WebResponse rsp) throws Exception {
 				if (iconURL.equals(req.getPath())) {
 					try {
-						rsp.setHeader(CONTENT_TYPE, "image/x-icon");						
+
+						// Check ETag
+						if (useETags) {
+							String ifNoneMatch = req.getHeader(IF_NONE_MATCH);
+							if (ifNoneMatch != null && ifNoneMatch.equals(etag)) {
+
+								// 304 Not Modified
+								try {
+									rsp.setStatus(304);
+									rsp.setHeader(CONTENT_LENGTH, "0");
+								} finally {
+									rsp.end();
+								}
+								return;
+							}
+						}
+
+						// Set Content-Type header
+						rsp.setHeader(CONTENT_TYPE, "image/x-icon");
+
+						// Set ETag header
+						if (useETags) {
+							rsp.setHeader(ETAG, etag);
+						}
+
+						// Set Cache-Control header
 						if (maxAge > 0) {
 							rsp.setHeader(CACHE_CONTROL, "public, max-age=" + maxAge);
 						}
+
+						// Load image
 						if (image == null && iconPath != null) {
 							image = readAllBytes(iconPath);
 							if (image.length == 0) {
 								throw new IllegalArgumentException("File or resource not found: " + iconPath);
 							}
 						}
+
+						// Set Content-Length
 						rsp.setHeader(CONTENT_LENGTH, Integer.toString(image.length));
+
+						// Send image
 						rsp.send(image);
 					} finally {
 						rsp.end();
 					}
-					return;					
+					return;
 				}
-				
+
 				// Invoke next handler / action
 				next.service(req, rsp);
 			}
@@ -138,6 +190,14 @@ public class Favicon extends HttpMiddleware implements HttpConstants {
 
 	public void setIconURL(String iconURL) {
 		this.iconURL = Objects.requireNonNull(iconURL);
+	}
+
+	public boolean isUseETags() {
+		return useETags;
+	}
+
+	public void setUseETags(boolean useETags) {
+		this.useETags = useETags;
 	}
 
 }

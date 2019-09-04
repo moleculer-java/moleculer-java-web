@@ -59,7 +59,8 @@ public class PojoTest extends TestCase {
 
 	private static class FilterTestClasses implements PojoClassFilter {
 		public boolean include(PojoClass pojoClass) {
-			boolean enable = !pojoClass.getName().contains("Test") && !pojoClass.getName().contains("$");
+			String n = pojoClass.getName();
+			boolean enable = !n.contains("Test") && !n.contains("$") && !n.contains("TopLevelCache");
 			if (enable) {
 				// System.out.println(pojoClass.getName());
 			}

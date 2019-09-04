@@ -10,7 +10,7 @@
 
 - The same code can run as a J2EE Servlet and as high-performance Netty application without any changes
 - WebSocket support (same API for Netty and J2EE Servers)
-- Can run as a non-blocking Servlet (tested on JBoss EAP, GlassFish, Tomcat, Jetty)
+- Can run as a non-blocking Servlet (tested on JBoss EAP, GlassFish, Tomcat, Jetty, WebLogic, WAS Liberty)
 - Able to run without a Servlet Container ("high performance mini webserver")
 - SSL/HTTPS support
 - Serving static files (HTML, CSS, JavaScript, images, videos, etc.)
@@ -36,7 +36,7 @@
 	<dependency>
 		<groupId>com.github.berkesa</groupId>
 		<artifactId>moleculer-java-web</artifactId>
-		<version>1.0.6</version>
+		<version>1.1.0</version>
 		<scope>runtime</scope>
 	</dependency>
 </dependencies>
@@ -46,7 +46,7 @@
 
 ```gradle
 dependencies {
-	compile group: 'com.github.berkesa', name: 'moleculer-java-web', version: '1.0.6' 
+	compile group: 'com.github.berkesa', name: 'moleculer-java-web', version: '1.1.0' 
 }
 ```
 

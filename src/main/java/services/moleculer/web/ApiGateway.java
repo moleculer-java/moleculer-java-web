@@ -28,6 +28,7 @@ package services.moleculer.web;
 import static services.moleculer.util.CommonUtils.nameOf;
 import static services.moleculer.web.common.HttpConstants.CONTENT_LENGTH;
 
+import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
@@ -45,10 +46,12 @@ import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
 import services.moleculer.eventbus.Listener;
 import services.moleculer.eventbus.Subscribe;
+import services.moleculer.service.Action;
 import services.moleculer.service.Service;
 import services.moleculer.web.middleware.HttpMiddleware;
 import services.moleculer.web.middleware.NotFound;
 import services.moleculer.web.router.Alias;
+import services.moleculer.web.router.HttpAlias;
 import services.moleculer.web.router.Mapping;
 import services.moleculer.web.router.MappingPolicy;
 import services.moleculer.web.router.Route;
@@ -98,6 +101,11 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 * Global middlewares.
 	 */
 	protected Set<HttpMiddleware> globalMiddlewares = new LinkedHashSet<>(32);
+
+	/**
+	 * Checked services with @HttpAlias annotations.
+	 */
+	protected Set<String> checkedNames = new HashSet<>();
 
 	// --- TEMPLATE ENGINE ---
 
@@ -168,6 +176,82 @@ public class ApiGateway extends Service implements RequestProcessor {
 		webSocketRegistry.send(path, msg);
 	};
 
+	// --- AUTODEPLOYER ---
+
+	@Subscribe("$services.changed")
+	public Listener autoDeployListener = payload -> {
+
+		// Local service?
+		if (!payload.get("localService", false)) {
+			return;
+		}
+
+		// Check annotations
+		Tree descriptor = broker.getConfig().getServiceRegistry().getDescriptor();
+		Tree services = descriptor.get("services");
+		if (services == null || services.isEmpty()) {
+			return;
+		}
+		StringBuilder msg = new StringBuilder(128);
+		for (Tree service : services) {
+			String serviceName = service.get("name", "");
+			if (serviceName == null || serviceName.isEmpty() || !checkedNames.add(serviceName)) {
+				continue;
+			}
+			Service localService = broker.getLocalService(serviceName);
+			Class<? extends Service> clazz = localService.getClass();
+			Field[] fields = clazz.getFields();
+			for (Field field : fields) {
+				if (!Action.class.isAssignableFrom(field.getType())) {
+					continue;
+				}
+				field.setAccessible(true);
+				HttpAlias httpAlias = field.getAnnotation(HttpAlias.class);
+				if (httpAlias == null) {
+					continue;
+				}
+
+				// Name of the action (eg. "service.action")
+				String actionName = nameOf(serviceName, field);
+
+				// Create alias for router
+				String httpMethod = httpAlias.method();
+				if (httpMethod == null) {
+
+					// All methods are allowed
+					httpMethod = "ALL";
+				}
+				String pathPattern = httpAlias.path();
+				if (pathPattern == null || pathPattern.isEmpty()) {
+
+					// Deploy as "/service/action"
+					pathPattern = '/' + actionName.replace('.', '/');
+				}
+				
+				// Find Route by path of the Route
+				String routePath = httpAlias.route();
+				if (routePath == null) {
+					routePath = "";
+				}
+				Route route = null;
+				for (Route test : routes) {
+					if (test.getPath().equals(routePath)) {
+						route = test;
+						break;
+					}
+				}
+				if (route == null) {
+					route = addRoute(new Route(routePath));
+				}
+				Alias alias = new Alias(httpMethod, pathPattern, actionName);
+				route.addAlias(alias);
+				if (checkedNames.add(actionName)) {
+					loagAlias(msg, route, alias);					
+				}
+			}
+		}
+	};
+
 	// --- CONSTRUCTORS ---
 
 	public ApiGateway() {
@@ -227,6 +311,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 
 		// Set last route (ServeStatic, "404 Not Found", etc.)
 		lastRoute = new Route("", lastMiddleware);
+		lastRoute.setMappingPolicy(MappingPolicy.ALL);
 		lastRoute.started(broker, globalMiddlewares);
 		logRoute(lastRoute);
 	}
@@ -263,18 +348,9 @@ public class ApiGateway extends Service implements RequestProcessor {
 		Alias[] aliases = route.getAliases();
 		if (aliases != null && aliases.length > 0) {
 			for (Alias alias : aliases) {
-				msg.setLength(0);
-				msg.append(alias.getHttpMethod());
-				msg.append(" methods with path \"");
-				String p = route.getPath();
-				if (p != null && !p.isEmpty() && !"/".equals(p)) {
-					msg.append(p);
+				if (checkedNames.add(alias.getActionName())) {
+					loagAlias(msg, route, alias);
 				}
-				msg.append(alias.getPathPattern());
-				msg.append("\" mapped to \"");
-				msg.append(alias.getActionName());
-				msg.append("\" action.");
-				logger.info(msg.toString());
 			}
 		}
 
@@ -299,9 +375,23 @@ public class ApiGateway extends Service implements RequestProcessor {
 				logger.info(msg.toString());
 			}
 		}
-
 	}
 
+	protected void loagAlias(StringBuilder msg, Route route, Alias alias) {
+		msg.setLength(0);
+		msg.append(alias.getHttpMethod());
+		msg.append(" methods with path \"");
+		String p = route.getPath();
+		if (p != null && !p.isEmpty() && !"/".equals(p)) {
+			msg.append(p);
+		}
+		msg.append(alias.getPathPattern());
+		msg.append("\" mapped to \"");
+		msg.append(alias.getActionName());
+		msg.append("\" action.");
+		logger.info(msg.toString());
+	}
+	
 	// --- STOP GATEWAY INSTANCE ---
 
 	/**
@@ -567,7 +657,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 		if (templateEngine != null && route.getTemplateEngine() == null) {
 			route.setTemplateEngine(templateEngine);
 		}
-		
+
 		// Set "beforeCall" hook
 		if (beforeCall != null && route.getBeforeCall() == null) {
 			route.setBeforeCall(beforeCall);

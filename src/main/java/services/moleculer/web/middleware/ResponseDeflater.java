@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2017 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2019 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -58,8 +58,8 @@ public class ResponseDeflater extends HttpMiddleware implements HttpConstants {
 
 	// --- PROPERTIES ---
 
-	protected int compressionLevel = Deflater.BEST_COMPRESSION;
-	protected int bufferSize = 512;
+	protected int compressionLevel = Deflater.DEFAULT_COMPRESSION;
+	protected int bufferSize = 1024;
 	protected Set<String> compressedTypes = new HashSet<>(
 			Arrays.asList(new String[] { "image", "audio", "video", "gzip" }));
 
@@ -177,7 +177,7 @@ public class ResponseDeflater extends HttpMiddleware implements HttpConstants {
 									rsp.send(bytes);
 
 								}
-							} catch (IOException cause) {
+							} catch (Exception cause) {
 								logger.error("Unable to send compressed content!", cause);
 							} finally {
 								ok = rsp.end();

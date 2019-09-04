@@ -271,13 +271,10 @@ public class Route {
 		}
 		for (String whiteListEntry : whiteListEntries) {
 			if (whiteListEntry != null && !whiteListEntry.isEmpty()) {
-				if (whiteListEntry.equals("*") || whiteListEntry.equals("/*") || whiteListEntry.equals("/*.*")) {
+				if (whiteListEntry.equals("*") || whiteListEntry.equals("/*") || whiteListEntry.equals("/**")) {
 					list.clear();
-					list.addLast("/*");
+					list.addLast("/**");
 					break;
-				}
-				if (whiteListEntry.indexOf('.') == -1) {
-					whiteListEntry = whiteListEntry + "*";
 				}
 				if (!whiteListEntry.startsWith("/")) {
 					whiteListEntry = "/" + whiteListEntry;

@@ -203,15 +203,8 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 
 					// If-None-Match header
 					String ifNoneMatch = null;
-
-					// Client supports compressed content
-					boolean compressionSupported = false;
 					if (useETags) {
 						ifNoneMatch = req.getHeader(IF_NONE_MATCH);
-					}
-					if (compressAbove > 0) {
-						String acceptEncoding = req.getHeader(ACCEPT_ENCODING);
-						compressionSupported = acceptEncoding != null && acceptEncoding.contains(DEFLATE);
 					}
 
 					// Remove prefix
@@ -252,19 +245,6 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 						}
 					}
 
-					// Get extension
-					int i = relativePath.lastIndexOf('.');
-					String extension = "";
-					if (i > -1) {
-						extension = relativePath.substring(i + 1).toLowerCase();
-					}
-
-					// Get content-type
-					String contentType = getContentType(extension);
-
-					// Set "Content-Type" header
-					rsp.setHeader(CONTENT_TYPE, contentType);
-
 					// Handling ETag
 					String etag = null;
 					long time = -1;
@@ -282,7 +262,6 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 							// 304 Not Modified
 							try {
 								rsp.setStatus(304);
-								rsp.setHeader(CONTENT_TYPE, contentType);
 								rsp.setHeader(CONTENT_LENGTH, "0");
 							} finally {
 								rsp.end();
@@ -295,7 +274,27 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 							rsp.setHeader(ETAG, etag);
 						}
 					}
+
+					// Get extension
+					int i = relativePath.lastIndexOf('.');
+					String extension = "";
+					if (i > -1) {
+						extension = relativePath.substring(i + 1).toLowerCase();
+					}
 					
+					// Get content-type
+					String contentType = getContentType(extension);
+					
+					// Set "Content-Type" header
+					rsp.setHeader(CONTENT_TYPE, contentType);
+					
+					// Does the client support compressed content?
+					boolean compressionSupported = false;
+					if (compressAbove > 0) {
+						String acceptEncoding = req.getHeader(ACCEPT_ENCODING);
+						compressionSupported = acceptEncoding != null && acceptEncoding.contains(DEFLATE);
+					}
+
 					// Set body
 					if (cached != null && (!reload || (cached.etag != null && cached.etag.equals(etag)))) {
 
