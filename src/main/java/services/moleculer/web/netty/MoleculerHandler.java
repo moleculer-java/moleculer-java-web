@@ -86,7 +86,7 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 		// --- HTTP MESSAGES ---
 
 		try {
-
+			
 			// HTTP request -> begin
 			if (request instanceof HttpRequest) {
 				HttpRequest httpRequest = (HttpRequest) request;

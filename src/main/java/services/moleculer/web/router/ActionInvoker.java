@@ -137,7 +137,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 		// Parse URL
 		Tree params = null;
-		if (isStatic) {
+		if (isStatic || indexes.length == 0) {
 
 			// HTTP GET QueryString
 			String query = req.getQuery();

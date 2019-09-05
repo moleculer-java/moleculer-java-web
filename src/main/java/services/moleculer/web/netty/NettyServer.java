@@ -83,12 +83,14 @@ public class NettyServer extends Service {
 
 	protected String address;
 
-	protected EventLoopGroup singletonGroup;
+	protected EventLoopGroup threadGroup;
 
 	protected ChannelHandler handler;
 
 	protected int webSocketCleanupSeconds = 15;
 
+	protected boolean shutDownThreadPools = true;
+	
 	// --- SSL PROPERTIES ---
 
 	protected boolean useSSL;
@@ -118,7 +120,7 @@ public class NettyServer extends Service {
 	protected NettyWebSocketRegistry webSocketRegistry;
 
 	// --- CONSTRUCTORS ---
-	
+
 	public NettyServer() {
 	}
 
@@ -129,7 +131,7 @@ public class NettyServer extends Service {
 	// --- INIT GATEWAY ---
 
 	private final Object gatewayLock = new Object();
-	
+
 	@Subscribe("$services.changed")
 	public Listener evt = payload -> {
 		if (gateway == null) {
@@ -141,7 +143,7 @@ public class NettyServer extends Service {
 						webSocketRegistry = new NettyWebSocketRegistry(broker, webSocketCleanupSeconds);
 					}
 					gateway.setWebSocketRegistry(webSocketRegistry);
-					logger.info("ApiGateway connected to Netty Server.");				
+					logger.info("ApiGateway connected to Netty Server.");
 					synchronized (gatewayLock) {
 						gatewayLock.notifyAll();
 					}
@@ -157,9 +159,9 @@ public class NettyServer extends Service {
 		super.started(broker);
 
 		// Worker group
-		if (singletonGroup == null) {
-			singletonGroup = new NioEventLoopGroup(1, Executors.newSingleThreadExecutor(r -> {
-				Thread t = new Thread(r, "Netty Server on port " + port);
+		if (threadGroup == null) {
+			threadGroup = new NioEventLoopGroup(1, Executors.newSingleThreadExecutor(r -> {
+				Thread t = new Thread(r, "Netty Server on port " + port  + " (" + hashCode() + ")");
 				t.setPriority(Thread.MAX_PRIORITY - 1);
 				return t;
 			}));
@@ -167,7 +169,7 @@ public class NettyServer extends Service {
 
 		// Create request chain
 		ServerBootstrap bootstrap = new ServerBootstrap();
-		bootstrap.group(singletonGroup, singletonGroup);
+		bootstrap.group(threadGroup, threadGroup);
 
 		bootstrap.channel(NioServerSocketChannel.class);
 
@@ -215,10 +217,10 @@ public class NettyServer extends Service {
 	@Override
 	public void stopped() {
 		super.stopped();
-		if (singletonGroup != null) {
-			singletonGroup.shutdownGracefully();
-			singletonGroup = null;
+		if (threadGroup != null && shutDownThreadPools) {
+			threadGroup.shutdownGracefully();
 		}
+		threadGroup = null;
 		handler = null;
 		if (webSocketRegistry != null) {
 			webSocketRegistry.stopped();
@@ -430,12 +432,12 @@ public class NettyServer extends Service {
 		this.address = address;
 	}
 
-	public EventLoopGroup getSingletonGroup() {
-		return singletonGroup;
+	public EventLoopGroup getThreadGroup() {
+		return threadGroup;
 	}
 
-	public void setSingletonGroup(EventLoopGroup singletonGroup) {
-		this.singletonGroup = singletonGroup;
+	public void setThreadGroup(EventLoopGroup singletonGroup) {
+		this.threadGroup = singletonGroup;
 	}
 
 	public ChannelHandler getHandler() {
@@ -444,6 +446,14 @@ public class NettyServer extends Service {
 
 	public void setHandler(ChannelHandler handler) {
 		this.handler = handler;
+	}
+
+	public boolean isShutDownThreadPools() {
+		return shutDownThreadPools;
+	}
+
+	public void setShutDownThreadPools(boolean shutDownThreadPools) {
+		this.shutDownThreadPools = shutDownThreadPools;
 	}
 
 }

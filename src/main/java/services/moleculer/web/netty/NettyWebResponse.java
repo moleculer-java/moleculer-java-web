@@ -33,18 +33,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import services.moleculer.web.WebResponse;
+import services.moleculer.web.common.HttpConstants;
 
-public class NettyWebResponse implements WebResponse {
+public class NettyWebResponse implements WebResponse, HttpConstants {
 
 	// --- REQUEST PROPERTIES ----
 
 	protected final ChannelHandlerContext ctx;
 	protected final NettyWebRequest req;
 	protected final Channel channel;
-	
+
 	/**
 	 * Custom properties (for inter-middleware communication).
 	 */
@@ -153,7 +155,7 @@ public class NettyWebResponse implements WebResponse {
 	/**
 	 * Completes the asynchronous operation that was started on the request.
 	 * 
-	 * @return return true, if any resources are released
+	 * @return return true, if all resources are released
 	 */
 	@Override
 	public boolean end() {
@@ -166,12 +168,19 @@ public class NettyWebResponse implements WebResponse {
 			req.parser = null;
 			return true;
 		}
+		try {
+			String connection = req.getHeader(CONNECTION);
+			if (connection == null || !KEEP_ALIVE.equalsIgnoreCase(connection)) {
+				ctx.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+			}
+		} catch (Exception ignored) {
+		}
 		return false;
 	}
 
 	protected void sendHeaders() {
 		if (first.compareAndSet(true, false)) {
-			StringBuilder header = new StringBuilder();
+			StringBuilder header = new StringBuilder(512);
 			if (code == 200) {
 				header.append("HTTP/1.1 200 Ok\r\n");
 			} else {

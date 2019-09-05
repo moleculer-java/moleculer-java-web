@@ -25,8 +25,9 @@
  */
 package services.moleculer.web.servlet.response;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.LinkedList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.servlet.AsyncContext;
@@ -45,15 +46,14 @@ public class NonBlockingWebResponse extends AbstractWebResponse {
 
 	protected final AtomicReference<Throwable> error = new AtomicReference<>();
 
-	protected final LinkedList<byte[]> queue = new LinkedList<>();
-	
-	protected final SharedListener sharedListener;
-	
+	protected final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+
+	protected final AtomicBoolean listenerSet = new AtomicBoolean();
+
 	// --- CONSTRUCTOR ---
 
 	public NonBlockingWebResponse(AsyncContext async) throws IOException {
 		super((HttpServletResponse) async.getResponse());
-		sharedListener = new SharedListener(async);
 		this.async = async;
 	}
 
@@ -77,7 +77,40 @@ public class NonBlockingWebResponse extends AbstractWebResponse {
 			}
 			throw new IOException(t);
 		}
-		addToQueue(bytes);
+		buffer.write(bytes, 0, bytes.length);
+		tryToSend();
+	}
+
+	protected void tryToSend() throws IOException {
+		byte[] bytes;
+		boolean ready = out.isReady();
+		synchronized (buffer) {
+			bytes = buffer.toByteArray();
+			if (ready) {
+				buffer.reset();
+			}
+		}
+		boolean empty = bytes.length == 0;
+		if (ready && !empty) {
+			
+			// Send data
+			out.write(bytes);			
+		}
+		if ((ready || empty) && closed.get()) {
+			
+			// Closed
+			try {
+				out.close();
+			} finally {
+				async.complete();
+			}
+			return;
+		}
+		if ((!ready || empty) && listenerSet.compareAndSet(false, true)) {
+			
+			// Send later
+			out.setWriteListener(new SendLaterListener(async));
+		}
 	}
 
 	// --- END PROCESSING ---
@@ -91,60 +124,28 @@ public class NonBlockingWebResponse extends AbstractWebResponse {
 	public boolean end() {
 		if (closed.compareAndSet(false, true)) {
 			try {
-				addToQueue(END_MARKER);
-			} catch (Throwable t) {
-				error.set(t);
+				tryToSend();				
+			} catch (Exception ignored) {
+				ignored.printStackTrace();
 			}
 			return true;
 		}
 		return false;
 	}
 
-	// --- QUEUE UTILS ---
-
-	protected void addToQueue(byte[] bytes) throws IOException {
-		synchronized (queue) {
-			queue.addLast(bytes);
-		}
-		sendPacket();
-	}
-
-	protected void sendPacket() throws IOException {
-		synchronized (queue) {
-			byte[] bytes;
-			while (out.isReady() && !queue.isEmpty()) {
-				bytes = queue.removeFirst();
-				if (bytes == END_MARKER) {
-					try {
-						out.close();
-					} catch (Exception ignored) {
-						ignored.printStackTrace();
-					} finally {
-						async.complete();
-					}
-					return;
-				}
-				out.write(bytes);
-			}
-			if (!out.isReady() && !queue.isEmpty()) {
-				out.setWriteListener(sharedListener);
-			}
-		}
-	}
-
 	// --- LISTENER ---
-	
-	protected class SharedListener implements WriteListener {
+
+	protected class SendLaterListener implements WriteListener {
 
 		private final AsyncContext ctx;
-		
-		private SharedListener(AsyncContext ctx) {
+
+		private SendLaterListener(AsyncContext ctx) {
 			this.ctx = ctx;
 		}
-		
+
 		@Override
 		public void onWritePossible() throws IOException {
-			sendPacket();
+			tryToSend();
 		}
 
 		@Override
@@ -159,12 +160,12 @@ public class NonBlockingWebResponse extends AbstractWebResponse {
 
 		@Override
 		public boolean equals(Object obj) {
-			if (obj != null && obj instanceof SharedListener) {
-				return ((SharedListener) obj).ctx == ctx;
+			if (obj != null && obj instanceof SendLaterListener) {
+				return ((SendLaterListener) obj).ctx == ctx;
 			}
 			return false;
 		}
 
 	}
-	
+
 }

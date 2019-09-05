@@ -60,6 +60,7 @@ public class JettyWebSocketTest extends TestCase {
 	protected ApiGateway gateway;
 	protected WebSocketClient client;
 
+	@SuppressWarnings("deprecation")
 	@Override
 	protected void setUp() throws Exception {
 
