@@ -4,7 +4,11 @@
 
 # Moleculer API Gateway
 
-[Moleculer](https://github.com/berkesa/moleculer-java) API Gateway is a Service that makes other Moleculer (Java and/or NodeJS) Services available through REST. It allows to create high-performance, non-blocking, distributed web applications. Web request processing can be fine tuned using server-independent middlewares. Moleculer API Gateway provides full support for high-load React, Angular or VueJS applications.
+[Moleculer](https://moleculer-java.github.io/moleculer-java/)
+API Gateway is a Service that makes other Moleculer (Java and/or NodeJS) Services available through REST.
+It allows to create high-performance, non-blocking, distributed web applications.
+Web request processing can be fine tuned using server-independent middlewares.
+Moleculer API Gateway provides full support for high-load React, Angular or VueJS applications.
 
 ## Features
 
