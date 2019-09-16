@@ -74,9 +74,8 @@ To do this, submit the `{"a":3,"b":5}` JSON (as POST body) to this URL:
 
 ## Detailed Example
 
-A demo project demonstrating some of the capabilities of APIGateway is available at the following URL:  
-https://github.com/moleculer-java/moleculer-spring-boot-demo
-
+[This demo project](https://github.com/moleculer-java/moleculer-spring-boot-demo)
+demonstrating some of the capabilities of APIGateway.  
 The project can be imported into the Eclipse IDE. The brief examples illustrate the following:
 
 - Integration of Moleculer API into the Spring Boot Framework
