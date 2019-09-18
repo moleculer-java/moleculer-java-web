@@ -119,18 +119,11 @@ public class NettyServer extends Service {
 
 	protected NettyWebSocketRegistry webSocketRegistry;
 
-	// --- CONSTRUCTORS ---
-
-	public NettyServer() {
-	}
-
-	public NettyServer(int port) {
-		this.port = port;
-	}
-
-	// --- INIT GATEWAY ---
-
+	// --- LOCK ---
+	
 	private final Object gatewayLock = new Object();
+	
+	// --- INIT GATEWAY ---
 
 	@Subscribe("$services.changed")
 	public Listener evt = payload -> {
@@ -151,6 +144,15 @@ public class NettyServer extends Service {
 			}
 		}
 	};
+	
+	// --- CONSTRUCTORS ---
+
+	public NettyServer() {
+	}
+
+	public NettyServer(int port) {
+		this.port = port;
+	}
 
 	// --- START NETTY SERVER ---
 

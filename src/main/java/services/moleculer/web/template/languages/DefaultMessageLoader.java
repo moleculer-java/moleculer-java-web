@@ -49,7 +49,7 @@ public class DefaultMessageLoader implements MessageLoader {
 	protected String extension = "properties";
 	protected boolean reloadable;
 
-	protected ConcurrentHashMap<String, Tree> cache = new ConcurrentHashMap<>();
+	protected ConcurrentHashMap<String, CachedTemplate> cache = new ConcurrentHashMap<>();
 	
 	// --- CONSTRUCTORS ---
 	
@@ -71,23 +71,20 @@ public class DefaultMessageLoader implements MessageLoader {
 	@Override
 	public Tree loadMessages(String locale) {
 		String key = locale.trim().toLowerCase();
-		Tree messages;
-		if (!reloadable) {
-			messages = cache.get(key);
-			if (messages != null) {
-				return messages;
-			}
+		CachedTemplate template = cache.get(key);
+		if (!reloadable && template != null) {
+			return template.tree;
 		}
 		
 		// Default language
 		if (locale.isEmpty()) {
 
 			// Find "prefix.extension"...
-			messages = tryToLoadMessages("");
-			if (!reloadable && messages != null) {
-				cache.put(key, messages);
+			template = tryToLoadMessages("");
+			if (!reloadable && template != null) {
+				cache.put(key, template);
 			}
-			return messages;
+			return template.tree;
 		}
 
 		// Parse locale
@@ -121,25 +118,25 @@ public class DefaultMessageLoader implements MessageLoader {
 			return null;
 		}
 		if (!reloadable) {
-			cache.put(key, mergedMessages);
+			cache.put(key, new CachedTemplate(mergedMessages, 0));
 		}
 		return mergedMessages;
 	}
 
-	protected void mergeMessages(Tree mergedMessages, Tree messages) {
-		if (messages == null) {
+	protected void mergeMessages(Tree mergedMessages, CachedTemplate template) {
+		if (template == null) {
 			return;
 		}
-		for (Tree item: messages) {
+		for (Tree item: template.tree) {
 			if (item.isMap()) {
-				mergeMessages(mergedMessages, item);
+				mergeMessages(mergedMessages, new CachedTemplate(item, 0));
 				continue;
 			}
 			mergedMessages.putObject(item.getPath(), item.asObject());
 		}
 	}
 	
-	protected Tree tryToLoadMessages(String locale) {
+	protected CachedTemplate tryToLoadMessages(String locale) {
 		try {
 
 			// Calculate path
@@ -151,6 +148,18 @@ public class DefaultMessageLoader implements MessageLoader {
 				path = prefix + '-' + locale + '.' + extension;
 			}
 
+			// Get from cache
+			CachedTemplate template = cache.get(locale);
+			if (template != null) {
+				if (!reloadable) {
+					return template;
+				}
+				long lastModified = getLastModifiedTime(path);
+				if (template.lastModified == lastModified) {
+					return template;
+				}
+			}
+			
 			// Exists?
 			if (!isReadable(path)) {
 				return null;
@@ -162,11 +171,11 @@ public class DefaultMessageLoader implements MessageLoader {
 			Tree messages = new Tree(bytes, format);
 			logger.info("Message file \"" + path + "\" loaded successfully.");
 		
-			// Return message file
-			if (!reloadable) {
-				cache.put(locale, messages);
-			}
-			return messages;
+			// Store in cache
+			long lastModified = getLastModifiedTime(path);
+			template = new CachedTemplate(messages, lastModified);
+			cache.put(locale, template);
+			return template;
 
 		} catch (Exception cause) {
 			logger.error("Unable to load message file!", cause);

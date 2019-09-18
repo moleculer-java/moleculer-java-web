@@ -113,8 +113,8 @@ public class MergedMap implements Map<String, Object> {
 	}
 
 	@Override
-	public Set<java.util.Map.Entry<String, Object>> entrySet() {
-		LinkedHashSet<java.util.Map.Entry<String, Object>> set = new LinkedHashSet<>((size() + 1) * 2);
+	public Set<Map.Entry<String, Object>> entrySet() {
+		LinkedHashSet<Map.Entry<String, Object>> set = new LinkedHashSet<>((size() + 1) * 2);
 		set.addAll(data.entrySet());
 		set.addAll(messages.entrySet());
 		return set;

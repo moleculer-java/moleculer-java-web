@@ -299,7 +299,7 @@ public class TopLevelCache extends HttpMiddleware implements HttpConstants {
 			if (pathPattern == null || pathPattern.isEmpty()) {
 				continue;
 			}
-			if (pathPattern.equals("*") || pathPattern.equals("/*") || pathPattern.equals("/**")) {
+			if ("*".equals(pathPattern) || "/*".equals(pathPattern) || "/**".equals(pathPattern)) {
 				list.clear();
 				list.addLast("/**");
 				break;

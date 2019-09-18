@@ -121,10 +121,8 @@ public class PebbleEngine extends AbstractTemplateEngine {
 
 	@Override
 	public void setExecutor(ExecutorService executor) {
-		if ((executor == null && this.executor != null) || (executor != null && !executor.equals(this.executor))) {
-			super.setExecutor(executor);
-			buildEngine();
-		}
+		super.setExecutor(executor);
+		buildEngine();
 	}
 
 	// --- PEBBLE ENGINE ---
