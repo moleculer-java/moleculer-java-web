@@ -140,7 +140,7 @@ public class TopLevelCache extends HttpMiddleware implements HttpConstants {
 				}
 
 				// Try to load from cache
-				String key = region + '.' + path;
+				String key = region + '.' + path + '|' + req.getHeader(ACCEPT_ENCODING);
 				cacher.get(key).then(in -> {
 					if (in == null || in.isNull()) {
 

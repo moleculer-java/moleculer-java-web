@@ -50,16 +50,16 @@ public class DefaultMessageLoader implements MessageLoader {
 	protected boolean reloadable;
 
 	protected ConcurrentHashMap<String, CachedTemplate> cache = new ConcurrentHashMap<>();
-	
+
 	// --- CONSTRUCTORS ---
-	
+
 	public DefaultMessageLoader() {
 	}
 
 	public DefaultMessageLoader(boolean reloadable) {
 		this.reloadable = reloadable;
 	}
-	
+
 	public DefaultMessageLoader(String prefix, String extension, boolean reloadable) {
 		this.prefix = prefix;
 		this.extension = extension;
@@ -75,16 +75,19 @@ public class DefaultMessageLoader implements MessageLoader {
 		if (!reloadable && template != null) {
 			return template.tree;
 		}
-		
+
 		// Default language
 		if (locale.isEmpty()) {
 
 			// Find "prefix.extension"...
 			template = tryToLoadMessages("");
-			if (!reloadable && template != null) {
-				cache.put(key, template);
+			if (template != null) {
+				if (!reloadable) {
+					cache.put(key, template);
+				}
+				return template.tree;
 			}
-			return template.tree;
+			return null;
 		}
 
 		// Parse locale
@@ -99,7 +102,7 @@ public class DefaultMessageLoader implements MessageLoader {
 
 		// Find "prefix.extension"...
 		mergeMessages(mergedMessages, tryToLoadMessages(""));
-				
+
 		// Find "prefix-language.extension"...
 		mergeMessages(mergedMessages, tryToLoadMessages(l));
 
@@ -112,7 +115,7 @@ public class DefaultMessageLoader implements MessageLoader {
 		if (!c.isEmpty() && !v.isEmpty()) {
 			mergeMessages(mergedMessages, tryToLoadMessages(l + "-" + c + "-" + v));
 		}
-		
+
 		// Store in cache
 		if (mergedMessages.isEmpty()) {
 			return null;
@@ -127,7 +130,7 @@ public class DefaultMessageLoader implements MessageLoader {
 		if (template == null) {
 			return;
 		}
-		for (Tree item: template.tree) {
+		for (Tree item : template.tree) {
 			if (item.isMap()) {
 				mergeMessages(mergedMessages, new CachedTemplate(item, 0));
 				continue;
@@ -135,7 +138,7 @@ public class DefaultMessageLoader implements MessageLoader {
 			mergedMessages.putObject(item.getPath(), item.asObject());
 		}
 	}
-	
+
 	protected CachedTemplate tryToLoadMessages(String locale) {
 		try {
 
@@ -159,7 +162,7 @@ public class DefaultMessageLoader implements MessageLoader {
 					return template;
 				}
 			}
-			
+
 			// Exists?
 			if (!isReadable(path)) {
 				return null;
@@ -170,7 +173,7 @@ public class DefaultMessageLoader implements MessageLoader {
 			String format = "yml".equals(extension) ? "yaml" : extension;
 			Tree messages = new Tree(bytes, format);
 			logger.info("Message file \"" + path + "\" loaded successfully.");
-		
+
 			// Store in cache
 			long lastModified = getLastModifiedTime(path);
 			template = new CachedTemplate(messages, lastModified);
@@ -182,13 +185,13 @@ public class DefaultMessageLoader implements MessageLoader {
 		}
 		return null;
 	}
-	
+
 	// --- CHECK CHANGES ---
 
 	@Override
 	public long getLastModified(String locale) {
 		if (!reloadable) {
-			
+
 			// Time is not important in this case
 			return 0;
 		}
@@ -196,7 +199,7 @@ public class DefaultMessageLoader implements MessageLoader {
 		if (locale == null || locale.isEmpty()) {
 			return timestamp;
 		}
-		
+
 		// Parse locale
 		String key = locale == null || locale.isEmpty() ? key = "" : locale.trim().toLowerCase();
 		StringTokenizer st = new StringTokenizer(key, "_-");
@@ -206,7 +209,7 @@ public class DefaultMessageLoader implements MessageLoader {
 		if (v.startsWith("#")) {
 			v = "";
 		}
-		
+
 		// Find "prefix-language-country-variant.extension"...
 		if (!c.isEmpty() && !v.isEmpty()) {
 			timestamp = Math.max(timestamp, tryToCheckTimestamp(l + "-" + c + "-" + v));
@@ -223,7 +226,7 @@ public class DefaultMessageLoader implements MessageLoader {
 
 	protected long tryToCheckTimestamp(String locale) {
 		try {
-			
+
 			// Calculate path
 			String path;
 			boolean defaultLanguage = locale.isEmpty();
@@ -232,16 +235,16 @@ public class DefaultMessageLoader implements MessageLoader {
 			} else {
 				path = prefix + '-' + locale + '.' + extension;
 			}
-			
+
 			// Get timestamp (or -1)
 			return getLastModifiedTime(path);
-			
+
 		} catch (Exception cause) {
 			logger.error("Unable to check timestamp!", cause);
 		}
 		return -1;
 	}
-	
+
 	// --- GETTERS / SETTERS ---
 
 	public String getPrefix() {
@@ -267,5 +270,5 @@ public class DefaultMessageLoader implements MessageLoader {
 	public void setReloadable(boolean reloadable) {
 		this.reloadable = reloadable;
 	}
-	
+
 }

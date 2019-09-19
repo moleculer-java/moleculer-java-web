@@ -25,8 +25,8 @@
  */
 package services.moleculer.web.servlet.response;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -36,25 +36,64 @@ import javax.servlet.http.HttpServletResponse;
 
 public class NonBlockingWebResponse extends AbstractWebResponse {
 
-	// --- CONSTANTS ---
+	// --- END MARKER ---
 
 	protected static final byte[] END_MARKER = new byte[0];
 
 	// --- RESPONSE VARIABLES ---
 
-	protected final AsyncContext async;
-
 	protected final AtomicReference<Throwable> error = new AtomicReference<>();
 
-	protected final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-
 	protected final AtomicBoolean listenerSet = new AtomicBoolean();
+
+	protected final AtomicBoolean lock = new AtomicBoolean();
+
+	protected final LinkedList<byte[]> queue = new LinkedList<>();
+
+	protected final WriteListener listener;
 
 	// --- CONSTRUCTOR ---
 
 	public NonBlockingWebResponse(AsyncContext async) throws IOException {
 		super((HttpServletResponse) async.getResponse());
-		this.async = async;
+		listener = new WriteListener() {
+
+			@Override
+			public void onWritePossible() throws IOException {
+				while (out.isReady()) {
+					if (lock.compareAndSet(false, true)) {
+						try {
+							if (queue.isEmpty()) {
+								return;
+							}
+							byte[] bytes = queue.removeFirst();
+							if (bytes == END_MARKER) {
+								try {
+									out.close();
+								} catch (Throwable ignored) {
+								}
+								try {
+									async.complete();
+								} catch (Throwable ignored) {
+								}
+								return;
+							}
+							out.write(bytes);
+						} catch (Throwable cause) {
+							error.set(cause);
+						} finally {
+							lock.set(false);
+						}
+					}
+				}
+			}
+
+			@Override
+			public void onError(Throwable cause) {
+				error.set(cause);
+			}
+
+		};
 	}
 
 	// --- ASYNC WRITE ---
@@ -70,47 +109,14 @@ public class NonBlockingWebResponse extends AbstractWebResponse {
 	 */
 	@Override
 	public void send(byte[] bytes) throws IOException {
-		Throwable t = error.get();
-		if (t != null) {
-			if (t instanceof IOException) {
-				throw (IOException) t;
+		Throwable cause = error.get();
+		if (cause != null) {
+			if (cause instanceof IOException) {
+				throw (IOException) cause;
 			}
-			throw new IOException(t);
+			throw new IOException(cause);
 		}
-		buffer.write(bytes, 0, bytes.length);
-		tryToSend();
-	}
-
-	protected void tryToSend() throws IOException {
-		byte[] bytes;
-		boolean ready = out.isReady();
-		synchronized (buffer) {
-			bytes = buffer.toByteArray();
-			if (ready) {
-				buffer.reset();
-			}
-		}
-		boolean empty = bytes.length == 0;
-		if (ready && !empty) {
-			
-			// Send data
-			out.write(bytes);			
-		}
-		if ((ready || empty) && closed.get()) {
-			
-			// Closed
-			try {
-				out.close();
-			} finally {
-				async.complete();
-			}
-			return;
-		}
-		if ((!ready || empty) && listenerSet.compareAndSet(false, true)) {
-			
-			// Send later
-			out.setWriteListener(new SendLaterListener(async));
-		}
+		addToQueueAndSend(bytes);
 	}
 
 	// --- END PROCESSING ---
@@ -123,49 +129,31 @@ public class NonBlockingWebResponse extends AbstractWebResponse {
 	@Override
 	public boolean end() {
 		if (closed.compareAndSet(false, true)) {
-			try {
-				tryToSend();				
-			} catch (Exception ignored) {
-				ignored.printStackTrace();
-			}
+			addToQueueAndSend(END_MARKER);
 			return true;
 		}
 		return false;
 	}
 
-	// --- LISTENER ---
-
-	protected class SendLaterListener implements WriteListener {
-
-		private final AsyncContext ctx;
-
-		private SendLaterListener(AsyncContext ctx) {
-			this.ctx = ctx;
-		}
-
-		@Override
-		public void onWritePossible() throws IOException {
-			tryToSend();
-		}
-
-		@Override
-		public void onError(Throwable t) {
-			error.set(t);
-		}
-
-		@Override
-		public int hashCode() {
-			return async.hashCode();
-		}
-
-		@Override
-		public boolean equals(Object obj) {
-			if (obj != null && obj instanceof SendLaterListener) {
-				return ((SendLaterListener) obj).ctx == ctx;
+	protected void addToQueueAndSend(byte[] bytes) {
+		while (true) {
+			if (lock.compareAndSet(false, true)) {
+				try {
+					queue.addLast(bytes);
+					break;
+				} finally {
+					lock.set(false);
+				}
 			}
-			return false;
 		}
-
+		if (listenerSet.compareAndSet(false, true)) {
+			out.setWriteListener(listener);
+		}
+		try {
+			listener.onWritePossible();
+		} catch (Throwable cause) {
+			error.set(cause);
+		}
 	}
 
 }

@@ -166,11 +166,14 @@ public class MoleculerServlet extends HttpServlet {
 			// Blocking timeout
 			String blockingTimeout = config.getInitParameter("moleculer.blocking.timeout");
 			timeout = blockingTimeout == null ? 60000 * 3 : Long.parseLong(blockingTimeout);
-			
+
 			// Get or autodetect service mode
 			if (serviceMode == null) {
 				String forceBlocking = config.getInitParameter("moleculer.force.blocking");
-				if (forceBlocking == null || !"true".equals(forceBlocking)) {
+				if (forceBlocking == null || forceBlocking.isEmpty() || "auto".equalsIgnoreCase(forceBlocking)) {
+					forceBlocking = Boolean.toString(config.getClass().toString().contains("weblogic"));
+				}
+				if (!Boolean.parseBoolean(forceBlocking)) {
 					try {
 						Class.forName("javax.servlet.ReadListener");
 						serviceMode = (ServiceMode) Class.forName("services.moleculer.web.servlet.service.AsyncService")
@@ -253,7 +256,7 @@ public class MoleculerServlet extends HttpServlet {
 		}
 		System.out.println(message);
 	}
-	
+
 	protected void logError(String message, Throwable cause) {
 		if (broker != null) {
 			broker.getLogger(MoleculerServlet.class).error(message, cause);

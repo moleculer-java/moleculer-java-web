@@ -198,7 +198,7 @@ public final class GatewayUtils implements HttpConstants {
 				File file = new File(new URI(url.toString()));
 				return file.isFile() && file.canRead();
 			}
-			return getFileURL(path) != null;
+			return url != null;
 		} catch (Exception ignored) {
 		}
 		return false;
@@ -270,10 +270,11 @@ public final class GatewayUtils implements HttpConstants {
 			urlCache.put(path, url);
 			return url;
 		}
-		if (path.startsWith("/") && path.length() > 1) {
-			url = tryToGetFileURL(path.substring(1));
-			if (url != null) {
-				urlCache.put(path, url);
+		if (path.length() > 0) {
+			if (path.startsWith("/")) {
+				url = tryToGetFileURL(path.substring(1));	
+			} else {
+				url = tryToGetFileURL('/' + path);
 			}
 		}
 		return url;

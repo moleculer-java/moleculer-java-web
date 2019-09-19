@@ -6,7 +6,7 @@ apply plugin: 'jacoco'
 buildscript {
     repositories {
         maven {
-            url "https://plugins.gradle.org/m2/"
+            url 'https://plugins.gradle.org/m2/'
         }
     }
     dependencies {
@@ -19,6 +19,7 @@ buildscript {
 javadoc {
 	options.encoding = 'UTF-8'
 	failOnError = false
+	exclude '**/PojoTest.java'	
 }
 
 // --- JACOCO ---
@@ -46,7 +47,7 @@ configurations.all {
 repositories {
     mavenCentral()
     jcenter()
-    maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
+    maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
 }
 
 // --- SOURCE ---
@@ -54,16 +55,16 @@ repositories {
 sourceSets {
 	main {
 		java {
-			srcDirs = ["src/main/java"]
+			srcDirs = ['src/main/java']
 		}
 		resources {
-		    srcDirs = ["src/main/java"]
-		    includes = ["**/*.ico"]
+		    srcDirs = ['src/main/java']
+		    includes = ['**/*.ico']
 		}
 	}
 	test {
 	    resources {
-	        srcDirs = ["src/test/java"]
+	        srcDirs = ['src/test/java']
 	    }
 	}
 }
@@ -193,8 +194,8 @@ targetCompatibility = 1.8
 
 group = 'com.github.berkesa'
 
-// version = '1.1.2-SNAPSHOT'
-version = '1.1.2'
+// version = '1.1.3-SNAPSHOT'
+version = '1.1.3'
 
 modifyPom {
     project {
@@ -212,8 +213,8 @@ modifyPom {
 
         licenses {
             license {
-                name "The MIT License"
-                url "http://www.opensource.org/licenses/MIT"
+                name 'The MIT License'
+                url 'http://www.opensource.org/licenses/MIT'
                 distribution 'repo'
             }
         }
@@ -275,5 +276,5 @@ compileJava {
 
 jar {
     baseName = 'moleculer-web'
-    version =  '1.1.2'
+    version =  '1.1.3'
 }
