@@ -29,6 +29,7 @@ import static services.moleculer.web.common.GatewayUtils.getService;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Enumeration;
 import java.util.HashSet;
@@ -51,9 +52,25 @@ import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
 import services.moleculer.web.ApiGateway;
 import services.moleculer.web.servlet.service.BlockingService;
+import services.moleculer.web.servlet.service.InprocessExecutor;
 import services.moleculer.web.servlet.service.ServiceMode;
 import services.moleculer.web.servlet.websocket.ServletWebSocketRegistry;
 
+/**
+ * Servlet for embedding Moleculer Service Broker as J2EE Servlet.
+ * <ul>
+ * <li>moleculer.application = Class name of the main Spring Boot Application
+ * <li>moleculer.config = For XML-based Spring Context, the path of the config
+ * <li>moleculer.force.blocking = Force blocking mode (default = auto)
+ * <li>moleculer.blocking.timeout = Timeout in blocking mode (default = 0)
+ * <li>moleculer.inprocess = Inprocess execution blocking mode (default = true)
+ * <li>moleculer.check.period = WebSocket check period (sec, default = 15)
+ * </ul>
+ * 
+ * @see <a href=
+ *      "https://github.com/moleculer-java/moleculer-spring-boot-demo/blob/master/src/main/webapp/WEB-INF/web.xml">
+ *      Sample web.xml</a>
+ */
 public class MoleculerServlet extends HttpServlet {
 
 	// --- UID ---
@@ -72,8 +89,6 @@ public class MoleculerServlet extends HttpServlet {
 	// --- WEBSOCKET REGISTRY ---
 
 	protected ServletWebSocketRegistry webSocketRegistry;
-
-	protected int webSocketCleanupSeconds = 15;
 
 	// --- WORKING MODE (SYNC / ASYNC) ---
 
@@ -160,34 +175,87 @@ public class MoleculerServlet extends HttpServlet {
 			}
 
 			// Create WebSocket registry
-			webSocketRegistry = new ServletWebSocketRegistry(config, broker, webSocketCleanupSeconds);
+			String cleanupSeconds = config.getInitParameter("moleculer.check.period");
+			if (cleanupSeconds == null || cleanupSeconds.isEmpty()) {
+				cleanupSeconds = "15";
+			}
+			int sleep = Integer.parseInt(cleanupSeconds);
+			webSocketRegistry = new ServletWebSocketRegistry(config, broker, sleep);
 			gateway.setWebSocketRegistry(webSocketRegistry);
 
-			// Blocking timeout
+			// Blocking timeout (only in blocking mode)
 			String blockingTimeout = config.getInitParameter("moleculer.blocking.timeout");
-			timeout = blockingTimeout == null ? 60000 * 3 : Long.parseLong(blockingTimeout);
-
+			timeout = blockingTimeout == null ? 0 : Long.parseLong(blockingTimeout);
+			if (timeout < 1) {
+				timeout = 60000 * 3;
+			}
+			
 			// Get or autodetect service mode
 			if (serviceMode == null) {
 				String forceBlocking = config.getInitParameter("moleculer.force.blocking");
 				if (forceBlocking == null || forceBlocking.isEmpty() || "auto".equalsIgnoreCase(forceBlocking)) {
-					forceBlocking = Boolean.toString(config.getClass().toString().contains("weblogic"));
+					String i = config.getServletContext().getServerInfo();
+					if (i != null && !i.isEmpty()) {
+						logInfo("Server is \"" + i + "\".");
+					} else {
+						i = config.getClass().toString();
+					}
+					i = i.toLowerCase();
+					
+					// Partial non-blocking implementations (2019)
+					forceBlocking = Boolean.toString(i.contains("weblogic") || i.contains("fish") || i.contains("payara"));
 				}
 				if (!Boolean.parseBoolean(forceBlocking)) {
 					try {
+						
+						// Check classpath
 						Class.forName("javax.servlet.ReadListener");
-						serviceMode = (ServiceMode) Class.forName("services.moleculer.web.servlet.service.AsyncService")
-								.newInstance();
-						logInfo("Moleculer is using non-blocking request processor.");
+
+						@SuppressWarnings("unchecked")
+						Class<ServiceMode> clazz = (Class<ServiceMode>) Class
+								.forName("services.moleculer.web.servlet.service.AsyncService");
+						Constructor<ServiceMode> constructor = clazz.getConstructor(ServiceBroker.class,
+								ApiGateway.class);
+						serviceMode = constructor.newInstance(broker, gateway);
+						
 					} catch (Throwable notFound) {
 					}
 				}
 				if (serviceMode == null) {
-					serviceMode = new BlockingService(timeout);
-					logInfo("Moleculer is using blocking request processor (blocking timeout: " + timeout + " msec).");
+					serviceMode = new BlockingService(broker, gateway, timeout);
 				}
 			}
 
+			// Set in-process (not real) executor (vs. Join-Fork Executor)
+			String inprocess = config == null ? null : config.getInitParameter("moleculer.inprocess");
+			boolean useExecutor = (inprocess == null || Boolean.parseBoolean(inprocess)) && gateway.getExecutor() == null;
+			if (useExecutor) {
+				gateway.setExecutor(new InprocessExecutor());
+			}		
+			
+			// Write running mode into the log file
+			StringBuilder msg = new StringBuilder(256);
+			msg.append("Moleculer is using ");
+			boolean blocking = serviceMode instanceof BlockingService;
+			if (!blocking) {
+				msg.append("non-");	
+			}
+			msg.append("blocking, ");
+			if (useExecutor) {
+				msg.append("in-process");	
+			} else {
+				msg.append("detached");
+			}
+			msg.append(" request processor");
+			if (blocking) {
+				 msg.append(" (blocking timeout: ");
+				 msg.append(timeout);
+				 msg.append(" msec).");
+			} else {
+				msg.append('.');
+			}
+			logInfo(msg.toString());
+			
 		} catch (ServletException servletException) {
 			throw servletException;
 		} catch (Exception fatal) {
@@ -204,7 +272,7 @@ public class MoleculerServlet extends HttpServlet {
 		try {
 
 			// Process GET/POST/PUT/etc. requests
-			serviceMode.service(broker, gateway, request, response);
+			serviceMode.service(request, response);
 
 		} catch (IllegalStateException illegalState) {
 
@@ -212,11 +280,11 @@ public class MoleculerServlet extends HttpServlet {
 			if (serviceMode.getClass().getName().contains("Async")) {
 				logInfo("IllegalStateException occured, switching back to blocking mode "
 						+ " (hint: set the 'moleculer.force.blocking' Servlet parameter to 'true').");
-				serviceMode = new BlockingService(timeout);
+				serviceMode = new BlockingService(broker, gateway, timeout);
 
 				// Repeat processing
 				try {
-					serviceMode.service(broker, gateway, request, response);
+					serviceMode.service(request, response);
 				} catch (Throwable cause) {
 					handleError(response, cause);
 				}
@@ -317,9 +385,13 @@ public class MoleculerServlet extends HttpServlet {
 		return broker;
 	}
 
-	// --- SETTERS (FOR TESTING) ---
+	// --- GETTERS / SETTERS ---
 
-	public void setWorkingMode(ServiceMode serviceMode) {
+	public final ServiceMode getServiceMode() {
+		return serviceMode;
+	}
+
+	public final void setServiceMode(ServiceMode serviceMode) {
 		this.serviceMode = serviceMode;
 	}
 

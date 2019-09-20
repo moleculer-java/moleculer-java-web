@@ -25,6 +25,8 @@
  */
 package services.moleculer.web.template;
 
+import static services.moleculer.web.common.HttpConstants.META_LOCALE;
+
 import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Locale;
@@ -41,8 +43,6 @@ import org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver;
 import org.thymeleaf.templateresource.ITemplateResource;
 import org.thymeleaf.templateresource.StringTemplateResource;
 import org.thymeleaf.util.FastStringWriter;
-
-import static services.moleculer.web.common.HttpConstants.META_LOCALE;
 
 import io.datatree.Tree;
 

@@ -38,6 +38,7 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
@@ -138,6 +139,14 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 */
 	protected CallProcessor afterCall;
 
+	// --- CUSTOM EXECUTOR SERVICE ---
+
+	/**
+	 * Custom Action Executor (null = use the shared ExecutorService of the
+	 * MessageBroker).
+	 */
+	protected ExecutorService executor;
+
 	// --- LOCKS FOR MAPPINGS ---
 
 	protected final ReadLock readLock;
@@ -227,7 +236,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 					// Deploy as "/service/action"
 					pathPattern = '/' + actionName.replace('.', '/');
 				}
-				
+
 				// Find Route by path of the Route
 				String routePath = httpAlias.route();
 				if (routePath == null) {
@@ -246,7 +255,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 				Alias alias = new Alias(httpMethod, pathPattern, actionName);
 				route.addAlias(alias);
 				if (checkedNames.add(actionName)) {
-					loagAlias(msg, route, alias);					
+					loagAlias(msg, route, alias);
 				}
 			}
 		}
@@ -391,7 +400,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 		msg.append("\" action.");
 		logger.info(msg.toString());
 	}
-	
+
 	// --- STOP GATEWAY INSTANCE ---
 
 	/**
@@ -668,6 +677,11 @@ public class ApiGateway extends Service implements RequestProcessor {
 			route.setAfterCall(afterCall);
 		}
 
+		// Set Executor
+		if (executor != null && route.getExecutor() == null) {
+			route.setExecutor(executor);
+		}
+
 		// Add the new route to array of Routes
 		Route[] copy = new Route[routes.length + 1];
 		System.arraycopy(routes, 0, copy, 0, routes.length);
@@ -816,6 +830,23 @@ public class ApiGateway extends Service implements RequestProcessor {
 		this.webSocketFilter = webSocketFilter;
 		if (webSocketRegistry != null) {
 			webSocketRegistry.setWebSocketFilter(webSocketFilter);
+		}
+	}
+
+	public ExecutorService getExecutor() {
+		return executor;
+	}
+
+	public void setExecutor(ExecutorService executor) {
+		this.executor = executor;
+
+		// Set Executor of Routes
+		if (executor != null) {
+			for (Route route : routes) {
+				if (route.getExecutor() == null) {
+					route.setExecutor(executor);
+				}
+			}
 		}
 	}
 

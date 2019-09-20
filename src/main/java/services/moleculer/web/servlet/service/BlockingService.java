@@ -38,16 +38,23 @@ import services.moleculer.web.servlet.response.BlockingWebResponse;
 /**
  * Blocking request processing mode.
  */
-public class BlockingService implements ServiceMode {
+public class BlockingService extends ServiceMode {
+
+	// --- VARIABLES ---
 
 	protected final long timeout;
-	
-	public BlockingService(long timeout) {
-		this.timeout = timeout;
+
+	// --- CONSTRUCTOR ---
+
+	public BlockingService(ServiceBroker broker, ApiGateway gateway, long timeout) {
+		super(broker, gateway);
+		this.timeout = timeout < 1 ? 60000 * 3 : timeout;
 	}
-	
+
+	// --- HTTP PROCESSOR ---
+
 	@Override
-	public void service(ServiceBroker broker, ApiGateway gateway, HttpServletRequest request, HttpServletResponse response) throws Exception {
+	public void service(HttpServletRequest request, HttpServletResponse response) throws Exception {
 		try {
 
 			// Blocking service

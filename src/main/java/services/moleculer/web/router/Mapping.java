@@ -58,7 +58,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 	protected final Route route;
 	protected final CallProcessor beforeCall;
 	protected final CallProcessor afterCall;
-
+	
 	// --- LAST PROCESSOR ---
 
 	protected RequestProcessor lastProcessor;
@@ -71,7 +71,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 
 	public Mapping(ServiceBroker broker, String httpMethod, String pathPattern, String actionName,
 			CallOptions.Options opts, AbstractTemplateEngine templateEngine, Route route, CallProcessor beforeCall,
-			CallProcessor afterCall) {
+			CallProcessor afterCall, ExecutorService executor) {
 		this.httpMethod = "ALL".equals(httpMethod) ? null : httpMethod;
 		this.actionName = Objects.requireNonNull(actionName);
 		this.route = route;
@@ -134,9 +134,9 @@ public class Mapping implements RequestProcessor, HttpConstants {
 		// Set first RequestProcessor in the WebMiddleware chain
 		ServiceBrokerConfig cfg = broker.getConfig();
 		ServiceInvoker serviceInvoker = cfg.getServiceInvoker();
-		ExecutorService executor = cfg.getExecutor();
+		ExecutorService runner = executor == null ? cfg.getExecutor() : executor;
 		lastProcessor = new ActionInvoker(actionName, pathPattern, isStatic, pathPrefix, indexes, names, opts,
-				serviceInvoker, templateEngine, route, beforeCall, afterCall, executor);
+				serviceInvoker, templateEngine, route, beforeCall, afterCall, runner);
 	}
 
 	// --- MATCH TEST ---

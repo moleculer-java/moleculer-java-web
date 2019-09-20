@@ -47,7 +47,6 @@ import services.moleculer.service.Action;
 import services.moleculer.service.Service;
 import services.moleculer.web.router.Route;
 import services.moleculer.web.servlet.MoleculerServlet;
-import services.moleculer.web.servlet.service.AsyncService;
 import services.moleculer.web.servlet.websocket.EndpointDeployer;
 
 /**
@@ -78,10 +77,11 @@ public class JettyWebSocketTest extends TestCase {
 
 		// Create non-blocking servlet
 		MoleculerServlet servlet = new MoleculerServlet();
-		servlet.setWorkingMode(new AsyncService());
 		ServletHolder servletHolder = new ServletHolder(servlet);
 
 		servletHolder.setInitParameter("moleculer.config", "/services/moleculer/web/moleculer.config.xml");
+		servletHolder.setInitParameter("moleculer.force.blocking", "false");
+		servletHolder.setInitParameter("moleculer.inprocess", "false");
 		servletContextHandler.addServlet(servletHolder, "/*");
 
 		HandlerCollection handlerCollection = new HandlerCollection();

@@ -65,7 +65,6 @@ public class NonBlockingWebRequest extends AbstractWebRequest {
 
 			@Override
 			public final void onError(Throwable cause) {
-				cause.printStackTrace();
 				stream.sendError(cause);
 			}
 

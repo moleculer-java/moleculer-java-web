@@ -56,9 +56,9 @@ public class NonBlockingServletTest extends AbstractTemplateTest {
 		
 		// Create non-blocking servlet
 		MoleculerServlet sc = new MoleculerServlet();
-		sc.setWorkingMode(new AsyncService());
 		ServletHolder sh = new ServletHolder(sc);
 		sh.setInitParameter("moleculer.config", "/services/moleculer/web/moleculer.config.xml");
+		sh.setInitParameter("moleculer.force.blocking", "false");
 		publicContext.addServlet(sh, "/*");
 		HandlerCollection collection = new HandlerCollection();
 		collection.addHandler(publicContext);
@@ -66,6 +66,8 @@ public class NonBlockingServletTest extends AbstractTemplateTest {
 		server.addConnector(pContext);
 		server.start();
 				
+		assertEquals(AsyncService.class, sc.getServiceMode().getClass());
+		
 		br = sc.getBroker();
 		gw = sc.getGateway();
 		

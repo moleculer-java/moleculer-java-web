@@ -34,8 +34,16 @@ import services.moleculer.web.ApiGateway;
 /**
  * Blocking or non-blocking request processing mode.
  */
-public interface ServiceMode {
-	
-	void service(ServiceBroker broker, ApiGateway gateway, HttpServletRequest request, HttpServletResponse response) throws Exception;
-	
+public abstract class ServiceMode {
+
+	protected final ServiceBroker broker;
+	protected final ApiGateway gateway;
+
+	public ServiceMode(ServiceBroker broker, ApiGateway gateway) {
+		this.broker = broker;
+		this.gateway = gateway;		
+	}
+
+	public abstract void service(HttpServletRequest request, HttpServletResponse response) throws Exception;
+
 }

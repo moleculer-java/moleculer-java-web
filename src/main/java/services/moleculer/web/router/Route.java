@@ -33,6 +33,7 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,6 +73,14 @@ public class Route {
 
 	protected AbstractTemplateEngine templateEngine;
 
+	// --- CUSTOM EXECUTOR SERVICE ---
+
+	/**
+	 * Custom Action Executor (null = use the shared ExecutorService of the
+	 * MessageBroker).
+	 */
+	protected ExecutorService executor;
+	
 	// --- ROUTE-SPECIFIC MIDDLEWARES ---
 
 	protected final Set<HttpMiddleware> routeMiddlewares = new LinkedHashSet<>(32);
@@ -97,7 +106,7 @@ public class Route {
 			for (Alias alias : aliases) {
 				if (Alias.ALL.equals(alias.httpMethod) || httpMethod.equals(alias.httpMethod)) {
 					Mapping mapping = new Mapping(broker, httpMethod, this.path + alias.pathPattern, alias.actionName,
-							opts, templateEngine, this, beforeCall, afterCall);
+							opts, templateEngine, this, beforeCall, afterCall, executor);
 					if (mapping.matches(httpMethod, path)) {
 						if (!routeMiddlewares.isEmpty()) {
 							mapping.use(routeMiddlewares);
@@ -115,7 +124,7 @@ public class Route {
 			for (String pattern : whiteList) {
 				if (Matcher.matches(shortPath, pattern)) {
 					Mapping mapping = new Mapping(broker, httpMethod, this.path + pattern, actionName, opts,
-							templateEngine, this, beforeCall, afterCall);
+							templateEngine, this, beforeCall, afterCall, executor);
 					if (!routeMiddlewares.isEmpty()) {
 						mapping.use(routeMiddlewares);
 					}
@@ -131,7 +140,7 @@ public class Route {
 				pattern = this.path + '*';
 			}
 			Mapping mapping = new Mapping(broker, httpMethod, pattern, actionName, opts, templateEngine, this,
-					beforeCall, afterCall);
+					beforeCall, afterCall, executor);
 			if (!routeMiddlewares.isEmpty()) {
 				mapping.use(routeMiddlewares);
 			}
@@ -384,6 +393,14 @@ public class Route {
 				addAlias(alias);
 			}
 		}
+	}
+
+	public ExecutorService getExecutor() {
+		return executor;
+	}
+
+	public void setExecutor(ExecutorService executor) {
+		this.executor = executor;
 	}
 
 }

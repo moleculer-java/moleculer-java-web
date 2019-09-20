@@ -37,11 +37,18 @@ import services.moleculer.web.servlet.response.NonBlockingWebResponse;
 /**
  * Non-blocking request processing mode.
  */
-public class AsyncService implements ServiceMode {
+public class AsyncService extends ServiceMode {
+
+	// --- CONSTRUCTOR ---
+	
+	public AsyncService(ServiceBroker broker, ApiGateway gateway) {
+		super(broker, gateway);
+	}
+	
+	// --- HTTP PROCESSOR ---
 
 	@Override
-	public void service(ServiceBroker broker, ApiGateway gateway, HttpServletRequest request,
-			HttpServletResponse response) throws Exception {
+	public void service(HttpServletRequest request, HttpServletResponse response) throws Exception {
 		AsyncContext async = null;
 		try {
 

@@ -48,7 +48,7 @@ public class PojoTest extends TestCase {
 
 	@Test
 	public void testProductionClasses() throws Exception {
-		try {
+		try {		
 			validator.validate("services.moleculer.web.middleware", filterTestClasses);
 			validator.validate("services.moleculer.web.template", filterTestClasses);
 		} catch (Exception e) {
