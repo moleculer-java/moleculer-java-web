@@ -86,6 +86,7 @@ The project can be imported into the Eclipse IDE. The brief examples illustrate 
 - Configuring HTTP Routes and Middlewares
 - Creating non-blocking Moleculer Services
 - Using WebSockets
+- Generating HTML pages in multiple languages using Template Engines
 - Creating a WAR from the finished project (Servlet-based runtime)
 - Run code without any changes in "standalone mode" (Netty-based runtime)
 
