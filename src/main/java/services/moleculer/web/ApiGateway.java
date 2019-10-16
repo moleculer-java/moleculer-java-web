@@ -158,24 +158,24 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 * Send WebSocket via broadcasted Moleculer Event.
 	 */
 	@Subscribe("websocket.send")
-	public Listener webSocketListener = payload -> {
+	public Listener webSocketListener = ctx -> {
 		if (webSocketRegistry == null) {
 			logger.warn("WebSocket Registry not initialized!");
 			return;
 		}
-		if (payload == null) {
+		if (ctx.params == null || ctx.params.isEmpty()) {
 			logger.warn("Empty websocket packet, all parameters are missing!");
 			return;
 		}
-		String path = payload.get("path", "");
+		String path = ctx.params.get("path", "");
 		if (path == null || path.isEmpty()) {
-			logger.warn("Invalid websocket packet, the \"path\" parameter is required: " + payload);
+			logger.warn("Invalid websocket packet, the \"path\" parameter is required: " + ctx.params);
 			return;
 		}
 		if (path.charAt(0) != '/') {
 			path = '/' + path;
 		}
-		Tree data = payload.get("data");
+		Tree data = ctx.params.get("data");
 		String msg;
 		if (data == null) {
 			msg = "null";
@@ -188,10 +188,10 @@ public class ApiGateway extends Service implements RequestProcessor {
 	// --- AUTODEPLOYER ---
 
 	@Subscribe("$services.changed")
-	public Listener autoDeployListener = payload -> {
+	public Listener autoDeployListener = ctx -> {
 
 		// Local service?
-		if (!payload.get("localService", false)) {
+		if (ctx.params == null || !ctx.params.get("localService", false)) {
 			return;
 		}
 

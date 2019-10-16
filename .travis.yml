@@ -12,7 +12,7 @@ install: gradle wrapper --gradle-version 4.2
   
 before_install:
   - chmod +x gradlew
-  - sudo apt-get install jq
+  - sudo apt-get install -y jq
   - wget -O ~/codacy-coverage-reporter-assembly-latest.jar https://github.com/codacy/codacy-coverage-reporter/releases/download/4.0.5/codacy-coverage-reporter-4.0.5-assembly.jar
 
 # script: ./gradlew -i check

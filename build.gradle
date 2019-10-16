@@ -86,10 +86,10 @@ dependencies {
     // =============== MOLECULER ===============
 
 	// Moleculer core (required)
-	compile group: 'com.github.berkesa', name: 'moleculer-java', version: '1.1.3'
+	compile group: 'com.github.berkesa', name: 'moleculer-java', version: '1.2.0'
 	
 	// Moleculer developer console (optional)
-    compile group: 'com.github.berkesa', name: 'moleculer-java-repl', version: '1.0.6'
+    compile group: 'com.github.berkesa', name: 'moleculer-java-repl', version: '1.2.0'
     
     // ================ LOGGING ================
 	
@@ -110,7 +110,7 @@ dependencies {
     // --- SPRING DEPENDENCY INJECTION FRAMEWORK ---
 
 	// https://mvnrepository.com/artifact/org.springframework/spring-context
-	compile (group: 'org.springframework', name: 'spring-context', version: '5.1.9.RELEASE') {
+	compile (group: 'org.springframework', name: 'spring-context', version: '5.2.0.RELEASE') {
 		exclude group: 'org.springframework', module: 'spring-jcl'		
 	}
 	
@@ -119,10 +119,10 @@ dependencies {
 	// --- NETTY SERVER ---
 	
 	// https://mvnrepository.com/artifact/io.netty/netty-handler
-	compile group: 'io.netty', name: 'netty-handler', version: '4.1.39.Final'
+	compile group: 'io.netty', name: 'netty-handler', version: '4.1.42.Final'
 
 	// https://mvnrepository.com/artifact/io.netty/netty-codec-http
-	compile group: 'io.netty', name: 'netty-codec-http', version: '4.1.39.Final'
+	compile group: 'io.netty', name: 'netty-codec-http', version: '4.1.42.Final'
 
 	// --- WEBSOCKET API ---
 		
@@ -135,15 +135,15 @@ dependencies {
 	compile group: 'org.apache.httpcomponents', name: 'httpasyncclient', version: '4.1.4'
 
 	// https://mvnrepository.com/artifact/org.apache.httpcomponents/httpmime
-	compile group: 'org.apache.httpcomponents', name: 'httpmime', version: '4.5.9'
+	compile group: 'org.apache.httpcomponents', name: 'httpmime', version: '4.5.10'
 
 	// ============ JETTY SERVER ===============
 		
 	// https://mvnrepository.com/artifact/org.eclipse.jetty.websocket/javax-websocket-server-impl
-	compile group: 'org.eclipse.jetty.websocket', name: 'javax-websocket-server-impl', version: '9.4.20.v20190813'
+	compile group: 'org.eclipse.jetty.websocket', name: 'javax-websocket-server-impl', version: '9.4.21.v20190926'
 	
 	// https://mvnrepository.com/artifact/org.eclipse.jetty/jetty-continuation
-	compile group: 'org.eclipse.jetty', name: 'jetty-continuation', version: '9.4.20.v20190813'
+	compile group: 'org.eclipse.jetty', name: 'jetty-continuation', version: '9.4.21.v20190926'
 	
 	// ========== MULTIPART PARSER =============
 	
@@ -155,7 +155,7 @@ dependencies {
 	// --- DATATREE TEMPLATES ---
 
 	// https://mvnrepository.com/artifact/com.github.berkesa/datatree-templates
-	compile group: 'com.github.berkesa', name: 'datatree-templates', version: '1.1.3'
+	compile group: 'com.github.berkesa', name: 'datatree-templates', version: '1.1.4'
 	
 	// --- FREEMARKER ---
 	
@@ -194,8 +194,8 @@ targetCompatibility = 1.8
 
 group = 'com.github.berkesa'
 
-version = '1.1.4-SNAPSHOT'
-// version = '1.1.4'
+// version = '1.2.0-SNAPSHOT'
+version = '1.2.0'
 
 modifyPom {
     project {
@@ -223,7 +223,7 @@ modifyPom {
             dependency {
                 groupId 'com.github.berkesa'
                 artifactId 'moleculer-java'
-                version '1.1.3'
+                version '1.2.0'
                 scope 'runtime'
             }
             dependency {
@@ -235,13 +235,13 @@ modifyPom {
             dependency {
                 groupId 'io.netty'
                 artifactId 'netty-handler'
-                version '4.1.39.Final'
+                version '4.1.42.Final'
                 scope 'runtime'
             }
             dependency {
                 groupId 'io.netty'
                 artifactId 'netty-codec-http'
-                version '4.1.39.Final'
+                version '4.1.42.Final'
                 scope 'runtime'
             }
         }
@@ -276,5 +276,5 @@ compileJava {
 
 jar {
     baseName = 'moleculer-web'
-    version =  '1.1.4'
+    version =  '1.2.0'
 }

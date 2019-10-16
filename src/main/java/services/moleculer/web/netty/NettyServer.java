@@ -126,9 +126,9 @@ public class NettyServer extends Service {
 	// --- INIT GATEWAY ---
 
 	@Subscribe("$services.changed")
-	public Listener evt = payload -> {
-		if (gateway == null) {
-			boolean localService = payload.get("localService", false);
+	public Listener evt = ctx -> {
+		if (gateway == null && ctx.params != null) {
+			boolean localService = ctx.params.get("localService", false);
 			if (localService) {
 				gateway = getService(broker, ApiGateway.class);
 				if (gateway != null) {

@@ -28,6 +28,7 @@ package services.moleculer.web;
 import services.moleculer.ServiceBroker;
 import services.moleculer.service.Action;
 import services.moleculer.service.Service;
+import services.moleculer.stream.PacketStream;
 import services.moleculer.web.netty.NettyServer;
 
 /**
@@ -46,14 +47,14 @@ public class Sample {
 	public static void main(String[] args) throws Exception {
 	
 		new ServiceBroker()
-		   .createService(new NettyServer(8080))
-		   .createService(new ApiGateway("*"))
-		   .createService(new Service("math") {
-			public Action add = ctx -> {
-				return ctx.params.get("a", 0) +
-		        	   ctx.params.get("b", 0);
-		        };
-		    }).start();
+	    .createService(new NettyServer(8080))
+	    .createService(new ApiGateway("*"))
+	    .createService(new Service("math") {
+	     public Action add = ctx -> {
+	         return ctx.params.get("a", 0) +
+	                ctx.params.get("b", 0);
+	         };
+	     }).start();
 
 	}
 

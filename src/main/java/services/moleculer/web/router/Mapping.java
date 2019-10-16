@@ -36,6 +36,7 @@ import io.datatree.Tree;
 import services.moleculer.ServiceBroker;
 import services.moleculer.config.ServiceBrokerConfig;
 import services.moleculer.context.CallOptions;
+import services.moleculer.eventbus.Eventbus;
 import services.moleculer.service.ServiceInvoker;
 import services.moleculer.web.CallProcessor;
 import services.moleculer.web.RequestProcessor;
@@ -135,8 +136,9 @@ public class Mapping implements RequestProcessor, HttpConstants {
 		ServiceBrokerConfig cfg = broker.getConfig();
 		ServiceInvoker serviceInvoker = cfg.getServiceInvoker();
 		ExecutorService runner = executor == null ? cfg.getExecutor() : executor;
+		Eventbus eventbus = cfg.getEventbus();
 		lastProcessor = new ActionInvoker(actionName, pathPattern, isStatic, pathPrefix, indexes, names, opts,
-				serviceInvoker, templateEngine, route, beforeCall, afterCall, runner);
+				serviceInvoker, templateEngine, route, beforeCall, afterCall, runner, eventbus);
 	}
 
 	// --- MATCH TEST ---

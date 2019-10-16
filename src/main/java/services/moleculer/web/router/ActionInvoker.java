@@ -43,10 +43,14 @@ import org.slf4j.LoggerFactory;
 import io.datatree.Tree;
 import io.datatree.dom.TreeWriter;
 import io.datatree.dom.TreeWriterRegistry;
+import services.moleculer.config.ServiceBrokerConfig;
 import services.moleculer.context.CallOptions;
 import services.moleculer.context.CallOptions.Options;
+import services.moleculer.eventbus.Eventbus;
+import services.moleculer.context.Context;
 import services.moleculer.service.ServiceInvoker;
 import services.moleculer.stream.PacketStream;
+import services.moleculer.uid.UidGenerator;
 import services.moleculer.util.CheckedTree;
 import services.moleculer.web.CallProcessor;
 import services.moleculer.web.RequestProcessor;
@@ -75,6 +79,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 	protected final int[] indexes;
 	protected final String[] names;
 	protected final CallOptions.Options opts;
+	protected final String nodeID;
 
 	// --- INTERNAL OBJECTS ---
 
@@ -86,6 +91,8 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 	protected final ExecutorService executor;
 	protected final AbstractTemplateEngine templateEngine;
 	protected final MessageLoader messageLoader;
+	protected final Eventbus eventbus;
+	protected final UidGenerator uidGenerator;
 
 	// --- MESSAGE-FILE CACHE ---
 
@@ -95,7 +102,8 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 	public ActionInvoker(String actionName, String pathPattern, boolean isStatic, String pathPrefix, int[] indexes,
 			String[] names, Options opts, ServiceInvoker serviceInvoker, AbstractTemplateEngine templateEngine,
-			Route route, CallProcessor beforeCall, CallProcessor afterCall, ExecutorService executor) {
+			Route route, CallProcessor beforeCall, CallProcessor afterCall, ExecutorService executor,
+			Eventbus eventbus) {
 		this.actionName = actionName;
 		this.pathPattern = pathPattern;
 		this.isStatic = isStatic;
@@ -111,6 +119,11 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		this.afterCall = afterCall;
 		this.executor = executor;
 		this.messageLoader = templateEngine == null ? null : templateEngine.getMessageLoader();
+		this.eventbus = eventbus;
+
+		ServiceBrokerConfig cfg = eventbus.getBroker().getConfig();
+		this.uidGenerator = cfg.getUidGenerator();
+		this.nodeID = cfg.getNodeID();
 	}
 
 	// --- PROCESS (SERVLET OR NETTY) HTTP REQUEST ---
@@ -168,11 +181,12 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				}
 
 				// Invoke service
-				serviceInvoker.call(actionName, in, opts, req.getBody(), null).then(out -> {
-					sendResponse(req, rsp, out);
-				}).catchError(cause -> {
-					sendError(rsp, cause);
-				});
+				serviceInvoker.call(new Context(serviceInvoker, eventbus, uidGenerator, uidGenerator.nextUID(),
+						actionName, in, 1, null, null, req.getBody(), null, nodeID)).then(out -> {
+							sendResponse(req, rsp, out);
+						}).catchError(cause -> {
+							sendError(rsp, cause);
+						});
 			});
 			return;
 
@@ -190,12 +204,13 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				}
 
 				// Invoke service
-				serviceInvoker.call(actionName, in, opts, null, null).then(out -> {
-					sendResponse(req, rsp, out);
-				}).catchError(cause -> {
-					logger.error("Unable to invoke action!", cause);
-					sendError(rsp, cause);
-				});
+				serviceInvoker.call(new Context(serviceInvoker, eventbus, uidGenerator, uidGenerator.nextUID(),
+						actionName, in, 1, null, null, req.getBody(), null, nodeID)).then(out -> {
+							sendResponse(req, rsp, out);
+						}).catchError(cause -> {
+							logger.error("Unable to invoke action!", cause);
+							sendError(rsp, cause);
+						});
 			});
 			return;
 		}
@@ -231,12 +246,13 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 					}
 
 					// Invoke service
-					serviceInvoker.call(actionName, postParams, opts, null, null).then(out -> {
-						sendResponse(req, rsp, out);
-					}).catchError(err -> {
-						logger.error("Unable to invoke action!", err);
-						sendError(rsp, err);
-					});
+					serviceInvoker.call(new Context(serviceInvoker, eventbus, uidGenerator, uidGenerator.nextUID(),
+							actionName, postParams, 1, null, null, req.getBody(), null, nodeID)).then(out -> {
+								sendResponse(req, rsp, out);
+							}).catchError(err -> {
+								logger.error("Unable to invoke action!", err);
+								sendError(rsp, err);
+							});
 				});
 			}
 		});
