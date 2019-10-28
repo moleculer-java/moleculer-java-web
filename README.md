@@ -85,7 +85,7 @@ The project can be imported into the Eclipse IDE. The brief examples illustrate 
 - Integration of Moleculer API into the Spring Boot Framework
 - Configuring HTTP Routes and Middlewares
 - Creating non-blocking Moleculer Services
-- Publishing and invoking Molecular Services as REST Services
+- Publishing and invoking Moleculer Services as REST Services
 - Generating HTML pages in multiple languages using Template Engines
 - Using WebSockets (sending real-time server-side events to browsers)
 - Using file upload and download
