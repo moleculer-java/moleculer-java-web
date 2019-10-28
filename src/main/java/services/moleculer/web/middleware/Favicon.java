@@ -36,6 +36,12 @@ import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
+/**
+ * Server "/favicon.ico" HTTP requests. Sample:
+ * <pre>
+ * route.use(new Favicon("custom.ico"));
+ * </pre>
+ */
 @Name("Favicon")
 public class Favicon extends HttpMiddleware implements HttpConstants {
 
@@ -84,8 +90,8 @@ public class Favicon extends HttpMiddleware implements HttpConstants {
 
 	@Override
 	public RequestProcessor install(RequestProcessor next, Tree config) {
-		return new RequestProcessor() {
-
+		return new AbstractRequestProcessor(next) {
+			
 			/**
 			 * Current ETag.
 			 */
@@ -161,7 +167,7 @@ public class Favicon extends HttpMiddleware implements HttpConstants {
 				// Invoke next handler / action
 				next.service(req, rsp);
 			}
-
+			
 		};
 	}
 

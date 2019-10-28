@@ -36,7 +36,10 @@ import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 /**
- * Implements server side https://www.w3.org/wiki/CORS support for Moleculer.
+ * Implements server side https://www.w3.org/wiki/CORS support for Moleculer. Sample:
+ * <pre>
+ * restRoute.use(new CorsHeaders());
+ * </pre>
  */
 @Name("CORS Headers")
 public class CorsHeaders extends HttpMiddleware {
@@ -112,7 +115,7 @@ public class CorsHeaders extends HttpMiddleware {
 
 	@Override
 	public RequestProcessor install(RequestProcessor next, Tree config) {
-		return new RequestProcessor() {
+		return new AbstractRequestProcessor(next) {
 
 			/**
 			 * Handles request of the HTTP client.

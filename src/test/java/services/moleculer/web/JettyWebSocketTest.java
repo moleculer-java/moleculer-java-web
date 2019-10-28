@@ -112,7 +112,7 @@ public class JettyWebSocketTest extends TestCase {
 		broker.createService(new Service("test") {
 
 			@SuppressWarnings("unused")
-			public Action send = ctx -> {
+			Action send = ctx -> {
 
 				Tree packet = new Tree();
 				packet.put("path", "/ws/test/q");

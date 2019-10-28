@@ -50,11 +50,11 @@ public class Sample {
 	    .createService(new NettyServer(8080))
 	    .createService(new ApiGateway("*"))
 	    .createService(new Service("math") {
-	     public Action add = ctx -> {
+	       Action add = ctx -> {
 	         return ctx.params.get("a", 0) +
 	                ctx.params.get("b", 0);
 	         };
-	     }).start();
+	       }).start();
 
 	}
 

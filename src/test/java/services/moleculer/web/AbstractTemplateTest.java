@@ -78,7 +78,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 		br.createService(new Service("test") {
 
 			@SuppressWarnings("unused")
-			public Action html = ctx -> {
+			Action html = ctx -> {
 				
 				Tree rsp = new Tree();
 				rsp.put("a", 1);
@@ -111,7 +111,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 		br.createService(new Service("math") {
 
 			@SuppressWarnings("unused")
-			public Action add = ctx -> {
+			Action add = ctx -> {
 				int c = ctx.params.get("a", 0) + ctx.params.get("b", 0);
 				if (c == -1) {
 					Thread.sleep(2000);

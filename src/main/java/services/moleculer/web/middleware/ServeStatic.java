@@ -50,7 +50,12 @@ import services.moleculer.web.common.HttpConstants;
 /**
  * Service to serve files from within a given root directory. When a file is not
  * found, instead of sending a 404 response. Supports content compression,
- * automatic "Content-Type" detection, and ETAGs.
+ * automatic "Content-Type" detection, and ETAGs. Sample:
+ * <pre>
+ * ServeStatic staticHandler = new ServeStatic("/", "/www");
+ * staticHandler.setEnableReloading(true) // During the development
+ * route.use(staticHandler);
+ * </pre>
  */
 @Name("Static File Provider")
 public class ServeStatic extends HttpMiddleware implements HttpConstants {
@@ -172,7 +177,7 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 			fileCache = new Cache<>(numberOfCachedFiles);
 		}
 		
-		return new RequestProcessor() {
+		return new AbstractRequestProcessor(next) {
 
 			/**
 			 * Handles request of the HTTP client.

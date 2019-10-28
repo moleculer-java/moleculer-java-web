@@ -38,7 +38,11 @@ import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 /**
- * Redirects all requests to the specified URL / location.
+ * Redirects all requests to the specified URL / location. Sample:
+ * <pre>
+ * // This middleware redirects "/" path to "index.html"
+ * route.use(new Redirector("/", "index.html", 307));
+ * </pre>
  */
 @Name("Redirector")
 public class Redirector extends HttpMiddleware implements HttpConstants {
@@ -77,7 +81,7 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 	}
 
 	/**
-	 * Redirects browser from "path" to "/index.html".
+	 * Redirects browser from "path" to "index.html".
 	 * 
 	 * @param path
 	 *            redirect FROM (eg. "/deleted-page.html")
@@ -92,7 +96,7 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 	 * @param path
 	 *            redirect FROM (eg. "/deleted-page.html")
 	 * @param location
-	 *            redirect TO (eg. "/new-page.html")
+	 *            redirect TO (eg. "new-page.html")
 	 */
 	public Redirector(String path, String location) {
 		this(path, location, 307);
@@ -104,7 +108,7 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 	 * @param path
 	 *            redirect FROM (eg. "/deleted-page.html")
 	 * @param location
-	 *            redirect TO (eg. "/new-page.html")
+	 *            redirect TO (eg. "new-page.html")
 	 * @param status
 	 *            status code (eg. 307 = Temporary Redirect)
 	 */
@@ -118,7 +122,7 @@ public class Redirector extends HttpMiddleware implements HttpConstants {
 
 	@Override
 	public RequestProcessor install(RequestProcessor next, Tree config) {
-		return new RequestProcessor() {
+		return new AbstractRequestProcessor(next) {
 
 			/**
 			 * Handles request of the HTTP client.

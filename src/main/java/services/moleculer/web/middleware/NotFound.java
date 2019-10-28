@@ -39,7 +39,13 @@ import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 /**
- * Refuses all requests with "Error 400 Not Found" message.
+ * Refuses all requests with "Error 400 Not Found" message. Sample usage with
+ * ServeStatic and Favicon middlewares:
+ * <pre>
+ * route.use(new NotFound());
+ * route.use(new ServeStatic("/", "/www"));
+ * route.use(new Favicon("/www/images/custom.ico"));
+ * </pre>
  */
 @Name("Not Found")
 public class NotFound extends HttpMiddleware implements HttpConstants {
@@ -77,7 +83,7 @@ public class NotFound extends HttpMiddleware implements HttpConstants {
 
 	@Override
 	public RequestProcessor install(RequestProcessor next, Tree config) {
-		return new RequestProcessor() {
+		return new AbstractRequestProcessor(next) {
 
 			/**
 			 * Handles request of the HTTP client.

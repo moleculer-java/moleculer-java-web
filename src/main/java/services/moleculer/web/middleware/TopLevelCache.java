@@ -51,10 +51,13 @@ import services.moleculer.web.common.HttpConstants;
 /**
  * URL-based content cache. It is good for caching the responses of
  * non-authenticated REST services with large responses. For example, if the
- * service generates blog/wiki content using the template engine. It is not
+ * service generates blog/wiki content using a HTML Template Egine. It is not
  * advisable to cache POST requests and/or requests that depend not only on the
  * URL but also on the content of the request. TopLevelCache speeds up querying
- * of various reports (tables, charts) and dynamically generated images.
+ * of various reports (tables, charts) and dynamically generated images. Sample:
+ * <pre>
+ * restRoute.use(new TopLevelCache("/blog/posts/**"));
+ * </pre>
  */
 @Name("Top-level Cache")
 public class TopLevelCache extends HttpMiddleware implements HttpConstants {
@@ -85,7 +88,7 @@ public class TopLevelCache extends HttpMiddleware implements HttpConstants {
 	 * Use ETag headers
 	 */
 	protected boolean useETags = true;
-	
+
 	// --- CONSTRUCTORS ---
 
 	public TopLevelCache(Cacher cacher, String... pathPatterns) {
@@ -97,7 +100,7 @@ public class TopLevelCache extends HttpMiddleware implements HttpConstants {
 
 	@Override
 	public RequestProcessor install(RequestProcessor next, Tree config) {
-		return new RequestProcessor() {
+		return new AbstractRequestProcessor(next) {
 
 			/**
 			 * Handles request of the HTTP client.
@@ -115,6 +118,15 @@ public class TopLevelCache extends HttpMiddleware implements HttpConstants {
 			 */
 			@Override
 			public void service(WebRequest req, WebResponse rsp) throws Exception {
+
+				// Check method and Query String
+				if (req.getBody() != null || !"GET".equals(req.getMethod())) {
+
+					// Disable caching POST methods and/or any methods
+					// with Query Strings (uploaded data)
+					next.service(req, rsp);
+					return;
+				}
 
 				// Check path
 				String path = req.getPath();
@@ -148,7 +160,7 @@ public class TopLevelCache extends HttpMiddleware implements HttpConstants {
 						ByteArrayOutputStream buffer = new ByteArrayOutputStream(1024);
 						Tree data = new Tree();
 						Tree headers = data.putMap("headers");
-						
+
 						// Invoke next handler / action
 						next.service(req, new WebResponse() {
 
@@ -186,7 +198,7 @@ public class TopLevelCache extends HttpMiddleware implements HttpConstants {
 								if (finished.compareAndSet(false, true)) {
 									boolean ok;
 									try {
-										
+
 										// Add ETag header
 										if (useETags) {
 											setHeader(ETAG, Long.toHexString(Math.abs(System.nanoTime())));

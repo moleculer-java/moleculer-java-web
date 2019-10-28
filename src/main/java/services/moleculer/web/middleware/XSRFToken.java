@@ -49,7 +49,10 @@ import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 /**
- * This middleware adds "X-XSRF-TOKEN" header to responses.
+ * This middleware adds "X-XSRF-TOKEN" header to responses. Sample:
+ * <pre>
+ * restRoute.use(new XSRFToken());
+ * </pre>
  */
 @Name("XSRF Token")
 public class XSRFToken extends HttpMiddleware implements HttpConstants {
@@ -182,7 +185,7 @@ public class XSRFToken extends HttpMiddleware implements HttpConstants {
 
 	@Override
 	public RequestProcessor install(RequestProcessor next, Tree config) {
-		return new RequestProcessor() {
+		return new AbstractRequestProcessor(next) {
 
 			/**
 			 * Handles request of the HTTP client.

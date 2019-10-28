@@ -84,7 +84,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	/**
 	 * Maximum number of cached routes.
 	 */
-	protected int cachedRoutes = 1024;
+	protected int cachedRoutes = 2048;
 
 	// --- VARIABLES ---
 
@@ -850,4 +850,11 @@ public class ApiGateway extends Service implements RequestProcessor {
 		}
 	}
 
+	// --- PARENT PROCESSOR ---
+	
+	@Override
+	public RequestProcessor getParent() {
+		return null;
+	}
+	
 }

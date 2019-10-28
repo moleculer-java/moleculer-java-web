@@ -477,4 +477,11 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		return new CheckedTree(new MergedMap((Map<String, Object>) data.asObject(), cachedMessages.messageMap));
 	}
 
+	// --- PARENT PROCESSOR ---
+	
+	@Override
+	public RequestProcessor getParent() {
+		return null;
+	}
+	
 }

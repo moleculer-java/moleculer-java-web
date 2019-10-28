@@ -37,7 +37,10 @@ import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 
 /**
- * Adds custom and static HTTP-headers to the response message.
+ * Adds static HTTP-headers to the response message. Sample:
+ * <pre>
+ * route.use(new ResponseHeaders("X-Robots-Tag", "noindex"));
+ * </pre>
  */
 @Name("Response Headers")
 public class ResponseHeaders extends HttpMiddleware {
@@ -64,7 +67,7 @@ public class ResponseHeaders extends HttpMiddleware {
 
 	@Override
 	public RequestProcessor install(RequestProcessor next, Tree config) {
-		return new RequestProcessor() {
+		return new AbstractRequestProcessor(next) {
 
 			@Override
 			public void service(WebRequest req, WebResponse rsp) throws Exception {

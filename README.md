@@ -37,12 +37,12 @@ Moleculer API Gateway provides full support for high-load React, Angular or VueJ
 
 ```xml
 <dependencies>
-	<dependency>
-		<groupId>com.github.berkesa</groupId>
-		<artifactId>moleculer-java-web</artifactId>
-		<version>1.2.0</version>
-		<scope>runtime</scope>
-	</dependency>
+    <dependency>
+        <groupId>com.github.berkesa</groupId>
+        <artifactId>moleculer-java-web</artifactId>
+        <version>1.2.1</version>
+        <scope>runtime</scope>
+    </dependency>
 </dependencies>
 ```
 
@@ -50,7 +50,7 @@ Moleculer API Gateway provides full support for high-load React, Angular or VueJ
 
 ```gradle
 dependencies {
-	compile group: 'com.github.berkesa', name: 'moleculer-java-web', version: '1.2.0' 
+    compile group: 'com.github.berkesa', name: 'moleculer-java-web', version: '1.2.1' 
 }
 ```
 
@@ -63,11 +63,11 @@ new ServiceBroker()
     .createService(new NettyServer(8080))
     .createService(new ApiGateway("*"))
     .createService(new Service("math") {
-     public Action add = ctx -> {
+       Action add = ctx -> {
          return ctx.params.get("a", 0) +
                 ctx.params.get("b", 0);
          };
-     }).start();
+       }).start();
 ```
 After starting the program, enter the following URL into your browser:  
 `http://localhost:8080/math/add?a=3&b=6`

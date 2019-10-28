@@ -40,7 +40,10 @@ import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 /**
- * Simple middleware that provides HTTP BASIC Authentication support.
+ * Simple middleware that provides HTTP BASIC Authentication support. Sample:
+ * <pre>
+ * route.use(new BasicAuthenticator("user", "password"));
+ * </pre>
  */
 @Name("Basic Authenticator")
 public class BasicAuthenticator extends HttpMiddleware implements HttpConstants, BasicAuthProvider {
@@ -92,7 +95,7 @@ public class BasicAuthenticator extends HttpMiddleware implements HttpConstants,
 
 	@Override
 	public RequestProcessor install(RequestProcessor next, Tree config) {
-		return new RequestProcessor() {
+		return new AbstractRequestProcessor(next) {
 
 			/**
 			 * Handles request of the HTTP client.

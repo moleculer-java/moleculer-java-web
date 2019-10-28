@@ -59,7 +59,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 	protected final Route route;
 	protected final CallProcessor beforeCall;
 	protected final CallProcessor afterCall;
-	
+
 	// --- LAST PROCESSOR ---
 
 	protected RequestProcessor lastProcessor;
@@ -164,12 +164,52 @@ public class Mapping implements RequestProcessor, HttpConstants {
 	public void use(Collection<HttpMiddleware> middlewares) {
 		for (HttpMiddleware middleware : middlewares) {
 			if (installedMiddlewares.add(middleware)) {
-				RequestProcessor processor = middleware.install(lastProcessor, config);
+				RequestProcessor parent = lastProcessor.getParent();
+				if (parent == null) {
+					parent = lastProcessor;
+				}
+				Tree actionConfig = getActionConfig(parent);
+				Tree processorConfig;
+				if (actionConfig == null) {
+					processorConfig = config;
+				} else {
+					processorConfig = config.clone();
+					processorConfig.copyFrom(actionConfig);
+				}
+				RequestProcessor processor = middleware.install(lastProcessor, processorConfig);
 				if (processor != null) {
 					lastProcessor = processor;
 				}
 			}
 		}
+	}
+
+	protected Tree getActionConfig(RequestProcessor parent) {
+		if (parent == null || !(parent instanceof ActionInvoker)) {
+			return null;
+		}
+		ActionInvoker invoker = (ActionInvoker) parent;
+		if (invoker.actionName == null) {
+			return null;
+		}
+		Tree descriptor = route.getBroker().getConfig().getServiceRegistry().getDescriptor();
+		Tree services = descriptor.get("services");
+		if (services == null) {
+			return null;
+		}
+		for (Tree service : services) {
+			Tree actions = service.get("actions");
+			if (actions == null) {
+				continue;
+			}
+			for (Tree action : actions) {
+				String actionName = action.get("name", "");
+				if (invoker.actionName.equals(actionName)) {
+					return action;
+				}
+			}
+		}
+		return null;
 	}
 
 	// --- PROCESS (SERVLET OR NETTY) HTTP REQUEST ---
@@ -191,6 +231,13 @@ public class Mapping implements RequestProcessor, HttpConstants {
 	@Override
 	public void service(WebRequest req, WebResponse rsp) throws Exception {
 		lastProcessor.service(req, rsp);
+	}
+
+	// --- PARENT PROCESSOR ---
+
+	@Override
+	public RequestProcessor getParent() {
+		return null;
 	}
 
 	// --- PROPERTY GETTERS ---

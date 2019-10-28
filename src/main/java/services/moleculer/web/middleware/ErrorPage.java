@@ -46,7 +46,13 @@ import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 /**
- * Custom error page (Error 404, 500, etc.) handler.
+ * Custom error page (Error 404, 500, etc.) handler. Sample:
+ * <pre>
+ * ErrorPage errors = new ErrorPage("error-default.html");
+ * errors.setTemplate(404, "error-404.html");
+ * errors.setTemplate(500, "error-500.html");
+ * route.use(errors);
+ * </pre>
  */
 @Name("Error Handler")
 public class ErrorPage extends HttpMiddleware implements HttpConstants {
@@ -89,7 +95,7 @@ public class ErrorPage extends HttpMiddleware implements HttpConstants {
 
 	@Override
 	public RequestProcessor install(RequestProcessor next, Tree config) {
-		return new RequestProcessor() {
+		return new AbstractRequestProcessor(next) {
 
 			/**
 			 * Handles request of the HTTP client.

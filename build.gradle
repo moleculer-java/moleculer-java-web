@@ -194,8 +194,8 @@ targetCompatibility = 1.8
 
 group = 'com.github.berkesa'
 
-// version = '1.2.0-SNAPSHOT'
-version = '1.2.0'
+// version = '1.2.1-SNAPSHOT'
+version = '1.2.1'
 
 modifyPom {
     project {
@@ -223,7 +223,7 @@ modifyPom {
             dependency {
                 groupId 'com.github.berkesa'
                 artifactId 'moleculer-java'
-                version '1.2.0'
+                version '1.2.2'
                 scope 'runtime'
             }
             dependency {
@@ -276,5 +276,5 @@ compileJava {
 
 jar {
     baseName = 'moleculer-web'
-    version =  '1.2.0'
+    version =  '1.2.1'
 }

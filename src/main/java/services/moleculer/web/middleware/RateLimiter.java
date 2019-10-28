@@ -41,7 +41,10 @@ import services.moleculer.web.middleware.limiter.RatingStoreFactory;
 
 /**
  * Rate Limiter limits concurrent constant requests to the HTTP calls in the
- * application.
+ * application. Sample:
+ * <pre>
+ * route.use(new RateLimiter(100, true));
+ * </pre>
  */
 @Name("Rate Limiter")
 public class RateLimiter extends HttpMiddleware implements HttpConstants {
@@ -85,7 +88,7 @@ public class RateLimiter extends HttpMiddleware implements HttpConstants {
 	 * Hits per IP addresses store
 	 */
 	protected RatingStoreFactory storeFactory = new MemoryStoreFactory();
-
+	
 	// --- CONSTRUCTORS ---
 
 	public RateLimiter() {
@@ -159,7 +162,7 @@ public class RateLimiter extends HttpMiddleware implements HttpConstants {
 		}
 
 		// Create new middleware-layer
-		return new RequestProcessor() {
+		return new AbstractRequestProcessor(next) {
 
 			private RatingStore store = storeFactory.createStore(windowMillis);
 

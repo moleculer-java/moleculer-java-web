@@ -1,7 +1,7 @@
 /**
  * THIS SOFTWARE IS LICENSED UNDER MIT LICENSE.<br>
  * <br>
- * Copyright 2018 Andras Berkes [andras.berkes@programmer.net]<br>
+ * Copyright 2019 Andras Berkes [andras.berkes@programmer.net]<br>
  * Based on Moleculer Framework for NodeJS [https://moleculer.services].
  * <br><br>
  * Permission is hereby granted, free of charge, to any person obtaining
@@ -23,33 +23,28 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package services.moleculer.web;
+package services.moleculer.web.middleware;
 
-public interface RequestProcessor {
+import services.moleculer.web.RequestProcessor;
 
-	// --- PROCESS (SERVLET OR NETTY) HTTP REQUEST ---
+public abstract class AbstractRequestProcessor implements RequestProcessor {
 
-	/**
-	 * Handles request of the HTTP client.
-	 * 
-	 * @param req
-	 *            WebRequest object that contains the request the client made of
-	 *            the ApiGateway
-	 * @param rsp
-	 *            WebResponse object that contains the response the ApiGateway
-	 *            returns to the client
-	 * 
-	 * @throws Exception
-	 *             if an input or output error occurs while the ApiGateway is
-	 *             handling the HTTP request
-	 */
-	public void service(WebRequest req, WebResponse rsp) throws Exception;
-
-	/**
-	 * Returns the next RequestProcessor in the invocation chain.
-	 * 
-	 * @return parent processor
-	 */
-	public RequestProcessor getParent();
+	protected final RequestProcessor parent;
 	
+	protected AbstractRequestProcessor(RequestProcessor parent) {
+		this.parent = parent;
+	}
+	
+	@Override
+	public RequestProcessor getParent() {
+		if (parent == null) {
+			return this;
+		}
+		RequestProcessor parentProcessor = parent.getParent();
+		if (parentProcessor == null) {
+			return parent;
+		}
+		return parentProcessor;
+	}
+
 }

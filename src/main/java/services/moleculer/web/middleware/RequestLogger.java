@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
@@ -42,17 +43,21 @@ import org.slf4j.LoggerFactory;
 
 import io.datatree.Tree;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import services.moleculer.ServiceBroker;
 import services.moleculer.service.Name;
-import services.moleculer.stream.PacketStream;
 import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 /**
- * Writes request and response into the log. WARNING: Using this middleware
- * reduces the performance (nevertheless, it may be useful during development).
- * Be sure to turn it off in production mode.
+ * Writes request headers and response headers + response body into the log.
+ * WARNING: Using this middleware reduces the performance (nevertheless, it may
+ * be useful during development). Be sure to turn it off in production mode.
+ * Sample:
+ * <pre>
+ * route.use(new RequestLogger(2048));
+ * </pre>
  */
 @Name("Request Logger")
 public class RequestLogger extends HttpMiddleware implements HttpConstants {
@@ -65,6 +70,8 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 
 	protected int maxPrintedBytes = 512;
 	protected ExecutorService executor = ForkJoinPool.commonPool();
+	protected RequestLoggerTask task;
+	protected boolean shutDownThreadPools = true;
 
 	// --- CONSTRUCTORS ---
 
@@ -75,11 +82,29 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 		setMaxPrintedBytes(maxPrintedBytes);
 	}
 
+	// --- INIT MIDDLEWARE ---
+
+	@Override
+	public void started(ServiceBroker broker) throws Exception {
+		super.started(broker);
+		task = new RequestLoggerTask(maxPrintedBytes, executor);
+	}
+
+	// --- STOP MIDDLEWARE ---
+
+	@Override
+	public void stopped() {
+		super.stopped();
+		if (shutDownThreadPools && executor != null) {
+			executor.shutdownNow();
+		}
+	}
+
 	// --- CREATE NEW PROCESSOR ---
 
 	@Override
 	public RequestProcessor install(RequestProcessor next, Tree config) {
-		return new RequestProcessor() {
+		return new AbstractRequestProcessor(next) {
 
 			/**
 			 * Handles request of the HTTP client.
@@ -98,8 +123,8 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 			@Override
 			public void service(WebRequest req, WebResponse rsp) throws Exception {
 
-				// Create dumper
-				RequestDumper dumper = new RequestDumper(req, maxPrintedBytes, executor);
+				// Create property container
+				RequestProperties props = new RequestProperties(req);
 
 				// Invoke next handler / action
 				final long start = System.nanoTime();
@@ -110,7 +135,7 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 					@Override
 					public final void setStatus(int code) {
 						rsp.setStatus(code);
-						dumper.code = code;
+						props.code = code;
 					}
 
 					@Override
@@ -121,28 +146,28 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 					@Override
 					public final void setHeader(String name, String value) {
 						rsp.setHeader(name, value);
-						dumper.responseHeaders.put(name, value);
+						props.responseHeaders.put(name, value);
 					}
 
 					@Override
 					public final String getHeader(String name) {
-						return dumper.responseHeaders.get(name);
+						return props.responseHeaders.get(name);
 					}
 
 					@Override
 					public final void send(byte[] bytes) throws IOException {
 						rsp.send(bytes);
-						if (maxPrintedBytes < 1 || dumper.out.size() < maxPrintedBytes) {
-							dumper.out.write(bytes);
+						if (maxPrintedBytes < 1 || props.out.size() < maxPrintedBytes) {
+							props.out.write(bytes);
 						}
 					}
 
 					@Override
 					public final boolean end() {
 						if (finished.compareAndSet(false, true)) {
-							dumper.duration = System.nanoTime() - start;
+							props.duration = System.nanoTime() - start;
 							boolean ok = rsp.end();
-							executor.execute(dumper);
+							task.execute(props);
 							return ok;
 						}
 						return false;
@@ -164,7 +189,22 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 		};
 	}
 
-	protected static class RequestDumper implements Runnable {
+	protected static class RequestProperties {
+
+		protected final WebRequest req;
+		protected final LinkedHashMap<String, String> responseHeaders = new LinkedHashMap<>();
+		protected final ByteArrayOutputStream out = new ByteArrayOutputStream(512);
+
+		protected int code = 200;
+		protected long duration;
+
+		protected RequestProperties(WebRequest req) {
+			this.req = req;
+		}
+
+	}
+
+	protected static class RequestLoggerTask implements Runnable {
 
 		protected static final char[] CR_LF = System.getProperty("line.separator", "\r\n").toCharArray();
 		protected static final char[] HEX = "0123456789ABCDEF".toCharArray();
@@ -172,33 +212,57 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 		protected static final char[] COLON_SPACE = ": ".toCharArray();
 		protected static final char[] ETC = "...".toCharArray();
 
-		protected final WebRequest req;
 		protected final int maxPrintedBytes;
 		protected final ExecutorService executor;
+		protected final LinkedList<RequestProperties> queue = new LinkedList<>();
+		protected final AtomicBoolean running = new AtomicBoolean();
 
-		protected int code = 200;
-		protected LinkedHashMap<String, String> responseHeaders = new LinkedHashMap<>();
-		protected ByteArrayOutputStream out = new ByteArrayOutputStream(512);
-		protected long duration;
-
-		protected RequestDumper(WebRequest req, int maxPrintedBytes, ExecutorService executor) {
-			this.req = req;
+		protected RequestLoggerTask(int maxPrintedBytes, ExecutorService executor) {
 			this.maxPrintedBytes = maxPrintedBytes;
 			this.executor = executor;
 		}
 
+		public void execute(RequestProperties props) {
+			synchronized (queue) {
+				queue.addLast(props);
+			}
+			if (running.compareAndSet(false, true)) {
+				executor.execute(this);
+			}
+		}
+
 		@Override
 		public void run() {
+			try {
+				RequestProperties props;
+				while (!Thread.currentThread().isInterrupted()) {
+					props = null;
+					synchronized (queue) {
+						if (!queue.isEmpty()) {
+							props = queue.removeFirst();
+						}
+					}
+					if (props == null) {
+						break;
+					}
+					printRequest(props);
+				}
+			} finally {
+				running.set(false);
+			}
+		}
+
+		protected void printRequest(RequestProperties props) {
 			StringBuilder tmp = new StringBuilder(1024);
 
 			// General request properties
 			tmp.append(CR_LF);
 			tmp.append(CR_LF);
 			tmp.append(TWO_SPACES);
-			tmp.append(req.getMethod());
+			tmp.append(props.req.getMethod());
 			tmp.append(' ');
-			tmp.append(req.getPath());
-			String query = req.getQuery();
+			tmp.append(props.req.getPath());
+			String query = props.req.getQuery();
 			if (query != null && !query.isEmpty()) {
 				tmp.append('?');
 				tmp.append(query);
@@ -208,7 +272,7 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 			tmp.append(" HTTP/1.1");
 
 			tmp.append(CR_LF);
-			Iterator<String> requestHeaders = req.getHeaders();
+			Iterator<String> requestHeaders = props.req.getHeaders();
 			if (requestHeaders != null) {
 				String header;
 				while (requestHeaders.hasNext()) {
@@ -216,35 +280,19 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 					tmp.append(TWO_SPACES);
 					tmp.append(header);
 					tmp.append(COLON_SPACE);
-					tmp.append(req.getHeader(header));
+					tmp.append(props.req.getHeader(header));
 					tmp.append(CR_LF);
 				}
 			}
 
-			// Try to dump request body
-			if (req.getContentLength() > 0) {
-				PacketStream stream = req.getBody();
-				if (stream != null) {
-					ByteArrayOutputStream buffer = new ByteArrayOutputStream(512);
-					try {
-						stream.transferTo(buffer).waitFor(3000);
-						printBytes(tmp, buffer.toByteArray(), req.getHeader(CONTENT_TYPE),
-								req.getHeader(CONTENT_ENCODING));
-					} catch (Exception timeout) {
-						tmp.append(CR_LF);
-						tmp.append("<read timeouted>");
-					}
-				}
-			}
-			tmp.append(CR_LF);
-
 			// It's not known
+			tmp.append(CR_LF);
 			tmp.append("  HTTP/1.1 ");
 
 			// Status code and message
-			tmp.append(HttpResponseStatus.valueOf(code));
+			tmp.append(HttpResponseStatus.valueOf(props.code));
 			tmp.append(CR_LF);
-			for (Map.Entry<String, String> entry : responseHeaders.entrySet()) {
+			for (Map.Entry<String, String> entry : props.responseHeaders.entrySet()) {
 				tmp.append(TWO_SPACES);
 				tmp.append(entry.getKey());
 				tmp.append(COLON_SPACE);
@@ -253,18 +301,18 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 			}
 
 			// Try to dump body
-			if (out.size() > 0) {
-				printBytes(tmp, out.toByteArray(), responseHeaders.get(CONTENT_TYPE),
-						responseHeaders.get(CONTENT_ENCODING));
+			if (props.out.size() > 0) {
+				printBytes(tmp, props.out.toByteArray(), props.responseHeaders.get(CONTENT_TYPE),
+						props.responseHeaders.get(CONTENT_ENCODING));
 			}
 
 			// Insert processing time (first line)
 			tmp.insert(0, '.');
-			tmp.insert(0, formatNamoSec(duration));
+			tmp.insert(0, formatNamoSec(props.duration));
 			tmp.insert(0, " processed within ");
 
 			// Client address
-			String address = req.getAddress();
+			String address = props.req.getAddress();
 			if (address == null || address.isEmpty()) {
 				tmp.insert(0, "<unknown host>");
 			} else {
@@ -288,9 +336,8 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 						tmp.append(CR_LF);
 						tmp.append(ETC);
 					} else {
-						tmp.append(msg);
+						tmp.append(msg.trim());
 					}
-					tmp.append(CR_LF);
 					return;
 				} catch (Exception ignored) {
 				}
@@ -302,12 +349,13 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 			char[] printable = new char[16];
 			int count = 0;
 			printDecimal(tmp, 0);
+			int pos = 0;
 			for (int j = 0; j < bytes.length; j++) {
 				int v = bytes[j] & 0xFF;
 				tmp.append(HEX[v >>> 4]);
 				tmp.append(HEX[v & 0x0F]);
 				tmp.append(' ');
-				int pos = count % 16;
+				pos = count % 16;
 				if (v >= 32 && v <= 126) {
 					printable[pos] = (char) v;
 				} else {
@@ -325,7 +373,6 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 				}
 				count++;
 			}
-			tmp.append(CR_LF);
 		}
 
 		protected void printDecimal(StringBuilder tmp, int value) {
@@ -378,6 +425,14 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 	 */
 	public void setExecutor(ExecutorService executor) {
 		this.executor = executor;
+	}
+
+	public boolean isShutDownThreadPools() {
+		return shutDownThreadPools;
+	}
+
+	public void setShutDownThreadPools(boolean shutDownThreadPools) {
+		this.shutDownThreadPools = shutDownThreadPools;
 	}
 
 }

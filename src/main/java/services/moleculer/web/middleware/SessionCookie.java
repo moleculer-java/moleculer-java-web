@@ -41,7 +41,10 @@ import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 /**
- * Generates Session Cookies, and sets the cookie header.
+ * Generates Session Cookies, and sets the cookie header. Sample:
+ * <pre>
+ * route.use(new SessionCookie("SID"));
+ * </pre>
  */
 @Name("Session Cookie Handler")
 public class SessionCookie extends HttpMiddleware implements HttpConstants {
@@ -91,7 +94,7 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 
 	@Override
 	public RequestProcessor install(RequestProcessor next, Tree config) {
-		return new RequestProcessor() {
+		return new AbstractRequestProcessor(next) {
 
 			/**
 			 * Handles request of the HTTP client.

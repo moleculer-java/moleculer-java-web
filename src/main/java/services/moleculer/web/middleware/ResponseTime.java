@@ -37,7 +37,10 @@ import services.moleculer.web.WebResponse;
 
 /**
  * Adds a header "X-Response-Time" to the response, containing the time taken in
- * MILLISECONDS to process the request.
+ * MILLISECONDS to process the request. Sample:
+ * <pre>
+ * route.use(new ResponseTime());
+ * </pre>
  */
 @Name("Response Time")
 public class ResponseTime extends HttpMiddleware {
@@ -59,7 +62,7 @@ public class ResponseTime extends HttpMiddleware {
 
 	@Override
 	public RequestProcessor install(RequestProcessor next, Tree config) {
-		return new RequestProcessor() {
+		return new AbstractRequestProcessor(next) {
 
 			/**
 			 * Handles request of the HTTP client.

@@ -45,7 +45,10 @@ import services.moleculer.web.common.HttpConstants;
 
 /**
  * Middleware that will timeout requests if the response has not been written
- * after the specified time. HTTP response code will be "408".
+ * after the specified time. HTTP response code will be "408". Sample:
+ * <pre>
+ * route.use(new ResponseTimeout(1000L * 30));
+ * </pre>
  */
 @Name("Response Timeout")
 public class ResponseTimeout extends HttpMiddleware implements HttpConstants {
@@ -117,7 +120,7 @@ public class ResponseTimeout extends HttpMiddleware implements HttpConstants {
 
 	@Override
 	public RequestProcessor install(RequestProcessor next, Tree config) {
-		return new RequestProcessor() {
+		return new AbstractRequestProcessor(next) {
 
 			/**
 			 * Handles request of the HTTP client.

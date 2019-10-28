@@ -46,8 +46,13 @@ import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
 /**
- * Compresses body of REST responses. WARNING: Using this middleware reduces
- * the performance, so use it only on very slow networks.
+ * Compresses body of REST responses. Do not use it with ServeStatic middleware;
+ * ServeStatic also compresses the data. Use it to compress the response of REST
+ * services. Using this middleware reduces the performance, so use it only on
+ * slow networks. Sample:
+ * <pre>
+ * restRoute.use(new ResponseDeflater(Deflater.BEST_SPEED));
+ * </pre>
  */
 @Name("Response Deflater")
 public class ResponseDeflater extends HttpMiddleware implements HttpConstants {
@@ -81,7 +86,7 @@ public class ResponseDeflater extends HttpMiddleware implements HttpConstants {
 
 	@Override
 	public RequestProcessor install(RequestProcessor next, Tree config) {
-		return new RequestProcessor() {
+		return new AbstractRequestProcessor(next) {
 
 			/**
 			 * Handles request of the HTTP client.

@@ -65,7 +65,7 @@ public class NettyWebSocketTest extends TestCase {
 
 			// The "test.send" service ("action")
 			@SuppressWarnings("unused")
-			public Action send = ctx -> {
+			Action send = ctx -> {
 
 				Tree packet = new Tree();
 				packet.put("path", "/ws/test");
