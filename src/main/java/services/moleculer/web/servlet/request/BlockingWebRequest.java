@@ -48,10 +48,12 @@ public class BlockingWebRequest extends AbstractWebRequest {
 		super(req);
 
 		// Create body stream
-		if (multipart) {
-			createMultipartStream(broker);
-		} else {
-			createStream(broker);
+		if (contentLength != 0) {
+			if (multipart) {
+				createMultipartStream(broker);
+			} else {
+				createStream(broker);
+			}
 		}
 	}
 
@@ -121,5 +123,5 @@ public class BlockingWebRequest extends AbstractWebRequest {
 			}
 		}
 	}
-	
+
 }

@@ -49,10 +49,12 @@ public class NonBlockingWebRequest extends AbstractWebRequest {
 		super((HttpServletRequest) async.getRequest());
 
 		// Create body stream
-		if (multipart) {
-			createMultipartStream(broker, async);
-		} else {
-			createStream(broker, async);
+		if (contentLength != 0) {
+			if (multipart) {
+				createMultipartStream(broker, async);
+			} else {
+				createStream(broker, async);
+			}
 		}
 	}
 
@@ -119,7 +121,7 @@ public class NonBlockingWebRequest extends AbstractWebRequest {
 
 			@Override
 			public final void onStartAsync(AsyncEvent event) throws IOException {
-				
+
 				// Do nothing
 			}
 
@@ -135,7 +137,7 @@ public class NonBlockingWebRequest extends AbstractWebRequest {
 				}
 				final byte buffer[] = new byte[len];
 				while (in.isReady() && (len = in.read(buffer)) != -1) {
-					if (len > 0) {		
+					if (len > 0) {
 						parser.write(buffer, 0, len);
 					}
 				}
@@ -165,5 +167,5 @@ public class NonBlockingWebRequest extends AbstractWebRequest {
 
 		});
 	}
-	
+
 }

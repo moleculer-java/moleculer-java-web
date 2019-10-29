@@ -28,6 +28,7 @@ package services.moleculer.web.router;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -38,6 +39,7 @@ import services.moleculer.config.ServiceBrokerConfig;
 import services.moleculer.context.CallOptions;
 import services.moleculer.eventbus.Eventbus;
 import services.moleculer.service.ServiceInvoker;
+import services.moleculer.util.CheckedTree;
 import services.moleculer.web.CallProcessor;
 import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
@@ -67,7 +69,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 	// --- INSTALLED MIDDLEWARES ---
 
 	protected Set<HttpMiddleware> installedMiddlewares = new HashSet<>(32);
-
+	
 	// --- CONSTRUCTOR ---
 
 	public Mapping(ServiceBroker broker, String httpMethod, String pathPattern, String actionName,
@@ -189,25 +191,35 @@ public class Mapping implements RequestProcessor, HttpConstants {
 			return null;
 		}
 		ActionInvoker invoker = (ActionInvoker) parent;
-		if (invoker.actionName == null) {
+		if (invoker.actionName == null || invoker.actionName.isEmpty()) {
+			return null;
+		}
+		int i = invoker.actionName.indexOf('.');
+		if (i == -1) {
 			return null;
 		}
 		Tree descriptor = route.getBroker().getConfig().getServiceRegistry().getDescriptor();
 		Tree services = descriptor.get("services");
-		if (services == null) {
+		if (services == null || services.isEmpty()) {
 			return null;
 		}
+		String serviceName = invoker.actionName.substring(0, i);
 		for (Tree service : services) {
-			Tree actions = service.get("actions");
-			if (actions == null) {
+			if (serviceName != null && !serviceName.equals(service.get("name", ""))) {
 				continue;
 			}
-			for (Tree action : actions) {
-				String actionName = action.get("name", "");
-				if (invoker.actionName.equals(actionName)) {
-					return action;
-				}
+			Tree actions = service.get("actions");
+			if (actions == null || actions.isEmpty()) {
+				return null;
 			}
+			
+			@SuppressWarnings("unchecked")
+			Map<String, Object> map = (Map<String, Object>) actions.asObject();
+			Object value = map.get(actionName);
+			if (value != null) {
+				return new CheckedTree(value);
+			}
+			return null;
 		}
 		return null;
 	}

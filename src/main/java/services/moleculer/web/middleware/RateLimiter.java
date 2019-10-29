@@ -42,6 +42,7 @@ import services.moleculer.web.middleware.limiter.RatingStoreFactory;
 /**
  * Rate Limiter limits concurrent constant requests to the HTTP calls in the
  * application. Sample:
+ * 
  * <pre>
  * route.use(new RateLimiter(100, true));
  * </pre>
@@ -60,7 +61,7 @@ public class RateLimiter extends HttpMiddleware implements HttpConstants {
 	/**
 	 * Apply the performance cutoff for each service (= true), otherwise (=
 	 * false) it will only limit the load with the Actions marked with the
-	 * annotation.
+	 * 'RateLimit' annotation.
 	 */
 	protected boolean applyForAll;
 
@@ -70,7 +71,7 @@ public class RateLimiter extends HttpMiddleware implements HttpConstants {
 	protected long limit = 50;
 
 	/**
-	 * Time "window" length
+	 * Time "window" (time frame) length
 	 */
 	protected long window = 1;
 
@@ -80,19 +81,36 @@ public class RateLimiter extends HttpMiddleware implements HttpConstants {
 	protected boolean headers = true;
 
 	/**
-	 * Unit of the time "window"
+	 * Unit of the time window/frame
 	 */
 	protected TimeUnit unit = TimeUnit.SECONDS;
 
 	/**
-	 * Hits per IP addresses store
+	 * Hits per IP-addresses store
 	 */
 	protected RatingStoreFactory storeFactory = new MemoryStoreFactory();
-	
+
 	// --- CONSTRUCTORS ---
 
+	/**
+	 * Creates a RateLimiter with default settings (50 requests / second for all
+	 * URLs).
+	 */
 	public RateLimiter() {
-		this(50, 1, TimeUnit.SECONDS, false);
+		this(50, 1, TimeUnit.SECONDS, true);
+	}
+
+	/**
+	 * Creates a RateLimiter. It is adjustable to consider the 'RateLimit'
+	 * annotation.
+	 * 
+	 * @param applyForAll
+	 *            apply the performance cutoff for each service (= true),
+	 *            otherwise (= false) it will only limit the load with the
+	 *            Actions marked with the 'RateLimit' annotation.
+	 */
+	public RateLimiter(boolean applyForAll) {
+		this(50, 1, TimeUnit.SECONDS, applyForAll);
 	}
 
 	public RateLimiter(int rateLimit, boolean applyForAll) {
@@ -143,7 +161,7 @@ public class RateLimiter extends HttpMiddleware implements HttpConstants {
 		} else {
 			actionLimit = rateLimit.get("value", limit);
 			actionWindow = rateLimit.get("window", window);
-			actionUnit = TimeUnit.valueOf(rateLimit.get("unit", unit.toString()));
+			actionUnit = TimeUnit.valueOf(rateLimit.get("unit", unit.toString()).toUpperCase());
 		}
 
 		// Convert to milliseconds

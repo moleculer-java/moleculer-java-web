@@ -52,9 +52,10 @@ import services.moleculer.web.common.HttpConstants;
 
 /**
  * Writes request headers and response headers + response body into the log.
- * WARNING: Using this middleware reduces the performance (nevertheless, it may
- * be useful during development). Be sure to turn it off in production mode.
- * Sample:
+ * Request body not logged in this version. WARNING: Using this middleware
+ * reduces the performance (nevertheless, it may be useful during development).
+ * Be sure to turn it off in production mode. Sample:
+ * 
  * <pre>
  * route.use(new RequestLogger(2048));
  * </pre>
