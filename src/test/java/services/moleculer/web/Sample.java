@@ -28,7 +28,6 @@ package services.moleculer.web;
 import services.moleculer.ServiceBroker;
 import services.moleculer.service.Action;
 import services.moleculer.service.Service;
-import services.moleculer.stream.PacketStream;
 import services.moleculer.web.netty.NettyServer;
 
 /**

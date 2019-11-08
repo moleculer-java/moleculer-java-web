@@ -219,7 +219,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 			if (value != null) {
 				return new CheckedTree(value);
 			}
-			return null;
+			break;
 		}
 		return null;
 	}

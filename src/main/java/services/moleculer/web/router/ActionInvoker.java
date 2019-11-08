@@ -149,26 +149,22 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		rsp.setHeader(CACHE_CONTROL, NO_CACHE);
 
 		// Parse URL
-		Tree params = null;
+		final Tree params = new Tree();
 		if (isStatic || indexes.length == 0) {
 
 			// HTTP GET QueryString
 			String query = req.getQuery();
 			if (query != null && !query.isEmpty()) {
-				params = parseQueryString(query);
+				parseQueryString(params, query);
 			}
 		} else {
 
 			// Parameters in URL (eg "/path/:id/:name")
-			params = new Tree();
 			String[] tokens = req.getPath().split("/");
 			for (int i = 0; i < indexes.length; i++) {
 				params.put(names[i], tokens[indexes[i]]);
 			}
 		}
-
-		// Create not-null, final input structure
-		final Tree in = params == null ? new Tree() : params;
 
 		// Multipart request
 		if (req.isMultipart()) {
@@ -177,12 +173,12 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				// Custom "before call" processor
 				// (eg. copy HTTP headers into the "params" variable)
 				if (beforeCall != null) {
-					beforeCall.onCall(route, req, rsp, in);
+					beforeCall.onCall(route, req, rsp, params);
 				}
 
 				// Invoke service
 				serviceInvoker.call(new Context(serviceInvoker, eventbus, uidGenerator, uidGenerator.nextUID(),
-						actionName, in, 1, null, null, req.getBody(), null, nodeID)).then(out -> {
+						actionName, params, 1, null, null, req.getBody(), null, nodeID)).then(out -> {
 							sendResponse(req, rsp, out);
 						}).catchError(cause -> {
 							sendError(rsp, cause);
@@ -200,12 +196,12 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				// Custom "before call" processor
 				// (eg. copy HTTP headers into the "params" variable)
 				if (beforeCall != null) {
-					beforeCall.onCall(route, req, rsp, in);
+					beforeCall.onCall(route, req, rsp, params);
 				}
 
 				// Invoke service
 				serviceInvoker.call(new Context(serviceInvoker, eventbus, uidGenerator, uidGenerator.nextUID(),
-						actionName, in, 1, null, null, req.getBody(), null, nodeID)).then(out -> {
+						actionName, params, 1, null, null, req.getBody(), null, nodeID)).then(out -> {
 							sendResponse(req, rsp, out);
 						}).catchError(cause -> {
 							logger.error("Unable to invoke action!", cause);
@@ -219,7 +215,6 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		byte[] body = new byte[contentLength];
 		AtomicInteger pos = new AtomicInteger();
 		AtomicBoolean faulty = new AtomicBoolean();
-		final Tree urlParams = params;
 		req.getBody().onPacket((bytes, cause, close) -> {
 			if (bytes != null) {
 				System.arraycopy(bytes, 0, body, pos.getAndAdd(bytes.length), bytes.length);
@@ -230,24 +225,20 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 			}
 			if (close && !faulty.get()) {
 
-				// Parse body
-				Tree postParams = parsePostBody(body, req.getContentType());
+				// Parse and merge body
+				Tree merged = parsePostBody(params, body, req.getContentType());
 
-				// Merge with URL parameters
-				if (urlParams != null) {
-					postParams.copyFrom(urlParams, true);
-				}
 				executor.execute(() -> {
 
 					// Custom "before call" processor
 					// (eg. copy HTTP headers into the "params" variable)
 					if (beforeCall != null) {
-						beforeCall.onCall(route, req, rsp, in);
+						beforeCall.onCall(route, req, rsp, merged);
 					}
 
 					// Invoke service
 					serviceInvoker.call(new Context(serviceInvoker, eventbus, uidGenerator, uidGenerator.nextUID(),
-							actionName, postParams, 1, null, null, req.getBody(), null, nodeID)).then(out -> {
+							actionName, merged, 1, null, null, req.getBody(), null, nodeID)).then(out -> {
 								sendResponse(req, rsp, out);
 							}).catchError(err -> {
 								logger.error("Unable to invoke action!", err);
@@ -260,24 +251,25 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 	// --- PARSE BODY OF THE GET / POST REQUEST ---
 
-	protected Tree parsePostBody(byte[] bytes, String contentType) throws Exception {
-		Tree params;
-		if (bytes.length == 0) {
-			params = new Tree();
-		} else {
+	protected Tree parsePostBody(Tree params, byte[] bytes, String contentType) throws Exception {
+		if (bytes.length > 0) {
 			if (bytes[0] == '{' || bytes[0] == '[') {
 
 				// JSON body
-				params = new Tree(bytes);
-
+				Tree json = new Tree(bytes);
+				if (params != null && !params.isEmpty()) {
+					json.copyFrom(params);
+				}
+				return json;
+				
 			} else {
 
 				// QueryString body
 				String txt = new String(bytes, StandardCharsets.UTF_8);
 				if (contentType == null || contentType.contains("x-www")) {
-					params = parseQueryString(txt);
+					parseQueryString(params, txt);
 				} else {
-					params = parseTextPlain(txt);
+					parseTextPlain(params, txt);
 				}
 			}
 		}
@@ -286,8 +278,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 	// --- PARSE TEXT/PLAIN ENCODED REQUEST ---
 
-	protected Tree parseTextPlain(String query) throws UnsupportedEncodingException {
-		Tree params = new Tree();
+	protected void parseTextPlain(Tree params, String query) throws UnsupportedEncodingException {
 		StringTokenizer st = new StringTokenizer(query, "\r\n");
 		String pair;
 		int i;
@@ -298,13 +289,11 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				params.put(pair.substring(0, i).trim(), pair.substring(i + 1).trim());
 			}
 		}
-		return params;
 	}
 
 	// --- PARSE HTTP QUERY STRING ---
 
-	protected Tree parseQueryString(String query) throws UnsupportedEncodingException {
-		Tree params = new Tree();
+	protected void parseQueryString(Tree params, String query) throws UnsupportedEncodingException {
 		String[] pairs = query.split("&");
 		int i;
 		for (String pair : pairs) {
@@ -314,7 +303,6 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 						URLDecoder.decode(pair.substring(i + 1), "UTF-8").trim());
 			}
 		}
-		return params;
 	}
 
 	// --- SEND JSON/STREAMED RESPONSE ---

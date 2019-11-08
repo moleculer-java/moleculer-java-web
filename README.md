@@ -40,7 +40,7 @@ Moleculer API Gateway provides full support for high-load React, Angular or VueJ
     <dependency>
         <groupId>com.github.berkesa</groupId>
         <artifactId>moleculer-java-web</artifactId>
-        <version>1.2.2</version>
+        <version>1.2.3</version>
         <scope>runtime</scope>
     </dependency>
 </dependencies>
@@ -50,7 +50,7 @@ Moleculer API Gateway provides full support for high-load React, Angular or VueJ
 
 ```gradle
 dependencies {
-    compile group: 'com.github.berkesa', name: 'moleculer-java-web', version: '1.2.2' 
+    compile group: 'com.github.berkesa', name: 'moleculer-java-web', version: '1.2.3' 
 }
 ```
 

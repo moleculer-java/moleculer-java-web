@@ -65,6 +65,8 @@ public class InprocessExecutor implements ExecutorService {
 
 	@Override
 	public void shutdown() {
+		
+		// Do nothing
 	}
 
 	@Override
