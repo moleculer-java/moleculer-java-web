@@ -157,7 +157,6 @@ public class ApiGateway extends Service implements RequestProcessor {
 	@Subscribe("websocket.send")
 	public Listener webSocketListener = ctx -> {
 		if (webSocketRegistry == null) {
-			logger.warn("WebSocket Registry not initialized!");
 			return;
 		}
 		if (ctx.params == null || ctx.params.isEmpty()) {
