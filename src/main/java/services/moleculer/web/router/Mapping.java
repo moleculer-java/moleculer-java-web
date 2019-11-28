@@ -69,7 +69,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 	// --- INSTALLED MIDDLEWARES ---
 
 	protected Set<HttpMiddleware> installedMiddlewares = new HashSet<>(32);
-	
+
 	// --- CONSTRUCTOR ---
 
 	public Mapping(ServiceBroker broker, String httpMethod, String pathPattern, String actionName,
@@ -195,7 +195,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 			return null;
 		}
 		int i = invoker.actionName.indexOf('.');
-		if (i == -1) {
+		if (i < 1) {
 			return null;
 		}
 		Tree descriptor = route.getBroker().getConfig().getServiceRegistry().getDescriptor();
@@ -205,21 +205,19 @@ public class Mapping implements RequestProcessor, HttpConstants {
 		}
 		String serviceName = invoker.actionName.substring(0, i);
 		for (Tree service : services) {
-			if (serviceName != null && !serviceName.equals(service.get("name", ""))) {
-				continue;
-			}
-			Tree actions = service.get("actions");
-			if (actions == null || actions.isEmpty()) {
-				return null;
-			}
-			
-			@SuppressWarnings("unchecked")
-			Map<String, Object> map = (Map<String, Object>) actions.asObject();
-			Object value = map.get(actionName);
-			if (value != null) {
+			if (serviceName.equals(service.get("name", ""))) {
+				Tree actions = service.get("actions");
+				if (actions == null || actions.isEmpty()) {
+					return null;
+				}
+				@SuppressWarnings("unchecked")
+				Map<String, Object> map = (Map<String, Object>) actions.asObject();
+				Object value = map.get(actionName);
+				if (value == null) {
+					return null;
+				}
 				return new CheckedTree(value);
 			}
-			break;
 		}
 		return null;
 	}
@@ -258,6 +256,10 @@ public class Mapping implements RequestProcessor, HttpConstants {
 		return isStatic;
 	}
 
+	public String getPathPrefix() {
+		return pathPrefix;
+	}
+	
 	// --- COLLECTION HELPERS ---
 
 	@Override

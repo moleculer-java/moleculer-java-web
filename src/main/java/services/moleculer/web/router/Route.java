@@ -123,7 +123,7 @@ public class Route {
 		if (whiteList != null && whiteList.length > 0) {
 			for (String pattern : whiteList) {
 				if (Matcher.matches(shortPath, pattern)) {
-					Mapping mapping = new Mapping(broker, httpMethod, this.path + pattern, actionName, opts,
+					Mapping mapping = new Mapping(broker, httpMethod, path, actionName, opts,
 							templateEngine, this, beforeCall, afterCall, executor);
 					if (!routeMiddlewares.isEmpty()) {
 						mapping.use(routeMiddlewares);
@@ -133,13 +133,7 @@ public class Route {
 			}
 		}
 		if (mappingPolicy == MappingPolicy.ALL) {
-			String pattern;
-			if (this.path == null || this.path.isEmpty()) {
-				pattern = path;
-			} else {
-				pattern = this.path + '*';
-			}
-			Mapping mapping = new Mapping(broker, httpMethod, pattern, actionName, opts, templateEngine, this,
+			Mapping mapping = new Mapping(broker, httpMethod, path, actionName, opts, templateEngine, this,
 					beforeCall, afterCall, executor);
 			if (!routeMiddlewares.isEmpty()) {
 				mapping.use(routeMiddlewares);

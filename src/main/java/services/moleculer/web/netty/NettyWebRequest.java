@@ -27,6 +27,7 @@ package services.moleculer.web.netty;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.Iterator;
 
 import org.synchronoss.cloud.nio.multipart.Multipart;
@@ -124,7 +125,11 @@ public class NettyWebRequest implements WebRequest {
 	 */
 	@Override
 	public String getAddress() {
-		return ((InetSocketAddress) ctx.channel().remoteAddress()).getHostString();
+		SocketAddress address = ctx.channel().remoteAddress();
+		if (address == null) {
+			return "0.0.0.0";
+		}
+		return ((InetSocketAddress) address).getHostString();
 	}
 
 	/**

@@ -450,7 +450,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 		// Try to find in static mappings (eg. "/user")
 		String httpMethod = req.getMethod();
 		String path = req.getPath();
-		String staticKey = httpMethod + '|' + path;
+		String staticKey = httpMethod + ' ' + path;
 		Mapping mapping;
 		readLock.lock();
 		try {
@@ -484,9 +484,6 @@ public class ApiGateway extends Service implements RequestProcessor {
 		for (Route route : routes) {
 			mapping = route.findMapping(httpMethod, path);
 			if (mapping != null) {
-				if (debug) {
-					logger.info("New mapping created by the following route:\r\n" + route.toTree());
-				}
 				if (!globalMiddlewares.isEmpty()) {
 					mapping.use(globalMiddlewares);
 				}
@@ -501,7 +498,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 				if (mapping.isStatic()) {
 					staticMappings.put(staticKey, mapping);
 					if (debug) {
-						logger.info("New mapping stored in the static mapping cache (key: " + staticKey + ").");
+						logger.info("New mapping for \"" + mapping.getPathPrefix() + "\" stored in the static mapping cache (key: " + staticKey + ").");
 					}
 				} else {
 					dynamicMappings.addLast(mapping);
@@ -509,7 +506,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 						dynamicMappings.removeFirst();
 					}
 					if (debug) {
-						logger.info("New mapping stored in the dynamic mapping cache.");
+						logger.info("New mapping for \"" + mapping.getPathPrefix() + "\" stored in the dynamic mapping cache.");
 					}
 				}
 			} finally {

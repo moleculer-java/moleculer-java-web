@@ -202,8 +202,8 @@ public class MoleculerServlet extends HttpServlet {
 					}
 					i = i.toLowerCase();
 					
-					// Faulty or partial non-blocking implementations (2019)
-					forceBlocking = Boolean.toString(i.contains("weblogic") || i.contains("fish"));
+					// Partial non-blocking implementation
+					forceBlocking = Boolean.toString(i.contains("weblogic"));
 				}
 				if (!Boolean.parseBoolean(forceBlocking)) {
 					try {

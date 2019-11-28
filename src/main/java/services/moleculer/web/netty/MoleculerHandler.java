@@ -86,7 +86,7 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 		// --- HTTP MESSAGES ---
 
 		try {
-			
+
 			// HTTP request -> begin
 			if (request instanceof HttpRequest) {
 				HttpRequest httpRequest = (HttpRequest) request;
@@ -146,6 +146,9 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 				}
 				int len = byteBuffer.readableBytes();
 				if (len < 1) {
+					if (req != null && req.stream != null && request instanceof LastHttpContent) {
+						req.stream.sendClose();
+					}
 					return;
 				}
 				data = new byte[len];
@@ -153,9 +156,11 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 
 				// Push data into the stream
 				if (req.parser == null) {
-					req.stream.sendData(data);
-					if (request instanceof LastHttpContent) {
-						req.stream.sendClose();
+					if (req.stream != null) {
+						req.stream.sendData(data);
+						if (request instanceof LastHttpContent) {
+							req.stream.sendClose();
+						}
 					}
 				} else {
 					req.parser.write(data);

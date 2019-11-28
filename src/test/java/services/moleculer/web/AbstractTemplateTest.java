@@ -25,11 +25,17 @@
  */
 package services.moleculer.web;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
 import org.apache.http.impl.nio.client.HttpAsyncClients;
 import org.junit.Test;
@@ -40,6 +46,7 @@ import junit.framework.TestCase;
 import services.moleculer.ServiceBroker;
 import services.moleculer.service.Action;
 import services.moleculer.service.Service;
+import services.moleculer.stream.PacketStream;
 import services.moleculer.util.CommonUtils;
 import services.moleculer.web.common.HttpConstants;
 import services.moleculer.web.middleware.BasicAuthenticator;
@@ -122,6 +129,8 @@ public abstract class AbstractTemplateTest extends TestCase {
 
 		});
 
+		br.createService(new ChunkedService());
+		
 		gw.use(new RequestLogger());
 		gw.use(new Favicon());
 
@@ -156,6 +165,10 @@ public abstract class AbstractTemplateTest extends TestCase {
 		r1.addAlias(Alias.GET, "/html/:locale", "test.html");
 		r1.use(new SessionCookie("SID", "/html"));
 
+		// Chunked test
+		r1.addAlias(Alias.POST, "/chunked/stream", "chunkedService.stream");
+		r1.addAlias(Alias.POST, "/chunked/rest", "chunkedService.rest");
+		
 		gw.addRoute(r1);
 
 		// Create route for serving html content
@@ -268,6 +281,69 @@ public abstract class AbstractTemplateTest extends TestCase {
 		doTemplateTests("thymeleaf");
 	}
 
+	@Test
+	public void testChunked() throws Exception {
+		HttpPost post = new HttpPost("http://localhost:3000/chunked/stream");
+		
+		ByteArrayOutputStream out = new ByteArrayOutputStream();
+		for (int i = 0; i < 10000; i++) {
+			out.write(i % 128);
+		}
+		ByteArrayInputStream in = new ByteArrayInputStream(out.toByteArray());
+        InputStreamEntity reqEntity = new InputStreamEntity(in, -1, ContentType.APPLICATION_OCTET_STREAM);
+        reqEntity.setChunked(true);
+        post.setEntity(reqEntity);
+        
+        HttpResponse rsp = cl.execute(post, null).get(300, TimeUnit.SECONDS);
+        byte[] bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+        
+		assertEquals(200, rsp.getStatusLine().getStatusCode());
+		for (int i = 0; i < 10000; i++) {
+			assertEquals(i % 128, bytes[i]);
+		}
+
+		post = new HttpPost("http://localhost:3000/chunked/rest");
+		
+		out = new ByteArrayOutputStream();
+		Tree t = new Tree();
+		for (int i = 0; i < 10; i++) {
+			t.put("key" + i, "value" + i);
+		}
+		out.write(t.toBinary());
+		in = new ByteArrayInputStream(out.toByteArray());
+        reqEntity = new InputStreamEntity(in, -1, ContentType.APPLICATION_JSON);
+        reqEntity.setChunked(true);
+        post.setEntity(reqEntity);
+        
+        rsp = cl.execute(post, null).get(300, TimeUnit.SECONDS);
+        bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+        
+		assertEquals(200, rsp.getStatusLine().getStatusCode());
+		Tree r = new Tree(bytes);
+		for (int i = 0; i < 10; i++) {
+			assertEquals("value" + i, r.get("key" + i, ""));
+		}		
+	}
+	
+	public static class ChunkedService extends Service {
+		
+		public Action stream = ctx -> {
+			ByteArrayOutputStream out = new ByteArrayOutputStream();
+			return ctx.stream.transferTo(out).then(rsp -> {
+				PacketStream stream = ctx.createStream();
+				stream.setPacketSize(1000);
+				stream.setPacketDelay(10);
+				stream.transferFrom(new ByteArrayInputStream(out.toByteArray()));
+				return stream;
+			});
+		};
+		
+		public Action rest = ctx -> {
+			return ctx.params;
+		};
+		
+	}
+	
 	@Test
 	public void testMiddlewares() throws Exception {
 

@@ -26,7 +26,7 @@
 package services.moleculer.web.servlet.response;
 
 import java.io.IOException;
-import java.util.LinkedList;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -36,21 +36,17 @@ import javax.servlet.http.HttpServletResponse;
 
 public class NonBlockingWebResponse extends AbstractWebResponse {
 
-	// --- END MARKER ---
-
-	protected static final byte[] END_MARKER = new byte[0];
-
 	// --- RESPONSE VARIABLES ---
 
 	protected final AtomicReference<Throwable> error = new AtomicReference<>();
 
 	protected final AtomicBoolean listenerSet = new AtomicBoolean();
 
-	protected final AtomicBoolean lock = new AtomicBoolean();
-
-	protected final LinkedList<byte[]> queue = new LinkedList<>();
+	protected final ConcurrentLinkedQueue<byte[]> queue = new ConcurrentLinkedQueue<>();
 
 	protected final WriteListener listener;
+
+	protected final AtomicBoolean writting = new AtomicBoolean();
 
 	// --- CONSTRUCTOR ---
 
@@ -60,14 +56,14 @@ public class NonBlockingWebResponse extends AbstractWebResponse {
 
 			@Override
 			public void onWritePossible() throws IOException {
-				while (out.isReady()) {
-					if (lock.compareAndSet(false, true)) {
-						try {
-							if (queue.isEmpty()) {
+				if (writting.compareAndSet(false, true)) {
+					try {
+						while (out.isReady()) {
+							byte[] bytes = queue.poll();
+							if (bytes == null) {
 								return;
 							}
-							byte[] bytes = queue.removeFirst();
-							if (bytes == END_MARKER) {
+							if (bytes.length == 0) {
 								try {
 									out.close();
 								} catch (Throwable ignored) {
@@ -79,11 +75,11 @@ public class NonBlockingWebResponse extends AbstractWebResponse {
 								return;
 							}
 							out.write(bytes);
-						} catch (Throwable cause) {
-							error.set(cause);
-						} finally {
-							lock.set(false);
 						}
+					} catch (Throwable cause) {
+						error.set(cause);
+					} finally {
+						writting.set(false);
 					}
 				}
 			}
@@ -116,7 +112,9 @@ public class NonBlockingWebResponse extends AbstractWebResponse {
 			}
 			throw new IOException(cause);
 		}
-		addToQueueAndSend(bytes);
+		if (bytes != null && bytes.length > 0) {
+			addToQueueAndSend(bytes);
+		}
 	}
 
 	// --- END PROCESSING ---
@@ -129,28 +127,20 @@ public class NonBlockingWebResponse extends AbstractWebResponse {
 	@Override
 	public boolean end() {
 		if (closed.compareAndSet(false, true)) {
-			addToQueueAndSend(END_MARKER);
+			addToQueueAndSend(new byte[0]);
 			return true;
 		}
 		return false;
 	}
 
 	protected void addToQueueAndSend(byte[] bytes) {
-		while (true) {
-			if (lock.compareAndSet(false, true)) {
-				try {
-					queue.addLast(bytes);
-					break;
-				} finally {
-					lock.set(false);
-				}
-			}
-		}
-		if (listenerSet.compareAndSet(false, true)) {
-			out.setWriteListener(listener);
-		}
+		queue.add(bytes);
 		try {
-			listener.onWritePossible();
+			if (listenerSet.compareAndSet(false, true)) {
+				out.setWriteListener(listener);
+			} else {
+				listener.onWritePossible();
+			}
 		} catch (Throwable cause) {
 			error.set(cause);
 		}

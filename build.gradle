@@ -86,10 +86,10 @@ dependencies {
     // =============== MOLECULER ===============
 
 	// Moleculer core (required)
-	compile group: 'com.github.berkesa', name: 'moleculer-java', version: '1.2.3'
+	compile group: 'com.github.berkesa', name: 'moleculer-java', version: '1.2.4'
 	
 	// Moleculer developer console (optional)
-    compile group: 'com.github.berkesa', name: 'moleculer-java-repl', version: '1.2.0'
+    compile group: 'com.github.berkesa', name: 'moleculer-java-repl', version: '1.2.1'
     
     // ================ LOGGING ================
 	
@@ -194,8 +194,8 @@ targetCompatibility = 1.8
 
 group = 'com.github.berkesa'
 
-// version = '1.2.3-SNAPSHOT'
-version = '1.2.3'
+// version = '1.2.4-SNAPSHOT'
+version = '1.2.4'
 
 modifyPom {
     project {
@@ -223,7 +223,7 @@ modifyPom {
             dependency {
                 groupId 'com.github.berkesa'
                 artifactId 'moleculer-java'
-                version '1.2.3'
+                version '1.2.4'
                 scope 'runtime'
             }
             dependency {
@@ -276,5 +276,5 @@ compileJava {
 
 jar {
     baseName = 'moleculer-web'
-    version =  '1.2.3'
+    version =  '1.2.4'
 }

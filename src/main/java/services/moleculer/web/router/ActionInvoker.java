@@ -27,6 +27,7 @@ package services.moleculer.web.router;
 
 import static services.moleculer.web.common.GatewayUtils.sendError;
 
+import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -166,8 +167,14 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 			}
 		}
 
-		// Multipart request
-		if (req.isMultipart()) {
+		// Multipart or chunked request
+		int contentLength = req.getContentLength();
+		boolean unknownType = false;
+		if (contentLength < 0) {
+			String contentType = req.getHeader("Content-Type");
+			unknownType = contentType == null || !contentType.contains("/json");
+		}
+		if (req.isMultipart() || unknownType) {
 			executor.execute(() -> {
 
 				// Custom "before call" processor
@@ -189,7 +196,6 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		}
 
 		// GET without body
-		int contentLength = req.getContentLength();
 		if (contentLength == 0) {
 			executor.execute(() -> {
 
@@ -212,12 +218,18 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		}
 
 		// POST with JSON / QueryString body
-		byte[] body = new byte[contentLength];
-		AtomicInteger pos = new AtomicInteger();
+		byte[] body = contentLength > 0 ? new byte[contentLength] : null;
+		ByteArrayOutputStream buffer = contentLength > 0 ? null : new ByteArrayOutputStream(1024);
+		AtomicInteger pos = new AtomicInteger();		
 		AtomicBoolean faulty = new AtomicBoolean();
+		
 		req.getBody().onPacket((bytes, cause, close) -> {
-			if (bytes != null) {
-				System.arraycopy(bytes, 0, body, pos.getAndAdd(bytes.length), bytes.length);
+			if (bytes != null && bytes.length > 0) {
+				if (contentLength > 0) {
+					System.arraycopy(bytes, 0, body, pos.getAndAdd(bytes.length), bytes.length);
+				} else {
+					buffer.write(bytes);
+				}
 			} else if (cause != null) {
 				faulty.set(true);
 				logger.error("Unexpected error occured while receiving and parsing client request!", cause);
@@ -226,7 +238,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 			if (close && !faulty.get()) {
 
 				// Parse and merge body
-				Tree merged = parsePostBody(params, body, req.getContentType());
+				Tree merged = parsePostBody(params, body == null ? buffer.toByteArray() : body, req.getContentType());
 
 				executor.execute(() -> {
 
@@ -379,7 +391,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		// Send body
 		Object object = data.asObject();
 		if (object != null && object instanceof PacketStream) {
-
+			
 			// Stream type?
 			if (!contentTypeSet) {
 				rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_JSON);
