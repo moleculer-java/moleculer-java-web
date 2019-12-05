@@ -172,9 +172,10 @@ public class NettyWebResponse implements WebResponse, HttpConstants {
 			boolean close = headers.get(CONTENT_LENGTH) == null;
 			if (!close) {
 				String connection = req.getHeader(CONNECTION);
-				close = connection == null || !KEEP_ALIVE.equalsIgnoreCase(connection);				
+				close = connection != null && CLOSE.equalsIgnoreCase(connection);				
 			}
 			if (close) {
+				ctx.flush();
 				ctx.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
 			}
 		} catch (Exception ignored) {

@@ -46,48 +46,54 @@ import services.moleculer.web.common.ParserListener;
 public class NettyWebRequest implements WebRequest {
 
 	// --- REQUEST VARIABLES ----
-	
+
 	protected final ChannelHandlerContext ctx;
 	protected final int contentLength;
 	protected final String contentType;
 	protected final HttpHeaders headers;
 	protected final String method;
-	protected final String path;	
+	protected final String path;
 	protected final String query;
 	protected final boolean multipart;
-	
+
 	// --- BODY PROCESSORS ---
-	
+
 	protected PacketStream stream;
 	protected NioMultipartParser parser;
-			
+
 	// --- CONSTRUCTOR ---
-	
-	public NettyWebRequest(ChannelHandlerContext ctx, HttpRequest req, HttpHeaders headers, ServiceBroker broker, String path) throws IOException {
+
+	public NettyWebRequest(ChannelHandlerContext ctx, HttpRequest req, HttpHeaders headers, ServiceBroker broker,
+			String path) throws IOException {
 		this.ctx = ctx;
 		this.headers = headers;
-		
+
 		// Get method
 		method = req.method().name();
-		
+
 		// Get content type
 		contentType = headers.get("Content-Type");
-		
-		// Get QueryString
-		path = req.uri();
-		int i = path.indexOf('?');
-		if (i > -1) {
-			query = path.substring(i + 1);
-			this.path = path.substring(0, i);
-		} else {
-			query = null;
-			this.path = path; 
-		}
-		
-		// Has body?
-		if (!"POST".equals(method) && !"PUT".equals(method)) {
 
-			// Not POST or PUT -> not a stream
+		// Get QueryString
+		boolean isConnect = "CONNECT".equals(method);
+		if (isConnect) {
+			this.query = null;
+			this.path = "/";
+		} else {
+			int i = path.indexOf('?');
+			if (i > -1) {
+				this.query = path.substring(i + 1);
+				this.path = path.substring(0, i);
+			} else {
+				this.query = null;
+				this.path = path;
+			}
+		}
+
+		// Has body?
+		if ("GET".equals(method) || "HEAD".equals(method) || "OPTIONS".equals(method) || "TRACE".equals(method) || isConnect) {
+
+			// Not a stream
 			multipart = false;
 			contentLength = 0;
 			return;
@@ -99,10 +105,10 @@ public class NettyWebRequest implements WebRequest {
 			multipart = false;
 			return;
 		}
-		
+
 		// Create stream
 		stream = broker.createStream();
-		
+
 		// Create body stream
 		multipart = MultipartUtils.isMultipart(contentType);
 		if (multipart) {
@@ -112,9 +118,9 @@ public class NettyWebRequest implements WebRequest {
 			listener.setParser(parser);
 		}
 	}
-	
+
 	// --- PROPERTY GETTERS ---
-	
+
 	/**
 	 * Returns the Internet Protocol (IP) address of the client or last proxy
 	 * that sent the request. For HTTP servlets, same as the value of the CGI
@@ -199,7 +205,7 @@ public class NettyWebRequest implements WebRequest {
 	public String getContentType() {
 		return contentType;
 	}
-	
+
 	/**
 	 * Returns the request body as PacketStream.
 	 * 
@@ -239,7 +245,7 @@ public class NettyWebRequest implements WebRequest {
 	public Iterator<String> getHeaders() {
 		return headers.names().iterator();
 	}
-		
+
 	/**
 	 * Checks if the Content-Type header defines a multipart request.
 	 * 
@@ -249,5 +255,5 @@ public class NettyWebRequest implements WebRequest {
 	public boolean isMultipart() {
 		return multipart;
 	}
-	
+
 }

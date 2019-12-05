@@ -106,7 +106,11 @@ public class Mapping implements RequestProcessor, HttpConstants {
 					endIndex += token.length() + 1;
 				}
 			}
-			pathPrefix = pathPattern.substring(0, endIndex);
+			if (endIndex <= pathPattern.length()) {
+				pathPrefix = pathPattern.substring(0, endIndex);				
+			} else {
+				pathPrefix = pathPattern;
+			}
 		}
 		int[] indexes = new int[indexList.size()];
 		String[] names = new String[nameList.size()];
