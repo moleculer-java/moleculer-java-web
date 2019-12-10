@@ -80,7 +80,8 @@ To do this, submit the `{"a":3,"b":5}` JSON (as POST body) to this URL:
 
 [This demo project](https://moleculer-java.github.io/moleculer-spring-boot-demo/)
 demonstrating some of the capabilities of APIGateway.  
-The project can be imported into the Eclipse IDE. The brief examples illustrate the following:
+The project can be imported into the Eclipse IDE or IntelliJ IDEA.
+The brief examples illustrate the following:
 
 - Integration of Moleculer API into the Spring Boot Framework
 - Configuring HTTP Routes and Middlewares
