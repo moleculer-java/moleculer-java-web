@@ -72,6 +72,7 @@ import services.moleculer.web.template.JadeEngine;
 import services.moleculer.web.template.MustacheEngine;
 import services.moleculer.web.template.PebbleEngine;
 import services.moleculer.web.template.ThymeleafEngine;
+import services.moleculer.web.template.VelocityEngine;
 import services.moleculer.web.template.languages.DefaultMessageLoader;
 
 public abstract class AbstractTemplateTest extends TestCase {
@@ -281,6 +282,18 @@ public abstract class AbstractTemplateTest extends TestCase {
 		doTemplateTests("thymeleaf");
 	}
 
+	@Test
+	public void testVelocityTemplateEngine() throws Exception {
+		VelocityEngine engine = new VelocityEngine();
+		engine.setMessageLoader(new DefaultMessageLoader());
+		engine.setTemplatePath("www");
+		engine.setDefaultExtension("velocity");
+		engine.setReloadable(false);
+		gw.setTemplateEngine(engine);
+		doTemplateTests("velocity");
+		doTemplateTests("velocity");
+	}
+	
 	@Test
 	public void testChunked() throws Exception {
 		HttpPost post = new HttpPost("http://localhost:3000/chunked/stream");

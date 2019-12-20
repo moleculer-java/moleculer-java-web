@@ -32,6 +32,7 @@ import static services.moleculer.web.common.GatewayUtils.readAllBytes;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.nio.charset.Charset;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.github.jknack.handlebars.Handlebars;
@@ -50,6 +51,7 @@ import io.datatree.Tree;
  * compile group: 'com.github.jknack', name: 'handlebars', version: '4.1.2'
  * </pre>
  * 
+ * @see VelocityEngine
  * @see DataTreeEngine
  * @see FreeMarkerEngine
  * @see JadeEngine
@@ -123,14 +125,14 @@ public class HandlebarsEngine extends AbstractTemplateEngine {
 		loader.setSuffix(this.defaultExtension);
 	}
 
-	// --- HANDLEBARS ENGINE ---
+	// --- GET/SET HANDLEBARS ENGINE ---
 
 	public Handlebars getEngine() {
 		return engine;
 	}
 
 	public void setEngine(Handlebars engine) {
-		this.engine = engine;
+		this.engine = Objects.requireNonNull(engine);
 	}
 
 	// --- ENABLE / DISABLE RELOADING ---

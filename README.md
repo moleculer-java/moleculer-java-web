@@ -28,7 +28,7 @@ Moleculer API Gateway provides full support for high-load React, Angular or VueJ
 - Rate limiter
 - Before & after call hooks
 - Authorization
-- Integrated with server-side template engines (FreeMarker, Jade, Pebble, Thymeleaf, Mustache, DataTree)
+- Integrated with server-side template engines (FreeMarker, Jade, Pebble, Thymeleaf, Mustache, Velocity)
 - And much more (favicon, custom error messages, session cookies, etc.)
 
 ## Download
@@ -40,7 +40,7 @@ Moleculer API Gateway provides full support for high-load React, Angular or VueJ
     <dependency>
         <groupId>com.github.berkesa</groupId>
         <artifactId>moleculer-java-web</artifactId>
-        <version>1.2.5</version>
+        <version>1.2.6</version>
         <scope>runtime</scope>
     </dependency>
 </dependencies>
@@ -50,7 +50,7 @@ Moleculer API Gateway provides full support for high-load React, Angular or VueJ
 
 ```gradle
 dependencies {
-    compile group: 'com.github.berkesa', name: 'moleculer-java-web', version: '1.2.5' 
+    compile group: 'com.github.berkesa', name: 'moleculer-java-web', version: '1.2.6' 
 }
 ```
 

@@ -47,6 +47,7 @@ import io.datatree.Tree;
  * compile group: 'com.mitchellbosecke', name: 'pebble', version: '2.4.0'
  * </pre>
  * 
+ * @see VelocityEngine
  * @see DataTreeEngine
  * @see FreeMarkerEngine
  * @see HandlebarsEngine
@@ -125,7 +126,7 @@ public class PebbleEngine extends AbstractTemplateEngine {
 		buildEngine();
 	}
 
-	// --- PEBBLE ENGINE ---
+	// --- GET/SET PEBBLE ENGINE ---
 
 	public com.mitchellbosecke.pebble.PebbleEngine getEngine() {
 		return engine;

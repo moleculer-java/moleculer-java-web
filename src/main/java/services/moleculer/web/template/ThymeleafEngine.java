@@ -54,6 +54,7 @@ import io.datatree.Tree;
  * compile group: 'org.thymeleaf', name: 'thymeleaf', version: '3.0.11.RELEASE'
  * </pre>
  * 
+ * @see VelocityEngine
  * @see DataTreeEngine
  * @see FreeMarkerEngine
  * @see HandlebarsEngine
@@ -139,7 +140,7 @@ public class ThymeleafEngine extends AbstractTemplateEngine {
 		loader.setSuffix('.' + this.defaultExtension);
 	}
 
-	// --- THYMELEAF ENGINE ---
+	// --- GET/SET THYMELEAF ENGINE ---
 
 	public TemplateEngine getEngine() {
 		return engine;

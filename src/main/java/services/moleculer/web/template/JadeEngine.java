@@ -47,6 +47,7 @@ import io.datatree.Tree;
  * compile group: 'de.neuland-bfi', name: 'jade4j', version: '1.2.7'
  * </pre>
  * 
+ * @see VelocityEngine
  * @see DataTreeEngine
  * @see FreeMarkerEngine
  * @see HandlebarsEngine
@@ -116,7 +117,7 @@ public class JadeEngine extends AbstractTemplateEngine {
 		loader.extension = this.defaultExtension;
 	}
 
-	// --- JADE CONFIGURATION ---
+	// --- GET/SET JADE CONFIGURATION ---
 
 	public JadeConfiguration getConfiguration() {
 		return configuration;

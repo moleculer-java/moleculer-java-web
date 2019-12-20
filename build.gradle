@@ -86,7 +86,7 @@ dependencies {
     // =============== MOLECULER ===============
 
 	// Moleculer core (required)
-	compile group: 'com.github.berkesa', name: 'moleculer-java', version: '1.2.4'
+	compile group: 'com.github.berkesa', name: 'moleculer-java', version: '1.2.5'
 	
 	// Moleculer developer console (optional)
     compile group: 'com.github.berkesa', name: 'moleculer-java-repl', version: '1.2.1'
@@ -187,6 +187,11 @@ dependencies {
 	// https://mvnrepository.com/artifact/com.github.jknack/handlebars
 	compile group: 'com.github.jknack', name: 'handlebars', version: '4.1.2'
 	
+	// --- VELOCITY ---
+	
+	// https://mvnrepository.com/artifact/org.apache.velocity/velocity-engine-core
+	compile group: 'org.apache.velocity', name: 'velocity-engine-core', version: '2.1'
+	
 }
 
 sourceCompatibility = 1.8
@@ -194,8 +199,8 @@ targetCompatibility = 1.8
 
 group = 'com.github.berkesa'
 
-// version = '1.2.5-SNAPSHOT'
-version = '1.2.5'
+// version = '1.2.6-SNAPSHOT'
+version = '1.2.6'
 
 modifyPom {
     project {
@@ -223,7 +228,7 @@ modifyPom {
             dependency {
                 groupId 'com.github.berkesa'
                 artifactId 'moleculer-java'
-                version '1.2.4'
+                version '1.2.5'
                 scope 'runtime'
             }
             dependency {
@@ -276,5 +281,5 @@ compileJava {
 
 jar {
     baseName = 'moleculer-web'
-    version =  '1.2.5'
+    version =  '1.2.6'
 }

@@ -43,6 +43,7 @@ import io.datatree.templates.TemplateEngine;
  * compile group: 'com.github.berkesa', name: 'datatree-templates', version: '1.1.3'
  * </pre>
  * 
+ * @see VelocityEngine
  * @see FreeMarkerEngine
  * @see HandlebarsEngine
  * @see JadeEngine
@@ -73,6 +74,7 @@ public class DataTreeEngine extends AbstractTemplateEngine {
 
 	// --- WRITE BUFFER SIZE ---
 
+	@Override
 	public void setWriteBufferSize(int writeBufferSize) {
 		super.setWriteBufferSize(writeBufferSize);
 		engine.setWriteBufferSize(this.writeBufferSize);
@@ -80,6 +82,7 @@ public class DataTreeEngine extends AbstractTemplateEngine {
 
 	// --- CHARACTER ENCODING OF TEMPLATES ---
 
+	@Override
 	public void setCharset(Charset charset) {
 		this.charset = charset;
 		engine.setCharset(this.charset);
@@ -111,7 +114,7 @@ public class DataTreeEngine extends AbstractTemplateEngine {
 		engine.setReloadTemplates(reloadable);
 	}
 
-	// --- DATATREE TEMPLATE ENGINE ---
+	// --- GET/SET DATATREE TEMPLATE ENGINE ---
 
 	public TemplateEngine getEngine() {
 		return engine;

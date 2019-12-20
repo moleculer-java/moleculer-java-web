@@ -46,6 +46,7 @@ import io.datatree.Tree;
  * compile group: 'com.github.spullara.mustache.java', name: 'compiler', version: '0.9.6'
  * </pre>
  * 
+ * @see VelocityEngine
  * @see DataTreeEngine
  * @see FreeMarkerEngine
  * @see HandlebarsEngine
@@ -119,7 +120,7 @@ public class MustacheEngine extends AbstractTemplateEngine {
 		factory.setExecutorService(this.executor);
 	}
 
-	// --- MUSTACHE FACTORY ---
+	// --- GET/SET MUSTACHE FACTORY ---
 
 	public DefaultMustacheFactory getFactory() {
 		return factory;

@@ -1,0 +1,17 @@
+<html>
+    <body>
+        #parse("header")
+		<p>A: $a</p>
+		<p>B: $b</p>
+		<p>C: $c</p>
+		<table>
+			#foreach($row in $table)
+			<tr>
+				<td>$row.first</td>
+				<td>$row.second</td>
+				<td>$row.third</td>
+			</tr>		
+			#end
+		</table>
+    </body>
+</html>

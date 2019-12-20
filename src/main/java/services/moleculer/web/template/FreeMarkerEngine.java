@@ -60,6 +60,7 @@ import services.moleculer.util.CheckedTree;
  * compile group: 'org.freemarker', name: 'freemarker', version: '2.3.28'
  * </pre>
  * 
+ * @see VelocityEngine
  * @see DataTreeEngine
  * @see HandlebarsEngine
  * @see JadeEngine
@@ -110,6 +111,7 @@ public class FreeMarkerEngine extends AbstractTemplateEngine {
 
 	// --- ENABLE / DISABLE RELOADING ---
 
+	@Override
 	public void setReloadable(boolean reloadable) {
 		if (this.reloadable != reloadable) {
 			super.setReloadable(this.reloadable);
@@ -138,7 +140,7 @@ public class FreeMarkerEngine extends AbstractTemplateEngine {
 		loader.extension = this.defaultExtension;
 	}
 
-	// --- FREEMARKER CONFIGURATION ---
+	// --- GET/SET FREEMARKER CONFIGURATION ---
 
 	public Configuration getConfiguration() {
 		return configuration;
