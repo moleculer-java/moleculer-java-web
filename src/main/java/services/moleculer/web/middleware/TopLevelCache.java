@@ -233,6 +233,11 @@ public class TopLevelCache extends HttpMiddleware implements HttpConstants {
 								return rsp.getProperty(name);
 							}
 
+							@Override
+							public final Object getInternalObject() {
+								return rsp.getInternalObject();
+							}
+							
 						});
 
 					} else {

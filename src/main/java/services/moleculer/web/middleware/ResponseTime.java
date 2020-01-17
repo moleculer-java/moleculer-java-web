@@ -140,6 +140,11 @@ public class ResponseTime extends HttpMiddleware {
 						return rsp.getProperty(name);
 					}
 
+					@Override
+					public final Object getInternalObject() {
+						return rsp.getInternalObject();
+					}
+					
 				});
 			}
 		};

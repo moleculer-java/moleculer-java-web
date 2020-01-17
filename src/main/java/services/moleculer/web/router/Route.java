@@ -90,9 +90,12 @@ public class Route {
 	public Route() {
 	}
 
-	public Route(String path, HttpMiddleware... middlewares) {
+	public Route(String path) {		
 		setPath(path);
-		use(middlewares);
+	}
+
+	public Route(String path, HttpMiddleware... middlewares) {		
+		use(middlewares).setPath(path);
 	}
 
 	// --- REQUEST PROCESSOR ---
@@ -246,7 +249,7 @@ public class Route {
 		}
 		for (Alias alias : aliases) {
 			if (Alias.REST.endsWith(alias.httpMethod)) {
-				list.addLast(new Alias(Alias.GET, alias.pathPattern, alias.actionName + ".find"));
+				list.addLast(new Alias(Alias.GET, alias.pathPattern, alias.actionName + ".list"));
 				list.addLast(new Alias(Alias.GET, alias.pathPattern + "/:id", alias.actionName + ".get"));
 				list.addLast(new Alias(Alias.POST, alias.pathPattern, alias.actionName + ".create"));
 				list.addLast(new Alias(Alias.PUT, alias.pathPattern + "/:id", alias.actionName + ".update"));
@@ -279,7 +282,14 @@ public class Route {
 					list.addLast("/**");
 					break;
 				}
-				if (!whiteListEntry.startsWith("/")) {
+				boolean simple = true;
+				for (char c: whiteListEntry.toCharArray()) {
+					if (c == '?' || c == '\\' || c == '^' || c == '$' || c == '[') {
+						simple = false;
+						break;
+					}
+				}
+				if (simple && !whiteListEntry.startsWith("/")) {
 					whiteListEntry = "/" + whiteListEntry;
 				}
 				list.addLast(whiteListEntry);

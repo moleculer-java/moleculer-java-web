@@ -118,4 +118,13 @@ public interface WebResponse {
 	 */
 	public Object getProperty(String name);
 
+	// --- ACCESS TO INTERNAL OBJECT ---
+	
+	/**
+	 * Returns the internal object of this WebResponse.
+	 * 
+	 * @return internal object (ServletResponse or Netty Context)
+	 */
+	public Object getInternalObject();
+	
 }

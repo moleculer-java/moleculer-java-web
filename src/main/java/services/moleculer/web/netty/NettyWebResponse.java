@@ -172,7 +172,7 @@ public class NettyWebResponse implements WebResponse, HttpConstants {
 			boolean close = headers.get(CONTENT_LENGTH) == null;
 			if (!close) {
 				String connection = req.getHeader(CONNECTION);
-				close = connection != null && CLOSE.equalsIgnoreCase(connection);				
+				close = connection != null && CLOSE.equalsIgnoreCase(connection);
 			}
 			if (close) {
 				ctx.flush();
@@ -243,6 +243,18 @@ public class NettyWebResponse implements WebResponse, HttpConstants {
 			return null;
 		}
 		return properties.get(name);
+	}
+
+	// --- ACCESS TO INTERNAL OBJECT ---
+	
+	/**
+	 * Returns the internal object of this WebResponse.
+	 * 
+	 * @return internal object (Netty ChannelHandlerContext)
+	 */
+	@Override
+	public Object getInternalObject() {
+		return ctx;
 	}
 
 }

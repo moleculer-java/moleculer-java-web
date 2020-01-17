@@ -131,4 +131,13 @@ public interface WebRequest {
 	 */
 	public boolean isMultipart();
 
+	// --- ACCESS TO INTERNAL OBJECT ---
+	
+	/**
+	 * Returns the internal object of this WebRequest.
+	 * 
+	 * @return internal object (ServletRequest or Netty Context)
+	 */
+	public Object getInternalObject();
+	
 }

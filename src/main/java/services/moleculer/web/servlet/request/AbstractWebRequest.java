@@ -229,4 +229,16 @@ public abstract class AbstractWebRequest implements WebRequest {
 		return multipart;
 	}
 
+	// --- ACCESS TO INTERNAL OBJECT ---
+	
+	/**
+	 * Returns the internal object of this WebRequest.
+	 * 
+	 * @return internal object (HttpServletRequest)
+	 */
+	@Override
+	public Object getInternalObject() {
+		return req;
+	}
+	
 }

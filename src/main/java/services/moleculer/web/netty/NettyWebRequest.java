@@ -256,4 +256,16 @@ public class NettyWebRequest implements WebRequest {
 		return multipart;
 	}
 
+	// --- ACCESS TO INTERNAL OBJECT ---
+	
+	/**
+	 * Returns the internal object of this WebRequest.
+	 * 
+	 * @return internal object (Netty ChannelHandlerContext)
+	 */
+	@Override
+	public Object getInternalObject() {
+		return ctx;
+	}
+	
 }

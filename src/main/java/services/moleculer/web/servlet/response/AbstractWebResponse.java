@@ -183,4 +183,16 @@ public abstract class AbstractWebResponse implements WebResponse {
 		return properties.get(name);
 	}
 	
+	// --- ACCESS TO INTERNAL OBJECT ---
+		
+	/**
+	 * Returns the internal object of this WebResponse.
+	 * 
+	 * @return internal object (HttpServletResponse)
+	 */
+	@Override
+	public Object getInternalObject() {
+		return rsp;
+	}
+	
 }

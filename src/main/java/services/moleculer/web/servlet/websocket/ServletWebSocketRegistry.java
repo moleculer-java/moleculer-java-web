@@ -80,42 +80,42 @@ public class ServletWebSocketRegistry extends WebSocketRegistry {
 			boolean accept = webSocketFilter.onConnect(new WebRequest() {
 
 				@Override
-				public boolean isMultipart() {
+				public final boolean isMultipart() {
 					return false;
 				}
 
 				@Override
-				public String getQuery() {
+				public final String getQuery() {
 					return session.getQueryString();
 				}
 
 				@Override
-				public String getPath() {
+				public final String getPath() {
 					return pathInfo;
 				}
 
 				@Override
-				public String getMethod() {
+				public final String getMethod() {
 					return "GET";
 				}
 
 				@Override
-				public Iterator<String> getHeaders() {
+				public final Iterator<String> getHeaders() {
 					return getHeaderMap().keySet().iterator();
 				}
 
 				@Override
-				public String getHeader(String name) {
+				public final String getHeader(String name) {
 					return getHeader(name);
 				}
 
 				@Override
-				public String getContentType() {
+				public final String getContentType() {
 					return getHeader(HttpConstants.CONTENT_TYPE, "text/plain");
 				}
 
 				@Override
-				public int getContentLength() {
+				public final int getContentLength() {
 					try {
 						return Integer.parseInt(getHeader(HttpConstants.CONTENT_LENGTH, "-1"));
 					} catch (Exception ignored) {
@@ -124,17 +124,22 @@ public class ServletWebSocketRegistry extends WebSocketRegistry {
 				}
 
 				@Override
-				public PacketStream getBody() {
+				public final PacketStream getBody() {
 					return new PacketStream(null, null);
 				}
 
 				@Override
-				public String getAddress() {
+				public final String getAddress() {
 					return "0.0.0.0";
 				}
 
+				@Override
+				public final Object getInternalObject() {
+					return session;
+				}
+				
 				@SuppressWarnings("unchecked")
-				private Map<String, List<String>> getHeaderMap() {
+				private final Map<String, List<String>> getHeaderMap() {
 					Map<String, Object> props = session.getUserProperties();
 					if (props == null) {
 						return Collections.emptyMap();
@@ -142,7 +147,7 @@ public class ServletWebSocketRegistry extends WebSocketRegistry {
 					return (Map<String, List<String>>) props.get("moleculer.headers");
 				}
 
-				private String getHeader(String name, String defaultValue) {
+				private final String getHeader(String name, String defaultValue) {
 					Map<String, List<String>> map = getHeaderMap();
 					if (map.isEmpty()) {
 						return defaultValue;
@@ -175,7 +180,7 @@ public class ServletWebSocketRegistry extends WebSocketRegistry {
 		// Add heartbeat handler
 		session.addMessageHandler(new MessageHandler.Whole<String>() {
 
-			public void onMessage(String text) {
+			public final void onMessage(String text) {
 				endpoint.send("!");
 			}
 
