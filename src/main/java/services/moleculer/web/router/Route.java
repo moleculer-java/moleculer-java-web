@@ -274,7 +274,7 @@ public class Route {
 		}
 		for (String whiteListEntry : whiteListEntries) {
 			if (whiteListEntry != null && !whiteListEntry.isEmpty()) {
-				if ("*".equals(whiteListEntry) || "/*".equals(whiteListEntry) || "/**".equals(whiteListEntry)) {
+				if ("*".equals(whiteListEntry) || "**".equals(whiteListEntry) || "/*".equals(whiteListEntry) || "/**".equals(whiteListEntry)) {
 					list.clear();
 					list.addLast("/**");
 					break;
