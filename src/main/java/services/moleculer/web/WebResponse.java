@@ -123,7 +123,7 @@ public interface WebResponse {
 	/**
 	 * Returns the internal object of this WebResponse.
 	 * 
-	 * @return internal object (ServletResponse or Netty Context)
+	 * @return internal object (HttpServletResponse or Netty Context)
 	 */
 	public Object getInternalObject();
 	

@@ -31,9 +31,11 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
@@ -61,7 +63,8 @@ import services.moleculer.web.middleware.ResponseHeaders;
 import services.moleculer.web.middleware.ResponseTime;
 import services.moleculer.web.middleware.ResponseTimeout;
 import services.moleculer.web.middleware.ServeStatic;
-import services.moleculer.web.middleware.SessionCookie;
+import services.moleculer.web.middleware.session.SessionCookie;
+import services.moleculer.web.middleware.session.SessionHandler;
 import services.moleculer.web.router.Alias;
 import services.moleculer.web.router.MappingPolicy;
 import services.moleculer.web.router.Route;
@@ -130,6 +133,21 @@ public abstract class AbstractTemplateTest extends TestCase {
 
 		});
 
+		br.createService(new Service("session") {
+
+			@SuppressWarnings("unused")
+			Action check = ctx -> {
+				Tree meta = ctx.params.getMeta();				
+				Tree session = meta.get("$session");
+				Tree storeit = ctx.params.get("storeit");
+				if (storeit != null) {
+					session.copyFrom(storeit);
+				}
+				return session;
+			};
+			
+		});
+		
 		br.createService(new ChunkedService());
 		
 		gw.use(new RequestLogger());
@@ -166,9 +184,17 @@ public abstract class AbstractTemplateTest extends TestCase {
 		r1.addAlias(Alias.GET, "/html/:locale", "test.html");
 		r1.use(new SessionCookie("SID", "/html"));
 
+		// Set SessionHandler
+		SessionHandler sessionHandler = new SessionHandler(br);
+		gw.setBeforeCall(sessionHandler.beforeCall());
+		gw.setAfterCall(sessionHandler.afterCall());
+		
 		// Chunked test
 		r1.addAlias(Alias.POST, "/chunked/stream", "chunkedService.stream");
 		r1.addAlias(Alias.POST, "/chunked/rest", "chunkedService.rest");
+
+		// Session test
+		r1.addAlias(Alias.POST, "/session", "session.check");
 		
 		gw.addRoute(r1);
 
@@ -186,9 +212,9 @@ public abstract class AbstractTemplateTest extends TestCase {
 
 		// ...and a sample Redirector middleware
 		r2.use(new Redirector("/missing", "/index.html", 307));
-
+		
 		gw.addRoute(r2);
-
+	
 		cl = HttpAsyncClients.createDefault();
 		cl.start();
 	}
@@ -360,6 +386,21 @@ public abstract class AbstractTemplateTest extends TestCase {
 	@Test
 	public void testMiddlewares() throws Exception {
 
+		// Session test
+		Tree t = checkSession(new Tree().put("a", 3));
+		assertEquals(3, t.get("a", 0));
+		
+		t = checkSession(new Tree());
+		assertEquals(3, t.get("a", 0));
+		
+		t = checkSession(new Tree().put("b", "xyz"));
+		assertEquals(3, t.get("a", 0));
+		assertEquals("xyz", t.get("b", ""));
+
+		t = checkSession(new Tree());
+		assertEquals(3, t.get("a", 0));
+		assertEquals("xyz", t.get("b", ""));
+
 		// First load
 		HttpGet get = new HttpGet("http://localhost:3000/static/index.html");
 		HttpResponse rsp = cl.execute(get, null).get();
@@ -481,12 +522,19 @@ public abstract class AbstractTemplateTest extends TestCase {
 
 		HttpGet get = new HttpGet("http://localhost:3000/html/en");
 		HttpResponse rsp = cl.execute(get, null).get();
-		String header = rsp.getLastHeader("Set-Cookie").getValue();
 
-		// SID="1|1c4xy2u8fjab3";$Path="/"
-		assertTrue(header.startsWith("SID=\"1|"));
-		assertTrue(header.endsWith(";$Path=\"/html\""));
-
+		Header[] headers = rsp.getHeaders("Set-Cookie");
+		boolean found = false;
+		for (Header header: headers) {
+			if (header.getValue().contains("SID=")) {
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			fail("SID cookie not found!");
+		}
+		
 		assertEquals(200, rsp.getStatusLine().getStatusCode());
 		byte[] bytes = CommonUtils.readFully(rsp.getEntity().getContent());
 		String html = new String(bytes, StandardCharsets.UTF_8);
@@ -519,7 +567,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 		get = new HttpGet("http://localhost:3000/math/add/1/2");
 		rsp = cl.execute(get, null).get();
 
-		header = rsp.getLastHeader("Access-Control-Allow-Origin").getValue();
+		String header = rsp.getLastHeader("Access-Control-Allow-Origin").getValue();
 		assertEquals("*", header);
 		header = rsp.getLastHeader("Access-Control-Allow-Methods").getValue();
 		assertEquals("GET,OPTIONS,POST,PUT,DELETE", header);
@@ -553,7 +601,29 @@ public abstract class AbstractTemplateTest extends TestCase {
 		assertTrue(html.contains("<li>Ok"));
 		assertTrue(html.contains("<li>Bonjour!"));
 		assertTrue(html.contains("<li>Au revoir!"));
-		assertTrue(html.contains("<li>Comment vas-tu?"));		
+		assertTrue(html.contains("<li>Comment vas-tu?"));
 	}
 
+	protected Tree checkSession(Tree storeit) throws Exception {
+		HttpPost post = new HttpPost("http://localhost:3000/session");
+		Tree body = new Tree();
+		body.putObject("storeit", storeit);
+		post.setEntity(new ByteArrayEntity(body.toBinary()));
+		HttpResponse rsp = cl.execute(post, null).get();
+		Header[] headers = rsp.getHeaders("Set-Cookie");
+		boolean found = false;
+		for (Header header: headers) {
+			if (header.getValue().contains("SID=")) {
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			fail("SID cookie not found!");
+		}
+		assertEquals(200, rsp.getStatusLine().getStatusCode());
+		byte[] bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+		return new Tree(bytes);
+	}
+	
 }

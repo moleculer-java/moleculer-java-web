@@ -28,6 +28,7 @@ package services.moleculer.web;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.handler.HandlerCollection;
+import org.eclipse.jetty.server.session.SessionHandler;
 import org.eclipse.jetty.servlet.ServletContextHandler;
 import org.eclipse.jetty.servlet.ServletHolder;
 
@@ -51,7 +52,8 @@ public class BlockingServletTest extends AbstractTemplateTest {
 		ServerConnector pContext = new ServerConnector(server);
 		pContext.setHost("127.0.0.1");
 		pContext.setPort(3000);
-		ServletContextHandler publicContext = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
+		ServletContextHandler publicContext = new ServletContextHandler(ServletContextHandler.SESSIONS);
+		publicContext.setSessionHandler(new SessionHandler());
 		publicContext.setContextPath("/");
 		
 		// Create blocking servlet

@@ -136,7 +136,7 @@ public interface WebRequest {
 	/**
 	 * Returns the internal object of this WebRequest.
 	 * 
-	 * @return internal object (ServletRequest or Netty Context)
+	 * @return internal object (HttpServletRequest or Netty Context)
 	 */
 	public Object getInternalObject();
 	

@@ -109,5 +109,10 @@ public interface HttpConstants {
 	 * Locale (~= language) of the generated HTML page.
 	 */
 	public static final String META_LOCALE = "$locale";
+
+	/**
+	 * Stored data of the HTTP Session .
+	 */
+	public static final String META_SESSION = "$session";
 	
 }

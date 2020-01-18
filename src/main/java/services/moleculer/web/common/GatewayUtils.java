@@ -167,26 +167,17 @@ public final class GatewayUtils implements HttpConstants {
 	}
 
 	private static final void parseCookies(HashMap<String, HttpCookie> cookies, String headerValue) {
-		List<HttpCookie> list = HttpCookie.parse(headerValue);
-		for (HttpCookie cookie : list) {
-			cookies.put(cookie.getName(), cookie);
+		String[] parts = headerValue.split(";");
+		for (String part: parts) {
+			List<HttpCookie> list = HttpCookie.parse(part.trim());
+			for (HttpCookie cookie : list) {
+				cookies.put(cookie.getName(), cookie);
+			}
 		}
 	}
 
-	public static final void setCookie(WebRequest req, WebResponse rsp, HttpCookie cookie) {
-		HashMap<String, HttpCookie> cookies = getCookieMap(req, rsp);
-		cookies.put(cookie.getName(), cookie);
-
-		// Set new "Set-Cookie" header
-		StringBuilder tmp = new StringBuilder(128);
-		for (HttpCookie c : cookies.values()) {
-			tmp.append(c.toString()).append(',');
-		}
-		int len = tmp.length();
-		if (len > 0) {
-			tmp.setLength(len - 1);
-		}
-		rsp.setHeader(SET_COOKIE, tmp.toString());
+	public static final void setCookie(WebResponse rsp, HttpCookie cookie) {
+		rsp.setHeader(SET_COOKIE, cookie.toString());
 	}
 
 	// --- FILE HANDLERS ---

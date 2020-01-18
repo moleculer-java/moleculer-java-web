@@ -238,7 +238,7 @@ public class XSRFToken extends HttpMiddleware implements HttpConstants {
 						HttpCookie cookie = new HttpCookie(cookieName, token);
 						cookie.setPath(path);
 						cookie.setMaxAge(maxAge);
-						setCookie(req, rsp, cookie);
+						setCookie(rsp, cookie);
 					}
 					break;
 

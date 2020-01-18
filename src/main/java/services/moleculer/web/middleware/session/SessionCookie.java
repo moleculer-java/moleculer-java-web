@@ -23,7 +23,7 @@
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package services.moleculer.web.middleware;
+package services.moleculer.web.middleware.session;
 
 import static services.moleculer.web.common.GatewayUtils.getCookie;
 import static services.moleculer.web.common.GatewayUtils.setCookie;
@@ -39,9 +39,12 @@ import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
+import services.moleculer.web.middleware.AbstractRequestProcessor;
+import services.moleculer.web.middleware.HttpMiddleware;
 
 /**
  * Generates Session Cookies, and sets the cookie header. Sample:
+ * 
  * <pre>
  * route.use(new SessionCookie("SID"));
  * </pre>
@@ -72,9 +75,13 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 
 	protected AtomicLong seq = new AtomicLong();
 
-	// --- CACHE ---
+	// --- COOKIE CACHE ---
 
-	protected WeakHashMap<String, HttpCookie> cache = new WeakHashMap<>(512);
+	protected WeakHashMap<String, HttpCookie> cookieCache = new WeakHashMap<>(512);
+
+	// --- SESSION STORE ---
+
+	protected SessionStore store;
 
 	// --- CONSTRUCTORS ---
 
@@ -130,18 +137,18 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 				}
 
 				// Write cookie into response
-				cookie = cache.get(sessionID);
+				cookie = cookieCache.get(sessionID);
 				if (cookie == null) {
 					cookie = new HttpCookie(cookieName, sessionID);
 					cookie.setPath(path);
 					if (maxAge > 0) {
 						cookie.setMaxAge(maxAge);
 					}
-					cache.put(sessionID, cookie);
+					cookieCache.put(sessionID, cookie);
 				}
-				setCookie(req, rsp, cookie);
+				setCookie(rsp, cookie);
 
-				// Store sessionID in request
+				// Store sessionID in response
 				rsp.setProperty(PROPERTY_SESSION_ID, sessionID);
 
 				// Invoke next handler
@@ -178,7 +185,7 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 
 	public void setCookieName(String cookieName) {
 		if (!this.cookieName.equals(cookieName)) {
-			cache.clear();
+			cookieCache.clear();
 		}
 		this.cookieName = Objects.requireNonNull(cookieName);
 	}
@@ -189,7 +196,7 @@ public class SessionCookie extends HttpMiddleware implements HttpConstants {
 
 	public void setPath(String path) {
 		if (!this.path.equals(path)) {
-			cache.clear();
+			cookieCache.clear();
 		}
 		this.path = path;
 	}
