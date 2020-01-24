@@ -97,7 +97,6 @@ public class JadeEngine extends AbstractTemplateEngine {
 	@Override
 	public void setTemplatePath(String templatePath) {
 		super.setTemplatePath(templatePath);
-		configuration.setBasePath(this.templatePath);
 		loader.templatePath = this.templatePath;
 	}
 

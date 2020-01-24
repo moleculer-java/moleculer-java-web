@@ -47,7 +47,7 @@ public class Sample {
 	
 		new ServiceBroker()
 	    .createService(new NettyServer(8080))
-	    .createService(new ApiGateway("*"))
+	    .createService(new ApiGateway("**"))
 	    .createService(new Service("math") {
 	       Action add = ctx -> {
 	         return ctx.params.get("a", 0) +

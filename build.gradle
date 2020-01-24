@@ -75,42 +75,42 @@ dependencies {
 	
     // ============== COMPILATION ==============
     
-    testCompile 'junit:junit:4.12'
+    testImplementation 'junit:junit:4.12'
 	ecj 'org.eclipse.jdt.core.compiler:ecj:4.4.2'
 
 	// ================ TESTING ================
 
 	// https://mvnrepository.com/artifact/com.openpojo/openpojo
-	testCompile group: 'com.openpojo', name: 'openpojo', version: '0.8.10'	
+	testImplementation group: 'com.openpojo', name: 'openpojo', version: '0.8.10'	
 	
     // =============== MOLECULER ===============
 
 	// Moleculer core (required)
-	compile group: 'com.github.berkesa', name: 'moleculer-java', version: '1.2.5'
+	implementation group: 'com.github.berkesa', name: 'moleculer-java', version: '1.2.6'
 	
 	// Moleculer developer console (optional)
-    compile group: 'com.github.berkesa', name: 'moleculer-java-repl', version: '1.2.1'
+    implementation group: 'com.github.berkesa', name: 'moleculer-java-repl', version: '1.2.1'
     
     // ================ LOGGING ================
 	
 	// http://mvnrepository.com/artifact/org.slf4j/slf4j-api
-	compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.28'
+	implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.30'
        
 	// http://mvnrepository.com/artifact/org.slf4j/slf4j-jdk14
-	compile group: 'org.slf4j', name: 'slf4j-jdk14', version: '1.7.28'
+	implementation group: 'org.slf4j', name: 'slf4j-jdk14', version: '1.7.30'
 
 	// https://mvnrepository.com/artifact/org.slf4j/log4j-over-slf4j
-	compile group: 'org.slf4j', name: 'log4j-over-slf4j', version: '1.7.28'
+	implementation group: 'org.slf4j', name: 'log4j-over-slf4j', version: '1.7.30'
 
 	// https://mvnrepository.com/artifact/org.slf4j/jcl-over-slf4j
-	compile group: 'org.slf4j', name: 'jcl-over-slf4j', version: '1.7.28'
+	implementation group: 'org.slf4j', name: 'jcl-over-slf4j', version: '1.7.30'
 
 	// =============== CDI FRAMEWORKS ===============
 	 
     // --- SPRING DEPENDENCY INJECTION FRAMEWORK ---
 
 	// https://mvnrepository.com/artifact/org.springframework/spring-context
-	compile (group: 'org.springframework', name: 'spring-context', version: '5.2.0.RELEASE') {
+	implementation (group: 'org.springframework', name: 'spring-context', version: '5.2.3.RELEASE') {
 		exclude group: 'org.springframework', module: 'spring-jcl'		
 	}
 	
@@ -119,78 +119,78 @@ dependencies {
 	// --- NETTY SERVER ---
 	
 	// https://mvnrepository.com/artifact/io.netty/netty-handler
-	compile group: 'io.netty', name: 'netty-handler', version: '4.1.42.Final'
+	implementation group: 'io.netty', name: 'netty-handler', version: '4.1.44.Final'
 
 	// https://mvnrepository.com/artifact/io.netty/netty-codec-http
-	compile group: 'io.netty', name: 'netty-codec-http', version: '4.1.42.Final'
+	implementation group: 'io.netty', name: 'netty-codec-http', version: '4.1.44.Final'
 
 	// --- WEBSOCKET API ---
 		
 	// https://mvnrepository.com/artifact/org.java-websocket/Java-WebSocket
-	compile group: 'org.java-websocket', name: 'Java-WebSocket', version: '1.4.0'
+	implementation group: 'org.java-websocket', name: 'Java-WebSocket', version: '1.4.0'
 	
 	// ========== ASYNC HTTP CLIENT ============
 	
 	// https://mvnrepository.com/artifact/org.apache.httpcomponents/httpasyncclient
-	compile group: 'org.apache.httpcomponents', name: 'httpasyncclient', version: '4.1.4'
+	implementation group: 'org.apache.httpcomponents', name: 'httpasyncclient', version: '4.1.4'
 
 	// https://mvnrepository.com/artifact/org.apache.httpcomponents/httpmime
-	compile group: 'org.apache.httpcomponents', name: 'httpmime', version: '4.5.10'
+	implementation group: 'org.apache.httpcomponents', name: 'httpmime', version: '4.5.11'
 
 	// ============ JETTY SERVER ===============
 		
 	// https://mvnrepository.com/artifact/org.eclipse.jetty.websocket/javax-websocket-server-impl
-	compile group: 'org.eclipse.jetty.websocket', name: 'javax-websocket-server-impl', version: '9.4.21.v20190926'
+	implementation group: 'org.eclipse.jetty.websocket', name: 'javax-websocket-server-impl', version: '9.4.26.v20200117'
 	
 	// https://mvnrepository.com/artifact/org.eclipse.jetty/jetty-continuation
-	compile group: 'org.eclipse.jetty', name: 'jetty-continuation', version: '9.4.21.v20190926'
+	implementation group: 'org.eclipse.jetty', name: 'jetty-continuation', version: '9.4.26.v20200117'
 	
 	// ========== MULTIPART PARSER =============
 	
 	// https://mvnrepository.com/artifact/org.synchronoss.cloud/nio-multipart-parser
-	compile group: 'org.synchronoss.cloud', name: 'nio-multipart-parser', version: '1.1.0'
+	implementation group: 'org.synchronoss.cloud', name: 'nio-multipart-parser', version: '1.1.0'
 
 	// ========== TEMPLATE ENGINES =============
 
 	// --- DATATREE TEMPLATES ---
 
 	// https://mvnrepository.com/artifact/com.github.berkesa/datatree-templates
-	compile group: 'com.github.berkesa', name: 'datatree-templates', version: '1.1.4'
+	implementation group: 'com.github.berkesa', name: 'datatree-templates', version: '1.1.4'
 	
 	// --- FREEMARKER ---
 	
 	// https://mvnrepository.com/artifact/org.freemarker/freemarker
-	compile group: 'org.freemarker', name: 'freemarker', version: '2.3.29'
+	implementation group: 'org.freemarker', name: 'freemarker', version: '2.3.29'
 	
 	// --- JADE ---
 	
 	// https://mvnrepository.com/artifact/de.neuland-bfi/jade4j
-	compile group: 'de.neuland-bfi', name: 'jade4j', version: '1.2.7'
+	implementation group: 'de.neuland-bfi', name: 'jade4j', version: '1.3.0'
 
 	// --- MUSTACHE ---
 		
 	// https://mvnrepository.com/artifact/com.github.spullara.mustache.java/compiler
-	compile group: 'com.github.spullara.mustache.java', name: 'compiler', version: '0.9.6'
+	implementation group: 'com.github.spullara.mustache.java', name: 'compiler', version: '0.9.6'
 
 	// --- THYMELEAF ---
 	
 	// https://mvnrepository.com/artifact/org.thymeleaf/thymeleaf
-	compile group: 'org.thymeleaf', name: 'thymeleaf', version: '3.0.11.RELEASE'
+	implementation group: 'org.thymeleaf', name: 'thymeleaf', version: '3.0.11.RELEASE'
 
 	// --- PEBBLE ---
 	
 	// https://mvnrepository.com/artifact/com.mitchellbosecke/pebble
-	compile group: 'com.mitchellbosecke', name: 'pebble', version: '2.4.0'
+	implementation group: 'com.mitchellbosecke', name: 'pebble', version: '2.4.0'
 
 	// --- HANDLEBARS ---
 	
 	// https://mvnrepository.com/artifact/com.github.jknack/handlebars
-	compile group: 'com.github.jknack', name: 'handlebars', version: '4.1.2'
+	implementation group: 'com.github.jknack', name: 'handlebars', version: '4.1.2'
 	
 	// --- VELOCITY ---
 	
 	// https://mvnrepository.com/artifact/org.apache.velocity/velocity-engine-core
-	compile group: 'org.apache.velocity', name: 'velocity-engine-core', version: '2.1'
+	implementation group: 'org.apache.velocity', name: 'velocity-engine-core', version: '2.1'
 	
 }
 
@@ -199,8 +199,8 @@ targetCompatibility = 1.8
 
 group = 'com.github.berkesa'
 
-// version = '1.2.6-SNAPSHOT'
-version = '1.2.6'
+// version = '1.2.7-SNAPSHOT'
+version = '1.2.7'
 
 modifyPom {
     project {
@@ -228,7 +228,7 @@ modifyPom {
             dependency {
                 groupId 'com.github.berkesa'
                 artifactId 'moleculer-java'
-                version '1.2.5'
+                version '1.2.6-SNAPSHOT'
                 scope 'runtime'
             }
             dependency {
@@ -240,13 +240,13 @@ modifyPom {
             dependency {
                 groupId 'io.netty'
                 artifactId 'netty-handler'
-                version '4.1.42.Final'
+                version '4.1.44.Final'
                 scope 'runtime'
             }
             dependency {
                 groupId 'io.netty'
                 artifactId 'netty-codec-http'
-                version '4.1.42.Final'
+                version '4.1.44.Final'
                 scope 'runtime'
             }
         }
@@ -281,5 +281,5 @@ compileJava {
 
 jar {
     baseName = 'moleculer-web'
-    version =  '1.2.6'
+    version =  '1.2.7'
 }
