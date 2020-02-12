@@ -184,7 +184,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	// --- AUTODEPLOYER ---
 
 	@Subscribe("$services.changed")
-	public Listener autoDeployListener = ctx -> {
+	private Listener autoDeployListener = ctx -> {
 
 		// Local service?
 		if (ctx.params == null || !ctx.params.get("localService", false)) {
