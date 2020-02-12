@@ -347,7 +347,7 @@ public class Route {
 		return mappingPolicy;
 	}
 
-	public CallOptions.Options getOpts() {
+	public CallOptions.Options getCallOptions() {
 		return opts;
 	}
 
@@ -377,7 +377,7 @@ public class Route {
 		this.mappingPolicy = mappingPolicy;
 	}
 
-	public void setOpts(CallOptions.Options opts) {
+	public void setCallOptions(CallOptions.Options opts) {
 		this.opts = opts;
 	}
 
