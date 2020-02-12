@@ -4,15 +4,14 @@ dist: trusty
 jdk:
   - oraclejdk8
 
-cache:
-  directories:
-  - "$HOME/.gradle/caches" 
+# cache:
+#   directories:
+#   - "$HOME/.gradle/caches" 
   
 install: gradle wrapper --gradle-version 4.2
   
 before_install:
   - chmod +x gradlew
-  - chmod 777 .gradle/
   - sudo apt-get install -y jq
   - wget -O ~/codacy-coverage-reporter-assembly-latest.jar https://github.com/codacy/codacy-coverage-reporter/releases/download/4.0.5/codacy-coverage-reporter-4.0.5-assembly.jar
 
