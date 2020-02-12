@@ -4,11 +4,11 @@ dist: trusty
 jdk:
   - oraclejdk8
 
-# cache:
-#   directories:
-#   - "$HOME/.gradle/caches" 
+cache:
+  directories:
+  - "$HOME/.gradle/caches" 
   
-install: gradle wrapper --gradle-version 4.2
+install: gradle wrapper --gradle-version 4.3
   
 before_install:
   - chmod +x gradlew
