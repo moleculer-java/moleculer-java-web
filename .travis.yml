@@ -8,15 +8,15 @@ cache:
   directories:
   - "$HOME/.gradle/caches" 
   
-install: gradle wrapper --gradle-version 4.2
+install: gradle wrapper --gradle-version 4.3
   
 before_install:
   - chmod +x gradlew
   - sudo apt-get install -y jq
   - wget -O ~/codacy-coverage-reporter-assembly-latest.jar https://github.com/codacy/codacy-coverage-reporter/releases/download/4.0.5/codacy-coverage-reporter-4.0.5-assembly.jar
 
-# script: ./gradlew -i check
-script: ./gradlew check
+script: ./gradlew -i check
+# script: ./gradlew check
 
 after_success:
   - if [ -e ./gradlew ]; then ./gradlew jacocoTestReport;else gradle jacocoTestReport;fi

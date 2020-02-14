@@ -57,7 +57,7 @@ import services.moleculer.util.CheckedTree;
  * 
  * <pre>
  * // https://mvnrepository.com/artifact/org.freemarker/freemarker
- * compile group: 'org.freemarker', name: 'freemarker', version: '2.3.28'
+ * compile group: 'org.freemarker', name: 'freemarker', version: '2.3.29'
  * </pre>
  * 
  * @see VelocityEngine

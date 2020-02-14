@@ -44,7 +44,7 @@ import io.datatree.Tree;
  * 
  * <pre>
  * // https://mvnrepository.com/artifact/de.neuland-bfi/jade4j
- * compile group: 'de.neuland-bfi', name: 'jade4j', version: '1.2.7'
+ * compile group: 'de.neuland-bfi', name: 'jade4j', version: '1.3.0'
  * </pre>
  * 
  * @see VelocityEngine

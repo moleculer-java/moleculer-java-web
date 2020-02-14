@@ -185,7 +185,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 				// Invoke service
 				serviceInvoker.call(new Context(serviceInvoker, eventbus, uidGenerator, uidGenerator.nextUID(),
-						actionName, params, 1, null, null, req.getBody(), null, nodeID)).then(out -> {
+						actionName, params, 1, null, null, req.getBody(), opts, nodeID)).then(out -> {
 							sendResponse(req, rsp, out);
 						}).catchError(cause -> {
 							sendError(rsp, cause);
@@ -207,7 +207,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 				// Invoke service
 				serviceInvoker.call(new Context(serviceInvoker, eventbus, uidGenerator, uidGenerator.nextUID(),
-						actionName, params, 1, null, null, req.getBody(), null, nodeID)).then(out -> {
+						actionName, params, 1, null, null, req.getBody(), opts, nodeID)).then(out -> {
 							sendResponse(req, rsp, out);
 						}).catchError(cause -> {
 							logger.error("Unable to invoke action!", cause);
@@ -250,7 +250,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 					// Invoke service
 					serviceInvoker.call(new Context(serviceInvoker, eventbus, uidGenerator, uidGenerator.nextUID(),
-							actionName, merged, 1, null, null, req.getBody(), null, nodeID)).then(out -> {
+							actionName, merged, 1, null, null, req.getBody(), opts, nodeID)).then(out -> {
 								sendResponse(req, rsp, out);
 							}).catchError(err -> {
 								logger.error("Unable to invoke action!", err);
