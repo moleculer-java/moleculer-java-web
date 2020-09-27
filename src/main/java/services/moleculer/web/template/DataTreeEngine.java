@@ -40,7 +40,7 @@ import io.datatree.templates.TemplateEngine;
  * 
  * <pre>
  * // https://mvnrepository.com/artifact/com.github.berkesa/datatree-templates
- * compile group: 'com.github.berkesa', name: 'datatree-templates', version: '1.1.3'
+ * compile group: 'com.github.berkesa', name: 'datatree-templates', version: '1.1.4'
  * </pre>
  * 
  * @see VelocityEngine
