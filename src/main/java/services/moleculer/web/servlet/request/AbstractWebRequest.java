@@ -45,6 +45,7 @@ public abstract class AbstractWebRequest implements WebRequest {
 	protected final int contentLength;
 	protected final String contentType;
 	protected final boolean multipart;
+	protected final int contextPathLength;
 	
 	// --- BODY STREAM ---
 
@@ -63,6 +64,10 @@ public abstract class AbstractWebRequest implements WebRequest {
 		// Get content type
 		contentType = req.getContentType();
 
+		// Length of the context path
+		String contextPath = req.getContextPath();
+		contextPathLength = contextPath == null ? 0 : contextPath.length();
+
 		// Has body?
 		if (!"POST".equals(method) && !"PUT".equals(method)) {
 
@@ -80,7 +85,7 @@ public abstract class AbstractWebRequest implements WebRequest {
 		}
 
 		// Multipart content?
-		multipart = MultipartUtils.isMultipart(contentType);
+		multipart = MultipartUtils.isMultipart(contentType);		
 	}
 
 	// --- PROPERTY GETTERS ---
@@ -123,7 +128,14 @@ public abstract class AbstractWebRequest implements WebRequest {
 	 */
 	@Override
 	public String getPath() {
-		return req.getPathInfo();
+		String path = req.getPathInfo();
+		if (path == null) {
+			path = req.getRequestURI();
+			if (contextPathLength > 1) {
+				path = path.substring(contextPathLength);
+			}
+		}
+		return path;
 	}
 
 	/**
