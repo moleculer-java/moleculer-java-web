@@ -147,7 +147,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 			};
 			
 		});
-		
+	
 		br.createService(new ChunkedService());
 		
 		gw.use(new RequestLogger());
@@ -159,7 +159,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 		r0.use(new BasicAuthenticator("testuser", "testpassword"));
 		
 		r0.addAlias(Alias.GET, "/auth", "math.add");
-
+	
 		r0.use(new ResponseHeaders("Test-Header", "Test-Value"));
 		
 		r0.use(new ResponseTime("Response-Time"));
@@ -174,6 +174,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 		Route r1 = new Route();
 
 		r1.addAlias(Alias.GET, "/math/add/:a/:b", "math.add");
+		r1.addAlias(Alias.GET, "/math/addshort/:a", "math.add");
 		r1.use(new CorsHeaders());
 
 		// Add deflater to REST service
@@ -578,6 +579,30 @@ public abstract class AbstractTemplateTest extends TestCase {
 		assertEquals("1", t.get("a", ""));
 		assertEquals("2", t.get("b", ""));
 		assertEquals("3", t.get("c", ""));
+
+		get = new HttpGet("http://localhost:3000/math/addshort/11");
+		rsp = cl.execute(get, null).get();
+		bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+		t = new Tree(new String(bytes, StandardCharsets.UTF_8));
+		assertEquals("11", t.get("a", ""));
+		assertNull(t.get("b"));
+		assertEquals("11", t.get("c", ""));	
+		
+		get = new HttpGet("http://localhost:3000/math/addshort/11?b=22");
+		rsp = cl.execute(get, null).get();
+		bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+		t = new Tree(new String(bytes, StandardCharsets.UTF_8));
+		assertEquals("11", t.get("a", ""));
+		assertEquals("22", t.get("b", ""));
+		assertEquals("33", t.get("c", ""));	
+		
+		get = new HttpGet("http://localhost:3000/math/add/11/22?b=33");
+		rsp = cl.execute(get, null).get();
+		bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+		t = new Tree(new String(bytes, StandardCharsets.UTF_8));
+		assertEquals("11", t.get("a", ""));
+		assertEquals("33", t.get("b", ""));
+		assertEquals("44", t.get("c", ""));		
 		
 		// #2.) Multilanguage (French language)
 		get = new HttpGet("http://localhost:3000/html/fr");

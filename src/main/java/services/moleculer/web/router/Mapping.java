@@ -143,7 +143,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 		ServiceInvoker serviceInvoker = cfg.getServiceInvoker();
 		ExecutorService runner = executor == null ? cfg.getExecutor() : executor;
 		Eventbus eventbus = cfg.getEventbus();
-		lastProcessor = new ActionInvoker(actionName, pathPattern, isStatic, pathPrefix, indexes, names, opts,
+		lastProcessor = new ActionInvoker(actionName, pathPattern, pathPrefix, indexes, names, opts,
 				serviceInvoker, templateEngine, route, beforeCall, afterCall, runner, eventbus);
 	}
 

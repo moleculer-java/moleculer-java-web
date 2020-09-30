@@ -75,7 +75,6 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 	protected final String actionName;
 	protected final String pathPattern;
-	protected final boolean isStatic;
 	protected final String pathPrefix;
 	protected final int[] indexes;
 	protected final String[] names;
@@ -101,13 +100,11 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 	// --- CONSTRUCTOR ---
 
-	public ActionInvoker(String actionName, String pathPattern, boolean isStatic, String pathPrefix, int[] indexes,
-			String[] names, Options opts, ServiceInvoker serviceInvoker, AbstractTemplateEngine templateEngine,
-			Route route, CallProcessor beforeCall, CallProcessor afterCall, ExecutorService executor,
-			Eventbus eventbus) {
+	public ActionInvoker(String actionName, String pathPattern, String pathPrefix, int[] indexes, String[] names,
+			Options opts, ServiceInvoker serviceInvoker, AbstractTemplateEngine templateEngine, Route route,
+			CallProcessor beforeCall, CallProcessor afterCall, ExecutorService executor, Eventbus eventbus) {
 		this.actionName = actionName;
 		this.pathPattern = pathPattern;
-		this.isStatic = isStatic;
 		this.pathPrefix = pathPrefix;
 		this.indexes = indexes;
 		this.names = names;
@@ -151,20 +148,19 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 		// Parse URL
 		final Tree params = new Tree();
-		if (isStatic || indexes.length == 0) {
-
-			// HTTP GET QueryString
-			String query = req.getQuery();
-			if (query != null && !query.isEmpty()) {
-				parseQueryString(params, query);
-			}
-		} else {
+		if (indexes.length > 0) {
 
 			// Parameters in URL (eg "/path/:id/:name")
 			String[] tokens = req.getPath().split("/");
 			for (int i = 0; i < indexes.length; i++) {
 				params.put(names[i], tokens[indexes[i]]);
 			}
+		}
+
+		// HTTP GET QueryString
+		String query = req.getQuery();
+		if (query != null && !query.isEmpty()) {
+			parseQueryString(params, query);
 		}
 
 		// Multipart or chunked request
@@ -220,9 +216,9 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		// POST with JSON / QueryString body
 		byte[] body = contentLength > 0 ? new byte[contentLength] : null;
 		ByteArrayOutputStream buffer = contentLength > 0 ? null : new ByteArrayOutputStream(1024);
-		AtomicInteger pos = new AtomicInteger();		
+		AtomicInteger pos = new AtomicInteger();
 		AtomicBoolean faulty = new AtomicBoolean();
-		
+
 		req.getBody().onPacket((bytes, cause, close) -> {
 			if (bytes != null && bytes.length > 0) {
 				if (contentLength > 0) {
@@ -273,7 +269,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 					json.copyFrom(params);
 				}
 				return json;
-				
+
 			} else {
 
 				// QueryString body
@@ -391,7 +387,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		// Send body
 		Object object = data.asObject();
 		if (object != null && object instanceof PacketStream) {
-			
+
 			// Stream type?
 			if (!contentTypeSet) {
 				rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_JSON);
@@ -478,10 +474,10 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 	}
 
 	// --- PARENT PROCESSOR ---
-	
+
 	@Override
 	public RequestProcessor getParent() {
 		return null;
 	}
-	
+
 }
