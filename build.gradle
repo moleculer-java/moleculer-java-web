@@ -86,10 +86,10 @@ dependencies {
     // =============== MOLECULER ===============
 
 	// Moleculer core (required)
-	implementation group: 'com.github.berkesa', name: 'moleculer-java', version: '1.2.7'
+	implementation group: 'com.github.berkesa', name: 'moleculer-java', version: '1.2.14'
 	
 	// Moleculer developer console (optional)
-    implementation group: 'com.github.berkesa', name: 'moleculer-java-repl', version: '1.2.1'
+    implementation group: 'com.github.berkesa', name: 'moleculer-java-repl', version: '1.2.2'
     
     // ================ LOGGING ================
 	
@@ -110,7 +110,7 @@ dependencies {
     // --- SPRING DEPENDENCY INJECTION FRAMEWORK ---
 
 	// https://mvnrepository.com/artifact/org.springframework/spring-context
-	implementation (group: 'org.springframework', name: 'spring-context', version: '5.2.3.RELEASE') {
+	implementation (group: 'org.springframework', name: 'spring-context', version: '5.2.9.RELEASE') {
 		exclude group: 'org.springframework', module: 'spring-jcl'		
 	}
 	
@@ -119,15 +119,15 @@ dependencies {
 	// --- NETTY SERVER ---
 	
 	// https://mvnrepository.com/artifact/io.netty/netty-handler
-	implementation group: 'io.netty', name: 'netty-handler', version: '4.1.44.Final'
+	implementation group: 'io.netty', name: 'netty-handler', version: '4.1.52.Final'
 
 	// https://mvnrepository.com/artifact/io.netty/netty-codec-http
-	implementation group: 'io.netty', name: 'netty-codec-http', version: '4.1.44.Final'
+	implementation group: 'io.netty', name: 'netty-codec-http', version: '4.1.52.Final'
 
 	// --- WEBSOCKET API ---
 		
 	// https://mvnrepository.com/artifact/org.java-websocket/Java-WebSocket
-	implementation group: 'org.java-websocket', name: 'Java-WebSocket', version: '1.4.0'
+	implementation group: 'org.java-websocket', name: 'Java-WebSocket', version: '1.5.1'
 	
 	// ========== ASYNC HTTP CLIENT ============
 	
@@ -135,15 +135,15 @@ dependencies {
 	implementation group: 'org.apache.httpcomponents', name: 'httpasyncclient', version: '4.1.4'
 
 	// https://mvnrepository.com/artifact/org.apache.httpcomponents/httpmime
-	implementation group: 'org.apache.httpcomponents', name: 'httpmime', version: '4.5.11'
+	implementation group: 'org.apache.httpcomponents', name: 'httpmime', version: '4.5.13'
 
 	// ============ JETTY SERVER ===============
 		
 	// https://mvnrepository.com/artifact/org.eclipse.jetty.websocket/javax-websocket-server-impl
-	implementation group: 'org.eclipse.jetty.websocket', name: 'javax-websocket-server-impl', version: '9.4.26.v20200117'
+	implementation group: 'org.eclipse.jetty.websocket', name: 'javax-websocket-server-impl', version: '9.4.32.v20200930'
 	
 	// https://mvnrepository.com/artifact/org.eclipse.jetty/jetty-continuation
-	implementation group: 'org.eclipse.jetty', name: 'jetty-continuation', version: '9.4.26.v20200117'
+	implementation group: 'org.eclipse.jetty', name: 'jetty-continuation', version: '9.4.32.v20200930'
 	
 	// ========== MULTIPART PARSER =============
 	
@@ -160,12 +160,12 @@ dependencies {
 	// --- FREEMARKER ---
 	
 	// https://mvnrepository.com/artifact/org.freemarker/freemarker
-	implementation group: 'org.freemarker', name: 'freemarker', version: '2.3.29'
+	implementation group: 'org.freemarker', name: 'freemarker', version: '2.3.30'
 	
 	// --- JADE ---
 	
 	// https://mvnrepository.com/artifact/de.neuland-bfi/jade4j
-	implementation group: 'de.neuland-bfi', name: 'jade4j', version: '1.3.0'
+	implementation group: 'de.neuland-bfi', name: 'jade4j', version: '1.3.2'
 
 	// --- MUSTACHE ---
 		
@@ -185,12 +185,12 @@ dependencies {
 	// --- HANDLEBARS ---
 	
 	// https://mvnrepository.com/artifact/com.github.jknack/handlebars
-	implementation group: 'com.github.jknack', name: 'handlebars', version: '4.1.2'
+	implementation group: 'com.github.jknack', name: 'handlebars', version: '4.2.0'
 	
 	// --- VELOCITY ---
 	
 	// https://mvnrepository.com/artifact/org.apache.velocity/velocity-engine-core
-	implementation group: 'org.apache.velocity', name: 'velocity-engine-core', version: '2.1'
+	implementation group: 'org.apache.velocity', name: 'velocity-engine-core', version: '2.2'
 	
 }
 
@@ -199,8 +199,8 @@ targetCompatibility = 1.8
 
 group = 'com.github.berkesa'
 
-// version = '1.2.10-SNAPSHOT'
-version = '1.2.10'
+version = '1.2.11-SNAPSHOT'
+// version = '1.2.11'
 // + JAR version
 
 modifyPom {
@@ -229,7 +229,7 @@ modifyPom {
             dependency {
                 groupId 'com.github.berkesa'
                 artifactId 'moleculer-java'
-                version '1.2.7'
+                version '1.2.14'
                 scope 'runtime'
             }
             dependency {
@@ -241,13 +241,13 @@ modifyPom {
             dependency {
                 groupId 'io.netty'
                 artifactId 'netty-handler'
-                version '4.1.44.Final'
+                version '4.1.52.Final'
                 scope 'runtime'
             }
             dependency {
                 groupId 'io.netty'
                 artifactId 'netty-codec-http'
-                version '4.1.44.Final'
+                version '4.1.52.Final'
                 scope 'runtime'
             }
         }
@@ -282,5 +282,5 @@ compileJava {
 
 jar {
     baseName = 'moleculer-web'
-    version =  '1.2.10'
+    version =  '1.2.11'
 }
