@@ -147,6 +147,11 @@ public class ServletWebSocketRegistry extends WebSocketRegistry {
 					return (Map<String, List<String>>) props.get("moleculer.headers");
 				}
 
+				@Override
+				public String getProtocol() {
+					return session.getProtocolVersion();
+				}
+				
 				private final String getHeader(String name, String defaultValue) {
 					Map<String, List<String>> map = getHeaderMap();
 					if (map.isEmpty()) {

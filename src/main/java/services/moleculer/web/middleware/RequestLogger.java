@@ -274,8 +274,9 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 				tmp.append(query);
 			}
 
-			// It's not known (but Servlet and Netty use HTTP1.1)
-			tmp.append(" HTTP/1.1");
+			// HTTP protocol version of the Request
+			tmp.append(' ');
+			tmp.append(props.req.getProtocol());
 
 			tmp.append(CR_LF);
 			Iterator<String> requestHeaders = props.req.getHeaders();
@@ -291,7 +292,7 @@ public class RequestLogger extends HttpMiddleware implements HttpConstants {
 				}
 			}
 
-			// It's not known
+			// It's always HTTP/1.1
 			tmp.append(CR_LF);
 			tmp.append("  HTTP/1.1 ");
 

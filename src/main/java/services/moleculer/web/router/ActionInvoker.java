@@ -203,7 +203,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 				// Invoke service
 				serviceInvoker.call(new Context(serviceInvoker, eventbus, uidGenerator, uidGenerator.nextUID(),
-						actionName, params, 1, null, null, req.getBody(), opts, nodeID)).then(out -> {
+						actionName, params, 1, null, null, null, opts, nodeID)).then(out -> {
 							sendResponse(req, rsp, out);
 						}).catchError(cause -> {
 							logger.error("Unable to invoke action!", cause);
@@ -246,7 +246,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 					// Invoke service
 					serviceInvoker.call(new Context(serviceInvoker, eventbus, uidGenerator, uidGenerator.nextUID(),
-							actionName, merged, 1, null, null, req.getBody(), opts, nodeID)).then(out -> {
+							actionName, merged, 1, null, null, null, opts, nodeID)).then(out -> {
 								sendResponse(req, rsp, out);
 							}).catchError(err -> {
 								logger.error("Unable to invoke action!", err);
@@ -261,24 +261,28 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 	protected Tree parsePostBody(Tree params, byte[] bytes, String contentType) throws Exception {
 		if (bytes.length > 0) {
+
+			// JSON body?
 			if (bytes[0] == '{' || bytes[0] == '[') {
-
-				// JSON body
-				Tree json = new Tree(bytes);
-				if (params != null && !params.isEmpty()) {
-					json.copyFrom(params);
+				try {
+					Tree json = new Tree(bytes);
+					if (params != null && !params.isEmpty()) {
+						json.copyFrom(params);
+					}
+					return json;
+				} catch (Exception cause) {
+					if (contentType.contains("json")) {
+						throw cause;
+					}
 				}
-				return json;
+			}
 
+			// QueryString body?
+			String txt = new String(bytes, StandardCharsets.UTF_8);
+			if (contentType == null || contentType.contains("x-www")) {
+				parseQueryString(params, txt);
 			} else {
-
-				// QueryString body
-				String txt = new String(bytes, StandardCharsets.UTF_8);
-				if (contentType == null || contentType.contains("x-www")) {
-					parseQueryString(params, txt);
-				} else {
-					parseTextPlain(params, txt);
-				}
+				parseTextPlain(params, txt);
 			}
 		}
 		return params;

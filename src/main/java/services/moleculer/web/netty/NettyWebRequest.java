@@ -38,6 +38,7 @@ import org.synchronoss.cloud.nio.multipart.NioMultipartParser;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpVersion;
 import services.moleculer.ServiceBroker;
 import services.moleculer.stream.PacketStream;
 import services.moleculer.web.WebRequest;
@@ -54,6 +55,7 @@ public class NettyWebRequest implements WebRequest {
 	protected final String method;
 	protected final String path;
 	protected final String query;
+	protected final HttpVersion httpVersion;
 	protected final boolean multipart;
 
 	// --- BODY PROCESSORS ---
@@ -74,6 +76,9 @@ public class NettyWebRequest implements WebRequest {
 		// Get content type
 		contentType = headers.get("Content-Type");
 
+		// Get protocol
+		httpVersion = req.protocolVersion();
+		
 		// Get QueryString
 		boolean isConnect = "CONNECT".equals(method);
 		if (isConnect) {
@@ -244,6 +249,18 @@ public class NettyWebRequest implements WebRequest {
 	@Override
 	public Iterator<String> getHeaders() {
 		return headers.names().iterator();
+	}
+
+	/**
+	 * Returns the name and version of the protocol the request uses in the form
+	 * <i>protocol/majorVersion.minorVersion</i>.
+	 *
+	 * @return a <code>String</code> containing the protocol name and version
+	 *         number
+	 */
+	@Override
+	public String getProtocol() {
+		return httpVersion == null ? "HTTP/1.1" : httpVersion.protocolName();
 	}
 
 	/**

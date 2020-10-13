@@ -28,6 +28,7 @@ package services.moleculer.web.servlet.request;
 import java.io.IOException;
 import java.util.Enumeration;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -41,12 +42,19 @@ public abstract class AbstractWebRequest implements WebRequest {
 	// --- REQUEST VARIABLES ----
 
 	protected final HttpServletRequest req;
+	protected final String protocol;
+	protected final String path;
+	protected final String query;
 	protected final String method;
 	protected final int contentLength;
 	protected final String contentType;
 	protected final boolean multipart;
-	protected final int contextPathLength;
-	
+	protected final String address;
+
+	// --- HEADERS ---
+
+	protected final LinkedHashMap<String, String> headers = new LinkedHashMap<>(32);
+
 	// --- BODY STREAM ---
 
 	protected PacketStream stream;
@@ -58,15 +66,34 @@ public abstract class AbstractWebRequest implements WebRequest {
 		// Store request
 		this.req = req;
 
-		// Get method
+		// Store properties
 		method = req.getMethod();
-
-		// Get content type
 		contentType = req.getContentType();
-
+		address = req.getRemoteAddr();
+		query = req.getQueryString();
+		protocol = req.getProtocol();
+		
 		// Length of the context path
 		String contextPath = req.getContextPath();
-		contextPathLength = contextPath == null ? 0 : contextPath.length();
+		int contextPathLength = contextPath == null ? 0 : contextPath.length();
+		String requestPath = req.getPathInfo();
+		if (requestPath == null) {
+			requestPath = req.getRequestURI();
+			if (requestPath != null && contextPathLength > 1) {
+				requestPath = requestPath.substring(contextPathLength);
+			}
+		}
+		path = requestPath;
+		
+		// Headers
+		Enumeration<String> headerNames = req.getHeaderNames();
+		if (headerNames != null) {
+			String headerName;
+			while (headerNames.hasMoreElements()) {
+				headerName = headerNames.nextElement();
+				headers.put(headerName, req.getHeader(headerName));
+			}
+		}
 
 		// Has body?
 		if (!"POST".equals(method) && !"PUT".equals(method)) {
@@ -85,7 +112,7 @@ public abstract class AbstractWebRequest implements WebRequest {
 		}
 
 		// Multipart content?
-		multipart = MultipartUtils.isMultipart(contentType);		
+		multipart = MultipartUtils.isMultipart(contentType);
 	}
 
 	// --- PROPERTY GETTERS ---
@@ -100,7 +127,7 @@ public abstract class AbstractWebRequest implements WebRequest {
 	 */
 	@Override
 	public String getAddress() {
-		return req.getRemoteAddr();
+		return address;
 	}
 
 	/**
@@ -128,13 +155,6 @@ public abstract class AbstractWebRequest implements WebRequest {
 	 */
 	@Override
 	public String getPath() {
-		String path = req.getPathInfo();
-		if (path == null) {
-			path = req.getRequestURI();
-			if (contextPathLength > 1) {
-				path = path.substring(contextPathLength);
-			}
-		}
 		return path;
 	}
 
@@ -148,7 +168,7 @@ public abstract class AbstractWebRequest implements WebRequest {
 	 */
 	@Override
 	public String getQuery() {
-		return req.getQueryString();
+		return query;
 	}
 
 	/**
@@ -203,7 +223,7 @@ public abstract class AbstractWebRequest implements WebRequest {
 	 */
 	@Override
 	public String getHeader(String name) {
-		return req.getHeader(name);
+		return headers.get(name);
 	}
 
 	/**
@@ -215,20 +235,21 @@ public abstract class AbstractWebRequest implements WebRequest {
 	 */
 	@Override
 	public Iterator<String> getHeaders() {
-		final Enumeration<String> e = req.getHeaderNames();
-		return new Iterator<String>() {
+		return headers.keySet().iterator();
+	}
 
-			@Override
-			public final boolean hasNext() {
-				return e.hasMoreElements();
-			}
-
-			@Override
-			public String next() {
-				return e.nextElement();
-			}
-
-		};
+	/**
+	 * Returns the name and version of the protocol the request uses in the form
+	 * <i>protocol/majorVersion.minorVersion</i>, for example, HTTP/1.1. For
+	 * HTTP servlets, the value returned is the same as the value of the CGI
+	 * variable <code>SERVER_PROTOCOL</code>.
+	 *
+	 * @return a <code>String</code> containing the protocol name and version
+	 *         number
+	 */
+	@Override
+	public String getProtocol() {
+		return protocol;
 	}
 
 	/**
@@ -242,7 +263,7 @@ public abstract class AbstractWebRequest implements WebRequest {
 	}
 
 	// --- ACCESS TO INTERNAL OBJECT ---
-	
+
 	/**
 	 * Returns the internal object of this WebRequest.
 	 * 
@@ -252,5 +273,5 @@ public abstract class AbstractWebRequest implements WebRequest {
 	public Object getInternalObject() {
 		return req;
 	}
-	
+
 }

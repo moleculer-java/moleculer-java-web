@@ -131,6 +131,15 @@ public interface WebRequest {
 	 */
 	public boolean isMultipart();
 
+	/**
+	 * Returns the name and version of the protocol the request uses in the form
+	 * <i>protocol/majorVersion.minorVersion</i>.
+	 *
+	 * @return a <code>String</code> containing the protocol name and version
+	 *         number
+	 */
+	public String getProtocol();
+	
 	// --- ACCESS TO INTERNAL OBJECT ---
 	
 	/**
