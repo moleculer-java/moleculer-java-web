@@ -237,7 +237,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 				}
 				Alias alias = new Alias(httpMethod, pathPattern, actionName);
 				route.addAlias(alias);
-				loagAlias(msg, route, alias);
+				logAlias(msg, route, alias);
 			}
 		}
 	};
@@ -338,9 +338,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 		Alias[] aliases = route.getAliases();
 		if (aliases != null && aliases.length > 0) {
 			for (Alias alias : aliases) {
-				if (checkedNames.add(alias.getActionName())) {
-					loagAlias(msg, route, alias);
-				}
+				logAlias(msg, route, alias);
 			}
 		}
 
@@ -348,26 +346,19 @@ public class ApiGateway extends Service implements RequestProcessor {
 		if (whiteList != null && whiteList.length > 0) {
 			for (String whiteListEntry : whiteList) {
 				msg.setLength(0);
-				msg.append("Methods with path \"");
+				msg.append("Path \"");
 				String p = route.getPath();
 				if (p != null && !p.isEmpty() && !"/".equals(p)) {
 					msg.append(p);
 				}
 				msg.append(whiteListEntry);
-				msg.append("\" mapped to \"");
-				msg.append(whiteListEntry);
-				msg.append("\" action");
-				if (whiteListEntry.indexOf('*') == -1) {
-					msg.append('.');
-				} else {
-					msg.append("s.");
-				}
+				msg.append("\" added to whitelist.");
 				logger.info(msg.toString());
 			}
 		}
 	}
 
-	protected void loagAlias(StringBuilder msg, Route route, Alias alias) {
+	protected void logAlias(StringBuilder msg, Route route, Alias alias) {
 		msg.setLength(0);
 		msg.append(alias.getHttpMethod());
 		msg.append(" methods with path \"");
