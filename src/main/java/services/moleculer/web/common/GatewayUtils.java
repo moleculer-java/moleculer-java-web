@@ -64,14 +64,19 @@ public final class GatewayUtils implements HttpConstants {
 
 	public static final void sendError(WebResponse rsp, Throwable cause) {
 		try {
-			MoleculerError error;
-			if (cause instanceof MoleculerError) {
-				error = (MoleculerError) cause;
-			} else {
-				Throwable err = cause;
-				if (err != null && err.getCause() != null) {
-					err = err.getCause();
+			MoleculerError error = null;
+			Throwable err = cause;
+			while (err != null) {
+				if (err instanceof MoleculerError) {
+					error = (MoleculerError) err;
+					break;
+				}				
+				if (err.getCause() == null) {
+					break;
 				}
+				err = err.getCause();
+			}
+			if (error == null) {
 				String msg = null;
 				String type = null;
 				if (err != null) {
