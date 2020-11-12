@@ -332,6 +332,9 @@ public class ErrorPage extends HttpMiddleware implements HttpConstants {
 									// accepts JSON -> send original JSON
 									boolean ok;
 									try {
+										for (Map.Entry<String, String> entry : headers.entrySet()) {
+											rsp.setHeader(entry.getKey(), entry.getValue());
+										}										
 										rsp.send(bytes);
 									} catch (Exception cause) {
 										logger.error("Unable to send error message!", cause);

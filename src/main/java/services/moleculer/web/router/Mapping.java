@@ -32,8 +32,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
+import java.util.regex.Pattern;
 
 import io.datatree.Tree;
+import io.datatree.dom.Cache;
 import services.moleculer.ServiceBroker;
 import services.moleculer.config.ServiceBrokerConfig;
 import services.moleculer.context.CallOptions;
@@ -66,6 +68,14 @@ public class Mapping implements RequestProcessor, HttpConstants {
 
 	protected RequestProcessor lastProcessor;
 
+	// --- REGEX PATTERN ---
+
+	protected Pattern pattern;
+
+	// --- REGEX RESULT CACHE ---
+
+	protected Cache<String, Boolean> cache;
+
 	// --- INSTALLED MIDDLEWARES ---
 
 	protected Set<HttpMiddleware> installedMiddlewares = new HashSet<>(32);
@@ -94,6 +104,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 		} else {
 			tokens = pathPattern.split("/");
 			int endIndex = 0;
+			boolean useRegex = false;
 			for (int i = 0; i < tokens.length; i++) {
 				String token = tokens[i].trim();
 				if (token.startsWith(":")) {
@@ -101,13 +112,33 @@ public class Mapping implements RequestProcessor, HttpConstants {
 					indexList.add(i);
 					nameList.add(token);
 					continue;
+				} else if (!indexList.isEmpty()) {
+					useRegex = true;
 				}
 				if (indexList.isEmpty()) {
 					endIndex += token.length() + 1;
 				}
 			}
+			if (useRegex) {
+				StringBuilder regex = new StringBuilder(pathPattern.length() + 32);
+				regex.append('^');
+				for (int i = 0; i < tokens.length; i++) {
+					String token = tokens[i].trim();
+					if (token.startsWith(":")) {
+						regex.append("[\\w\\d_]+");
+					} else {
+						regex.append(token);
+					}
+					if (i < tokens.length - 1) {
+						regex.append("\\/");
+					}
+				}
+				regex.append('$');
+				pattern = Pattern.compile(regex.toString());
+				cache = new Cache<String, Boolean>(128);
+			}
 			if (endIndex <= pathPattern.length()) {
-				pathPrefix = pathPattern.substring(0, endIndex);				
+				pathPrefix = pathPattern.substring(0, endIndex);
 			} else {
 				pathPrefix = pathPattern;
 			}
@@ -143,8 +174,8 @@ public class Mapping implements RequestProcessor, HttpConstants {
 		ServiceInvoker serviceInvoker = cfg.getServiceInvoker();
 		ExecutorService runner = executor == null ? cfg.getExecutor() : executor;
 		Eventbus eventbus = cfg.getEventbus();
-		lastProcessor = new ActionInvoker(actionName, pathPattern, pathPrefix, indexes, names, opts,
-				serviceInvoker, templateEngine, route, beforeCall, afterCall, runner, eventbus);
+		lastProcessor = new ActionInvoker(actionName, pathPattern, pathPrefix, indexes, names, opts, serviceInvoker,
+				templateEngine, route, beforeCall, afterCall, runner, eventbus);
 	}
 
 	// --- MATCH TEST ---
@@ -154,13 +185,19 @@ public class Mapping implements RequestProcessor, HttpConstants {
 			return false;
 		}
 		if (isStatic) {
-			if (!path.equals(pathPrefix)) {
-				return false;
+			return path.equals(pathPrefix);
+		}
+		if (!path.startsWith(pathPrefix)) {
+			return false;
+		}
+		if (pattern != null) {
+			Boolean result = cache.get(path);
+			if (result != null) {
+				return result;
 			}
-		} else {
-			if (!path.startsWith(pathPrefix)) {
-				return false;
-			}
+			result = pattern.matcher(path).matches();
+			cache.put(path, result);
+			return result;
 		}
 		return true;
 	}
@@ -263,7 +300,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 	public String getPathPrefix() {
 		return pathPrefix;
 	}
-	
+
 	// --- COLLECTION HELPERS ---
 
 	@Override
