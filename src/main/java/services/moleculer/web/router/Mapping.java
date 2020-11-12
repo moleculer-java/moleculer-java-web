@@ -76,6 +76,10 @@ public class Mapping implements RequestProcessor, HttpConstants {
 
 	protected Cache<String, Boolean> cache;
 
+	// --- SEPARATOR CHARACTERS ---
+
+	protected int separators;
+
 	// --- INSTALLED MIDDLEWARES ---
 
 	protected Set<HttpMiddleware> installedMiddlewares = new HashSet<>(32);
@@ -120,6 +124,8 @@ public class Mapping implements RequestProcessor, HttpConstants {
 				}
 			}
 			if (useRegex) {
+
+				// Use regex
 				StringBuilder regex = new StringBuilder(pathPattern.length() + 32);
 				regex.append('^');
 				for (int i = 0; i < tokens.length; i++) {
@@ -137,6 +143,17 @@ public class Mapping implements RequestProcessor, HttpConstants {
 				pattern = Pattern.compile(regex.toString());
 				cache = new Cache<String, Boolean>(128);
 			}
+
+			// Count separator characters
+			int i = 0;
+			for (char c : pathPattern.toCharArray()) {
+				if (c == '/') {
+					i++;
+				}
+			}
+			separators = i;
+
+			// Set prefix
 			if (endIndex <= pathPattern.length()) {
 				pathPrefix = pathPattern.substring(0, endIndex);
 			} else {
@@ -195,7 +212,20 @@ public class Mapping implements RequestProcessor, HttpConstants {
 			if (result != null) {
 				return result;
 			}
-			result = pattern.matcher(path).matches();
+		}
+		if (separators > 0) {
+			int i = 0;
+			for (char c : path.toCharArray()) {
+				if (c == '/') {
+					i++;
+				}
+			}
+			if (i != separators) {
+				return false;
+			}
+		}
+		if (pattern != null) {
+			Boolean result = pattern.matcher(path).matches();
 			cache.put(path, result);
 			return result;
 		}
