@@ -70,7 +70,7 @@ public final class GatewayUtils implements HttpConstants {
 				if (err instanceof MoleculerError) {
 					error = (MoleculerError) err;
 					break;
-				}				
+				}
 				if (err.getCause() == null) {
 					break;
 				}
@@ -142,38 +142,45 @@ public final class GatewayUtils implements HttpConstants {
 		return getCookieMap(req, rsp).get(name);
 	}
 
+	@SuppressWarnings("unchecked")
 	private static final HashMap<String, HttpCookie> getCookieMap(WebRequest req, WebResponse rsp) {
 
+		// Cookie map
+		HashMap<String, HttpCookie> cookies;
+
 		// Get from properties
-		@SuppressWarnings("unchecked")
-		HashMap<String, HttpCookie> cookies = (HashMap<String, HttpCookie>) rsp.getProperty(PROPERTY_COOKIES);
-		if (cookies != null) {
-			return cookies;
+		if (rsp != null) {
+			cookies = (HashMap<String, HttpCookie>) rsp.getProperty(PROPERTY_COOKIES);
+			if (cookies != null) {
+				return cookies;
+			}
 		}
 
 		// Parse cookies
 		cookies = new HashMap<String, HttpCookie>();
 
-		// Get from response
+		// Get from request
 		String headerValue = req.getHeader(COOKIE);
 		if (headerValue != null) {
 			parseCookies(cookies, headerValue);
 		}
 
 		// Get from response
-		headerValue = rsp.getHeader(SET_COOKIE);
-		if (headerValue != null) {
-			parseCookies(cookies, headerValue);
+		if (rsp != null) {
+			headerValue = rsp.getHeader(SET_COOKIE);
+			if (headerValue != null) {
+				parseCookies(cookies, headerValue);
+			}
+			
+			// Store cookie map
+			rsp.setProperty(PROPERTY_COOKIES, cookies);
 		}
-
-		// Store cookie map
-		rsp.setProperty(PROPERTY_COOKIES, cookies);
 		return cookies;
 	}
 
 	private static final void parseCookies(HashMap<String, HttpCookie> cookies, String headerValue) {
 		String[] parts = headerValue.split(";");
-		for (String part: parts) {
+		for (String part : parts) {
 			List<HttpCookie> list = HttpCookie.parse(part.trim());
 			for (HttpCookie cookie : list) {
 				cookies.put(cookie.getName(), cookie);
@@ -223,7 +230,7 @@ public final class GatewayUtils implements HttpConstants {
 		} finally {
 			if (in != null) {
 				try {
-					in.close();					
+					in.close();
 				} catch (Exception ignored) {
 				}
 			}
@@ -268,7 +275,7 @@ public final class GatewayUtils implements HttpConstants {
 		}
 		if (path.length() > 0) {
 			if (path.startsWith("/")) {
-				url = tryToGetFileURL(path.substring(1));	
+				url = tryToGetFileURL(path.substring(1));
 			} else {
 				url = tryToGetFileURL('/' + path);
 			}

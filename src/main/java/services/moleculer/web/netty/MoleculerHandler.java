@@ -101,33 +101,38 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 				if (httpHeaders.contains("Upgrade")) {
 
 					// Check access
-					if (webSocketRegistry.isRefused(ctx, httpRequest, httpHeaders, broker, path)) {
-						return;
-					}
+					webSocketRegistry.isRefused(ctx, httpRequest, httpHeaders, broker, path).then(refuse -> {
+						if (!refuse.asBoolean()) {
+							
+							// Accept WebSocket connection - do the handshake
+							WebSocketServerHandshakerFactory factory = new WebSocketServerHandshakerFactory(path, null, true);
+							handshaker = factory.newHandshaker(httpRequest);
+							if (handshaker == null) {
+								WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel());
+							} else {
+								DefaultFullHttpRequest req = new DefaultFullHttpRequest(httpRequest.protocolVersion(),
+										httpRequest.method(), path, Unpooled.buffer(0), httpHeaders,
+										new DefaultHttpHeaders(false));
 
-					// Do the handshake
-					WebSocketServerHandshakerFactory factory = new WebSocketServerHandshakerFactory(path, null, true);
-					handshaker = factory.newHandshaker(httpRequest);
-					if (handshaker == null) {
-						WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel());
-					} else {
-						DefaultFullHttpRequest req = new DefaultFullHttpRequest(httpRequest.protocolVersion(),
-								httpRequest.method(), path, Unpooled.buffer(0), httpHeaders,
-								new DefaultHttpHeaders(false));
+								ChannelPipeline p = ctx.pipeline();
+								p.addAfter("decoder", "encoder", new HttpResponseEncoder());
 
-						ChannelPipeline p = ctx.pipeline();
-						p.addAfter("decoder", "encoder", new HttpResponseEncoder());
+								handshaker.handshake(ctx.channel(), req).addListener(new ChannelFutureListener() {
 
-						handshaker.handshake(ctx.channel(), req).addListener(new ChannelFutureListener() {
-
-							@Override
-							public void operationComplete(ChannelFuture future) throws Exception {
-								if (future.isSuccess()) {
-									webSocketRegistry.register(path, ctx);
-								}
+									@Override
+									public void operationComplete(ChannelFuture future) throws Exception {
+										if (future.isSuccess()) {
+											int i = path.indexOf('?');
+											if (i > 0) {
+												path = path.substring(0, i);
+											}
+											webSocketRegistry.register(path, ctx);
+										}
+									}
+								});
 							}
-						});
-					}
+						}
+					});
 					return;
 				}
 

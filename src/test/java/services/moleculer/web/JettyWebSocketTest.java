@@ -40,6 +40,7 @@ import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.handshake.ServerHandshake;
 import org.junit.Test;
 
+import io.datatree.Promise;
 import io.datatree.Tree;
 import junit.framework.TestCase;
 import services.moleculer.ServiceBroker;
@@ -64,7 +65,7 @@ public class JettyWebSocketTest extends TestCase {
 	protected void setUp() throws Exception {
 
 		// --- TEST SERVLET CONTAINER ---
-		
+
 		server = new Server();
 		ServerConnector serverConnector = new ServerConnector(server);
 		serverConnector.setHost("127.0.0.1");
@@ -92,22 +93,43 @@ public class JettyWebSocketTest extends TestCase {
 		server.start();
 
 		// --- CREATE SERVICE BROKER ---
-		
+
 		ServiceBroker broker = servlet.getBroker();
 
 		// Open local REPL console
 		// broker.repl();
 
 		// --- ADD A ROUTE TO REST SERVICE ---
-		
+
 		Route route = new Route();
 		route.addAlias("/test", "test.send");
 
 		ApiGateway gateway = servlet.getGateway();
 		gateway.addRoute(route);
 
+		gateway.setWebSocketFilter(new WebSocketFilter() {
+
+			@Override
+			public Promise onConnect(WebRequest request) {
+				return new Promise(res -> {
+					assertEquals("/ws/test/q", request.getPath());
+					assertEquals("key=value", request.getQuery());
+					new Thread() {
+						public void run() {
+							try {
+								Thread.sleep(200);
+								res.resolve(true);
+							} catch (Exception e) {
+								res.reject(e);
+							}
+						}
+					}.start();
+				});
+			};
+		});
+
 		// --- TEST MOLCEULER SERVICE ---
-		
+
 		// Moleculer Service, which sends a websocket message
 		broker.createService(new Service("test") {
 
@@ -126,9 +148,9 @@ public class JettyWebSocketTest extends TestCase {
 		});
 
 		// --- TEST CLIENT ---
-		
+
 		// Emulate web browser (see "websocket.js")
-		URI uri = new URI("ws://localhost:3000/ws/test/q");
+		URI uri = new URI("ws://localhost:3000/ws/test/q?key=value");
 		client = new WebSocketClient(uri, new Draft_6455()) {
 
 			@Override
@@ -164,7 +186,7 @@ public class JettyWebSocketTest extends TestCase {
 	public void testWS() throws Exception {
 		assertNull(msg);
 		Thread.sleep(1000);
-		URL url = new URL("http://localhost:3000/test");
+		URL url = new URL("http://localhost:3000/test?key=value");
 		HttpURLConnection c = (HttpURLConnection) url.openConnection();
 		assertEquals(200, c.getResponseCode());
 		Thread.sleep(500);

@@ -30,6 +30,7 @@ import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import io.datatree.Promise;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpRequest;
@@ -95,19 +96,27 @@ public class NettyWebSocketRegistry extends WebSocketRegistry {
 
 	// --- CHECK ACCESS ---
 
-	public boolean isRefused(ChannelHandlerContext ctx, HttpRequest req, HttpHeaders headers, ServiceBroker broker,
+	public Promise isRefused(ChannelHandlerContext ctx, HttpRequest req, HttpHeaders headers, ServiceBroker broker,
 			String path) throws IOException {
 		if (webSocketFilter == null) {
-			return false;
+			return Promise.resolve(false);
 		}
 		NettyWebRequest webRequest = new NettyWebRequest(ctx, req, headers, broker, path);
-		boolean accept = webSocketFilter.onConnect(webRequest);
-		if (accept) {
-			return false;
-		}
-		ctx.close();
-		logger.info("Inbound WebSocket connection closed due to rejection of the WebSocket Filter: " + ctx);
-		return true;
+		return webSocketFilter.onConnect(webRequest).then(accept -> {
+			if (accept.asBoolean()) {
+				
+				// Accept WebSocket connection
+				return false;				
+			}
+			
+			// Refuse WebSocket connection			
+			ctx.close();
+			logger.info("Inbound WebSocket connection closed due to rejection of the WebSocket Filter: " + ctx);
+			return true;
+		}).catchError(err -> {
+			logger.error("Unexpected error occured while validating WebSocket connection!", err);
+			return true;
+		});
 	}
 
 }

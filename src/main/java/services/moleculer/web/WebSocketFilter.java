@@ -25,6 +25,8 @@
  */
 package services.moleculer.web;
 
+import io.datatree.Promise;
+
 /**
  * Security filter to decide if an incoming web socket connection is acceptable.
  * Sample:
@@ -47,6 +49,6 @@ public interface WebSocketFilter {
 	 * 
 	 * @return true = accept connection, false = close socket
 	 */
-	boolean onConnect(WebRequest request);
+	Promise onConnect(WebRequest request);
 
 }

@@ -9,6 +9,7 @@ import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.handshake.ServerHandshake;
 import org.junit.Test;
 
+import io.datatree.Promise;
 import io.datatree.Tree;
 import junit.framework.TestCase;
 import services.moleculer.ServiceBroker;
@@ -56,6 +57,27 @@ public class NettyWebSocketTest extends TestCase {
 		gateway.setDebug(true);
 		gateway.addRoute(route);
 		
+		gateway.setWebSocketFilter(new WebSocketFilter() {
+
+			@Override
+			public Promise onConnect(WebRequest request) {
+				return new Promise(res -> {
+					assertEquals("/ws/test", request.getPath());
+					assertEquals("key=value", request.getQuery());
+					new Thread() {
+						public void run() {
+							try {
+								Thread.sleep(200);
+								res.resolve(true);
+							} catch (Exception e) {
+								res.reject(e);
+							}
+						}
+					}.start();
+				});
+			};
+		});
+		
 		broker.createService(gateway);
 		
 		// --- TEST MOLCEULER SERVICE ---
@@ -83,7 +105,7 @@ public class NettyWebSocketTest extends TestCase {
 		// --- TEST CLIENT ---
 		
 		// Emulate web browser (see "websocket.js")
-		URI uri = new URI("ws://localhost:3000/ws/test");
+		URI uri = new URI("ws://localhost:3000/ws/test?key=value");
 		client = new WebSocketClient(uri, new Draft_6455()) {
 			
 			@Override
@@ -119,7 +141,7 @@ public class NettyWebSocketTest extends TestCase {
 	public void testWS() throws Exception {
 		assertNull(msg);
 		Thread.sleep(1000);
-		URL url = new URL("http://localhost:3000/test");
+		URL url = new URL("http://localhost:3000/test?key=value");
 		HttpURLConnection c = (HttpURLConnection) url.openConnection();
 		assertEquals(200, c.getResponseCode());		
 		Thread.sleep(500);

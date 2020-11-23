@@ -36,6 +36,7 @@ import javax.servlet.ServletException;
 import javax.websocket.MessageHandler;
 import javax.websocket.Session;
 
+import io.datatree.Promise;
 import services.moleculer.ServiceBroker;
 import services.moleculer.stream.PacketStream;
 import services.moleculer.web.WebRequest;
@@ -76,8 +77,11 @@ public class ServletWebSocketRegistry extends WebSocketRegistry {
 		String pathInfo = getPathInfo(session);
 
 		// Check access
-		if (webSocketFilter != null) {
-			boolean accept = webSocketFilter.onConnect(new WebRequest() {
+		Promise filter;
+		if (webSocketFilter == null) {
+			filter = Promise.resolve(true);
+		} else {
+			filter = webSocketFilter.onConnect(new WebRequest() {
 
 				@Override
 				public final boolean isMultipart() {
@@ -169,27 +173,31 @@ public class ServletWebSocketRegistry extends WebSocketRegistry {
 				}
 
 			});
-			if (!accept) {
-				try {
-					session.close();
-				} catch (Exception ignored) {
-				}
-				return;
-			}
 		}
+		filter.then(accept -> {
+			if (accept.asBoolean()) {
+				
+				// Accept connection
+				ServletEndpoint endpoint = new ServletEndpoint(session, true);
 
-		// Register
-		ServletEndpoint endpoint = new ServletEndpoint(session, true);
-		register(pathInfo, endpoint);
+				// Register
+				register(pathInfo, endpoint);
 
-		// Add heartbeat handler
-		session.addMessageHandler(new MessageHandler.Whole<String>() {
+				// Add heartbeat handler
+				session.addMessageHandler(new MessageHandler.Whole<String>() {
 
-			public final void onMessage(String text) {
-				endpoint.send("!");
+					public final void onMessage(String text) {
+						endpoint.send("!");
+					}
+
+				});
+
+			} else {
+				
+				// Refuse WebSocket connection
+				session.close();
 			}
-
-		});
+		});		
 	}
 
 	protected void onClose(Session session) {
@@ -199,7 +207,11 @@ public class ServletWebSocketRegistry extends WebSocketRegistry {
 	protected String getPathInfo(Session session) {
 		String path = session.getRequestURI().getPath();
 		if (contextPathLength > 1 && path.startsWith(contextPath)) {
-			return path.substring(contextPathLength);
+			path = path.substring(contextPathLength);
+		}
+		int i = path.indexOf('?');
+		if (i > 0) {
+			path = path.substring(0, i);
 		}
 		return path;
 	}
