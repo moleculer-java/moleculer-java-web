@@ -25,8 +25,6 @@
  */
 package services.moleculer.web.router;
 
-import static services.moleculer.util.CommonUtils.formatPath;
-
 public class Alias {
 
 	// --- HTTP METHODS ---
@@ -54,7 +52,11 @@ public class Alias {
 
 	public Alias(String httpMethod, String pathPattern, String actionName) {
 		this.httpMethod = httpMethod.trim().toUpperCase();
-		this.pathPattern = formatPath(pathPattern);
+		String pattern = pathPattern.trim();
+		if (!pattern.startsWith("/")) {
+			pattern = '/' + pattern;
+		}
+		this.pathPattern = pattern;
 		String name = actionName.trim().replace('/', '.');
 		while (name.startsWith(".")) {
 			name = name.substring(1);

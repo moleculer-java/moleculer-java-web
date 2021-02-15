@@ -28,6 +28,7 @@ package services.moleculer.web;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -135,16 +136,23 @@ public abstract class WebSocketRegistry implements Runnable {
 		} finally {
 			readLock.unlock();
 		}
+		HashSet<String> paths = new HashSet<>();
+		Map.Entry<String, EndpointSet> entry;
 		writeLock.lock();
 		try {
-			Iterator<EndpointSet> i = registry.values().iterator();
+			Iterator<Map.Entry<String, EndpointSet>> i = registry.entrySet().iterator();
 			while (i.hasNext()) {
-				if (i.next().canRemove()) {
+				entry = i.next();
+				if (entry.getValue().canRemove()) {
+					paths.add(entry.getKey());
 					i.remove();
 				}
 			}
 		} finally {
 			writeLock.unlock();
+		}
+		if (webSocketFilter != null && !paths.isEmpty()) {
+			webSocketFilter.onClose(paths);
 		}
 	}
 
@@ -152,7 +160,20 @@ public abstract class WebSocketRegistry implements Runnable {
 		this.webSocketFilter = webSocketFilter;
 	}
 
-	private class EndpointSet {
+	public Map<String, Integer> countClients() {
+		HashMap<String, Integer> clients = new HashMap<>(128);
+		readLock.lock();
+		try {
+			for (Map.Entry<String, EndpointSet> entry: registry.entrySet()) {
+				clients.put(entry.getKey(), entry.getValue().count());
+			}
+		} finally {
+			readLock.unlock();
+		}
+		return clients;
+	}
+	
+	private final class EndpointSet {
 
 		private final AtomicBoolean empty = new AtomicBoolean();		
 		private final AtomicLong lastTouched = new AtomicLong(); 
@@ -168,7 +189,16 @@ public abstract class WebSocketRegistry implements Runnable {
 			endpointWriteLock = lock.writeLock();
 		}
 
-		private Set<Endpoint> get() {
+		private final int count() {
+			endpointReadLock.lock();
+			try {
+				return set.size();
+			} finally {
+				endpointReadLock.unlock();
+			}			
+		}
+		
+		private final Set<Endpoint> get() {
 			lastTouched.set(System.currentTimeMillis());			
 			endpointReadLock.lock();
 			try {
@@ -181,7 +211,7 @@ public abstract class WebSocketRegistry implements Runnable {
 			}
 		}
 
-		private void add(Endpoint endpoint) {
+		private final void add(Endpoint endpoint) {
 			lastTouched.set(System.currentTimeMillis());
 			empty.set(false);
 			endpointWriteLock.lock();
@@ -192,7 +222,7 @@ public abstract class WebSocketRegistry implements Runnable {
 			}
 		}
 
-		private void remove(Endpoint endpoint) {
+		private final void remove(Endpoint endpoint) {
 			lastTouched.set(System.currentTimeMillis());			
 			endpointWriteLock.lock();
 			try {
@@ -204,12 +234,12 @@ public abstract class WebSocketRegistry implements Runnable {
 			}
 		}
 
-		private boolean canRemove() {
+		private final boolean canRemove() {
 			long now = System.currentTimeMillis();
 			return empty.get() && now - lastTouched.get() > 60000;
 		}
 
-		private void cleanup() {
+		private final void cleanup() {
 			endpointWriteLock.lock();
 			try {
 				Iterator<Endpoint> i = set.iterator();

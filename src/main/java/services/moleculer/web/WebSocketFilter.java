@@ -25,6 +25,8 @@
  */
 package services.moleculer.web;
 
+import java.util.Set;
+
 import io.datatree.Promise;
 
 /**
@@ -51,4 +53,12 @@ public interface WebSocketFilter {
 	 */
 	Promise onConnect(WebRequest request);
 
+	/**
+	 * Invokes when a WebSocket Endpoint closes.
+	 * 
+	 * @param paths Paths (relative URLs) of closed WebSocket Endpoints
+	 */
+	default void onClose(Set<String> paths) {		
+	}
+	
 }
