@@ -173,12 +173,18 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		if (req.isMultipart() || unknownType) {
 			executor.execute(() -> {
 
+				// Clear "meta" block to avoid a vulnerability
+				Tree meta = params.getMeta(false);
+				if (meta != null) {
+					meta.clear();
+				}
+				
 				// Custom "before call" processor
 				// (eg. copy HTTP headers into the "params" variable)
 				if (beforeCall != null) {
 					beforeCall.onCall(route, req, rsp, params);
 				}
-
+				
 				// Invoke service
 				serviceInvoker.call(new Context(serviceInvoker, eventbus, uidGenerator, uidGenerator.nextUID(),
 						actionName, params, 1, null, null, req.getBody(), opts, nodeID)).then(out -> {
@@ -194,6 +200,12 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		// GET without body
 		if (contentLength == 0) {
 			executor.execute(() -> {
+
+				// Clear "meta" block to avoid a vulnerability
+				Tree meta = params.getMeta(false);
+				if (meta != null) {
+					meta.clear();
+				}
 
 				// Custom "before call" processor
 				// (eg. copy HTTP headers into the "params" variable)
@@ -236,7 +248,14 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				// Parse and merge body
 				Tree merged = parsePostBody(params, body == null ? buffer.toByteArray() : body, req.getContentType());
 
+				// Forward to Thread Pool
 				executor.execute(() -> {
+
+					// Clear "meta" block to avoid a vulnerability
+					Tree meta = merged.getMeta(false);
+					if (meta != null) {
+						meta.clear();
+					}
 
 					// Custom "before call" processor
 					// (eg. copy HTTP headers into the "params" variable)
