@@ -74,7 +74,7 @@ public class VelocityEngine extends AbstractTemplateEngine {
 	/**
 	 * A list of template files containing macros to be used when merging.
 	 */
-	protected List<?> macroLibraries;
+	protected List<String> macroLibraries;
 
 	/**
 	 * Charset name.
@@ -184,11 +184,11 @@ public class VelocityEngine extends AbstractTemplateEngine {
 
 	// --- GET/SET MACRO LIBRARIES ---
 
-	public List<?> getMacroLibraries() {
+	public List<String> getMacroLibraries() {
 		return macroLibraries;
 	}
 
-	public void setMacroLibraries(List<?> macroLibraries) {
+	public void setMacroLibraries(List<String> macroLibraries) {
 		this.macroLibraries = macroLibraries;
 	}
 
