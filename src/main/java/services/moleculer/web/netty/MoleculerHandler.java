@@ -210,7 +210,7 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 				}
 				byte[] data = new byte[len];
 				byteBuffer.readBytes(data);
-				if (byteBuffer != null && data.length > 0 && data[0] == '!') {
+				if (data.length > 0 && data[0] == '!') {
 					ctx.channel().writeAndFlush(new TextWebSocketFrame("!"));
 				}
 				return;

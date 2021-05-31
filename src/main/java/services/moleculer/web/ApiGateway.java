@@ -304,6 +304,63 @@ public class ApiGateway extends Service implements RequestProcessor {
 		lastRoute.setMappingPolicy(MappingPolicy.ALL);
 		lastRoute.started(broker, globalMiddlewares);
 		logRoute(lastRoute);
+
+		// Prepare mappings
+		LinkedList<Mapping> mappingList = new LinkedList<>();
+		for (Route route : routes) {
+			Alias[] aliases = route.getAliases();
+			if (aliases != null) {
+				for (Alias alias : aliases) {
+					String httpMethod = alias.getHttpMethod();
+					if (httpMethod == null || Alias.ALL.equals(httpMethod) || Alias.REST.equals(httpMethod)) {
+						continue;
+					}
+					String path = alias.getPathPattern();
+					Mapping mapping = route.findMapping(httpMethod, path);
+					if (mapping != null) {
+						mappingList.addLast(mapping);
+					}
+				}
+			}
+		}
+		if (!mappingList.isEmpty()) {
+			Mapping[] mappingArray = new Mapping[mappingList.size()];
+			mappingList.toArray(mappingArray);
+			Arrays.sort(mappingArray, (m1, m2) -> {
+				int v1 = m1.getVariables();
+				int v2 = m2.getVariables();
+				if (v1 == v2) {
+					v1 = m1.getPathPrefix().length();
+					v2 = m2.getPathPrefix().length();
+				}
+				return Integer.compare(v1, v2);
+			});
+			cachedRoutes = Math.max(cachedRoutes, mappingArray.length);
+			writeLock.lock();
+			try {
+				for (Mapping mapping : mappingArray) {
+					if (!globalMiddlewares.isEmpty()) {
+						mapping.use(globalMiddlewares);
+					}
+					if (mapping.isStatic()) {
+						String staticKey = mapping.getHttpMethod() + ' ' + mapping.getPathPrefix();
+						staticMappings.put(staticKey, mapping);
+						if (debug) {
+							logger.info("New mapping for \"" + mapping.getPathPrefix()
+									+ "\" stored in the static mapping cache (key: " + staticKey + ").");
+						}
+					} else {
+						dynamicMappings.addLast(mapping);
+						if (debug) {
+							logger.info("New mapping for \"" + mapping.getPathPrefix()
+									+ "\" stored in the dynamic mapping cache.");
+						}
+					}
+				}
+			} finally {
+				writeLock.unlock();
+			}
+		}
 	}
 
 	protected void logRoute(Route route) {
@@ -488,7 +545,8 @@ public class ApiGateway extends Service implements RequestProcessor {
 				if (mapping.isStatic()) {
 					staticMappings.put(staticKey, mapping);
 					if (debug) {
-						logger.info("New mapping for \"" + mapping.getPathPrefix() + "\" stored in the static mapping cache (key: " + staticKey + ").");
+						logger.info("New mapping for \"" + mapping.getPathPrefix()
+								+ "\" stored in the static mapping cache (key: " + staticKey + ").");
 					}
 				} else {
 					dynamicMappings.addLast(mapping);
@@ -496,7 +554,8 @@ public class ApiGateway extends Service implements RequestProcessor {
 						dynamicMappings.removeFirst();
 					}
 					if (debug) {
-						logger.info("New mapping for \"" + mapping.getPathPrefix() + "\" stored in the dynamic mapping cache.");
+						logger.info("New mapping for \"" + mapping.getPathPrefix()
+								+ "\" stored in the dynamic mapping cache.");
 					}
 				}
 			} finally {

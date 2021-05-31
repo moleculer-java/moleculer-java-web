@@ -76,9 +76,10 @@ public class Mapping implements RequestProcessor, HttpConstants {
 
 	protected Cache<String, Boolean> cache;
 
-	// --- SEPARATOR CHARACTERS ---
+	// --- SEPARATOR AND VARIABLE CHARACTERS ---
 
 	protected int separators;
+	protected int variables;
 
 	// --- INSTALLED MIDDLEWARES ---
 
@@ -89,6 +90,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 	public Mapping(ServiceBroker broker, String httpMethod, String pathPattern, String actionName,
 			CallOptions.Options opts, AbstractTemplateEngine templateEngine, Route route, CallProcessor beforeCall,
 			CallProcessor afterCall, ExecutorService executor) {
+		
 		this.httpMethod = "ALL".equals(httpMethod) ? null : httpMethod;
 		this.actionName = Objects.requireNonNull(actionName);
 		this.route = route;
@@ -145,14 +147,18 @@ public class Mapping implements RequestProcessor, HttpConstants {
 			}
 
 			// Count separator characters
-			int i = 0;
+			int s = 0;
+			int v = 0;
 			for (char c : pathPattern.toCharArray()) {
 				if (c == '/') {
-					i++;
+					s++;
+				} else if (c == ':') {
+					v++;
 				}
 			}
-			separators = i;
-
+			separators = s;
+			variables = v;
+			
 			// Set prefix
 			if (endIndex <= pathPattern.length()) {
 				pathPrefix = pathPattern.substring(0, endIndex);
@@ -329,6 +335,18 @@ public class Mapping implements RequestProcessor, HttpConstants {
 
 	public String getPathPrefix() {
 		return pathPrefix;
+	}
+
+	public String getHttpMethod() {
+		return httpMethod;
+	}
+
+	public int getSeparators() {
+		return separators;
+	}
+
+	public int getVariables() {
+		return variables;
 	}
 
 	// --- COLLECTION HELPERS ---
