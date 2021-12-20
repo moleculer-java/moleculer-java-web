@@ -181,8 +181,8 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				
 				// Custom "before call" processor
 				// (eg. copy HTTP headers into the "params" variable)
-				if (beforeCall != null) {
-					beforeCall.onCall(route, req, rsp, params);
+				if (invokeBeforeCall(req, rsp, params)) {
+					return;
 				}
 				
 				// Invoke service
@@ -209,8 +209,8 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 				// Custom "before call" processor
 				// (eg. copy HTTP headers into the "params" variable)
-				if (beforeCall != null) {
-					beforeCall.onCall(route, req, rsp, params);
+				if (invokeBeforeCall(req, rsp, params)) {
+					return;
 				}
 
 				// Invoke service
@@ -259,8 +259,8 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 					// Custom "before call" processor
 					// (eg. copy HTTP headers into the "params" variable)
-					if (beforeCall != null) {
-						beforeCall.onCall(route, req, rsp, merged);
+					if (invokeBeforeCall(req, rsp, merged)) {
+						return;
 					}
 
 					// Invoke service
@@ -276,6 +276,19 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		});
 	}
 
+	protected boolean invokeBeforeCall(WebRequest req, WebResponse rsp, Tree data) {
+		if (beforeCall != null) {
+			try {
+				beforeCall.onCall(route, req, rsp, data);						
+			} catch (Throwable cause) {
+				logger.error("Unable to invoke 'beforeCall' method!", cause);
+				sendError(rsp, cause);
+				return true;
+			}
+		}
+		return false;
+	}
+	
 	// --- PARSE BODY OF THE GET / POST REQUEST ---
 
 	protected Tree parsePostBody(Tree params, byte[] bytes, String contentType) throws Exception {
@@ -343,9 +356,15 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		// Invoke custom "after call" processor
 		// (eg. insert custom HTTP headers by data)
 		if (afterCall != null) {
-			afterCall.onCall(route, req, rsp, data);
+			try {
+				afterCall.onCall(route, req, rsp, data);						
+			} catch (Throwable cause) {
+				logger.error("Unable to invoke 'afterCall' method!", cause);
+				sendError(rsp, cause);
+				return;
+			}
 		}
-
+		
 		// Disable cache
 		rsp.setHeader(CACHE_CONTROL, NO_CACHE);
 		if (data == null) {

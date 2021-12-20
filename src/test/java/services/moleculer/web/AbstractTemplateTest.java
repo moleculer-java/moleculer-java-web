@@ -131,6 +131,16 @@ public abstract class AbstractTemplateTest extends TestCase {
 				return ctx.params;
 			};
 
+			@SuppressWarnings("unused")
+			Action first = ctx -> {
+				return ctx.params.put("src", "first");
+			};
+			
+			@SuppressWarnings("unused")
+			Action second = ctx -> {
+				return ctx.params.put("src", "second");
+			};
+			
 		});
 
 		br.createService(new Service("session") {
@@ -173,6 +183,9 @@ public abstract class AbstractTemplateTest extends TestCase {
 		// REST route
 		Route r1 = new Route();
 
+		r1.addAlias(Alias.GET, "/api/users/:a/any", "math.first");
+		r1.addAlias(Alias.GET, "/api/users/:b/change-password", "math.second");
+		
 		r1.addAlias(Alias.GET, "/math/add/:a/:b", "math.add");
 		r1.addAlias(Alias.GET, "/math/addshort/:a", "math.add");
 		r1.use(new CorsHeaders());
@@ -383,6 +396,23 @@ public abstract class AbstractTemplateTest extends TestCase {
 		};
 		
 	}
+	
+	@Test
+	public void testPath() throws Exception {
+		HttpGet get = new HttpGet("http://localhost:3000/api/users/4/any");
+		HttpResponse rsp = cl.execute(get, null).get();
+		byte[] bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+		String txt = new String(bytes, StandardCharsets.UTF_8);
+		assertTrue(txt.contains("first"));
+		
+		get = new HttpGet("http://localhost:3000/api/users/3/change-password");
+		rsp = cl.execute(get, null).get();
+		System.out.println(rsp.getStatusLine());
+		bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+		txt = new String(bytes, StandardCharsets.UTF_8);
+		assertTrue(txt.contains("second"));
+	}
+	
 	
 	@Test
 	public void testMiddlewares() throws Exception {

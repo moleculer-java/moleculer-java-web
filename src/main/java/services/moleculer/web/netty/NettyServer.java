@@ -90,7 +90,7 @@ public class NettyServer extends Service {
 	protected int webSocketCleanupSeconds = 15;
 
 	protected boolean shutDownThreadPools = true;
-	
+
 	// --- SSL PROPERTIES ---
 
 	protected boolean useSSL;
@@ -120,31 +120,30 @@ public class NettyServer extends Service {
 	protected NettyWebSocketRegistry webSocketRegistry;
 
 	// --- LOCK ---
-	
+
 	private final Object gatewayLock = new Object();
-	
+
 	// --- INIT GATEWAY ---
 
 	@Subscribe("$services.changed")
 	private Listener evt = ctx -> {
-		if (gateway == null && ctx.params != null) {
-			boolean localService = ctx.params.get("localService", false);
-			if (localService) {
-				gateway = getService(broker, ApiGateway.class);
-				if (gateway != null) {
+		boolean localService = ctx.params.get("localService", false);
+		if (localService) {
+			synchronized (gatewayLock) {
+				ApiGateway g = getService(broker, ApiGateway.class);
+				if (g != null && gateway == null) {
+					gateway = g;
 					if (webSocketRegistry == null) {
 						webSocketRegistry = new NettyWebSocketRegistry(broker, webSocketCleanupSeconds);
 					}
 					gateway.setWebSocketRegistry(webSocketRegistry);
 					logger.info("ApiGateway connected to Netty Server.");
-					synchronized (gatewayLock) {
-						gatewayLock.notifyAll();
-					}
+					gatewayLock.notifyAll();
 				}
 			}
 		}
 	};
-	
+
 	// --- CONSTRUCTORS ---
 
 	public NettyServer() {
@@ -163,7 +162,7 @@ public class NettyServer extends Service {
 		// Worker group
 		if (threadGroup == null) {
 			threadGroup = new NioEventLoopGroup(1, Executors.newSingleThreadExecutor(r -> {
-				Thread t = new Thread(r, "Netty Server on port " + port  + " (" + hashCode() + ")");
+				Thread t = new Thread(r, "Netty Server on port " + port + " (" + hashCode() + ")");
 				t.setPriority(Thread.MAX_PRIORITY - 1);
 				return t;
 			}));

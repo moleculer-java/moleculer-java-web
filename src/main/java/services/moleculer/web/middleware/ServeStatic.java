@@ -120,6 +120,17 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 	 */
 	protected int compressionLevel = Deflater.BEST_SPEED;
 
+	/**
+	 * Size of packets.
+	 */
+	protected int packetSize = 1024 * 512;
+
+	/**
+	 * Time between each packet sent. This may be necessary because the other
+	 * Threads will get some CPU-time.
+	 */
+	protected long packetDelay = 20;
+	
 	// --- CONTENT TYPES ---
 
 	protected final HashMap<String, String> contentTypes = new HashMap<>();
@@ -359,6 +370,8 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 
 							// Create stream
 							PacketStream stream = broker.createStream();
+							stream.setPacketDelay(packetDelay);
+							stream.setPacketSize(packetSize);
 							stream.onPacket((bytes, cause, close) -> {
 								if (bytes != null) {
 									if (size > -1) {
@@ -882,6 +895,22 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 	}
 
 	// --- GETTERS AND SETTERS ---
+
+	public int getPacketSize() {
+		return packetSize;
+	}
+
+	public void setPacketSize(int packetSize) {
+		this.packetSize = Math.max(0, packetSize);
+	}
+
+	public long getPacketDelay() {
+		return packetDelay;
+	}
+
+	public void setPacketDelay(long packetDelay) {
+		this.packetDelay = Math.max(0L, packetDelay);
+	}
 
 	public String getLocalDirectory() {
 		return localDirectory;

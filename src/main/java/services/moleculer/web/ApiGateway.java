@@ -364,6 +364,9 @@ public class ApiGateway extends Service implements RequestProcessor {
 	}
 
 	protected void logRoute(Route route) {
+		if (!debug) {
+			return;
+		}
 		StringBuilder msg = new StringBuilder(128);
 		msg.append("Route installed on path \"");
 		String path = route.getPath();
@@ -416,6 +419,9 @@ public class ApiGateway extends Service implements RequestProcessor {
 	}
 
 	protected void logAlias(StringBuilder msg, Route route, Alias alias) {
+		if (!debug) {
+			return;
+		}
 		msg.setLength(0);
 		msg.append(alias.getHttpMethod());
 		msg.append(" methods with path \"");
