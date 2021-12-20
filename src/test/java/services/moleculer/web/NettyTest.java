@@ -45,6 +45,8 @@ public class NettyTest extends AbstractTemplateTest {
 	
 		br.start();
 		
+		System.out.println(br.getConfig().getCacher());
+		
 		super.setUp();
 	}
 	

@@ -80,7 +80,7 @@ public class Route {
 	 * MessageBroker).
 	 */
 	protected ExecutorService executor;
-	
+
 	// --- ROUTE-SPECIFIC MIDDLEWARES ---
 
 	protected final Set<HttpMiddleware> routeMiddlewares = new LinkedHashSet<>(32);
@@ -90,11 +90,11 @@ public class Route {
 	public Route() {
 	}
 
-	public Route(String path) {		
+	public Route(String path) {
 		setPath(path);
 	}
 
-	public Route(String path, HttpMiddleware... middlewares) {		
+	public Route(String path, HttpMiddleware... middlewares) {
 		use(middlewares).setPath(path);
 	}
 
@@ -126,8 +126,8 @@ public class Route {
 		if (whiteList != null && whiteList.length > 0) {
 			for (String pattern : whiteList) {
 				if (Matcher.matches(shortPath, pattern)) {
-					Mapping mapping = new Mapping(broker, httpMethod, path, actionName, opts,
-							templateEngine, this, beforeCall, afterCall, executor);
+					Mapping mapping = new Mapping(broker, httpMethod, path, actionName, opts, templateEngine, this,
+							beforeCall, afterCall, executor);
 					if (!routeMiddlewares.isEmpty()) {
 						mapping.use(routeMiddlewares);
 					}
@@ -136,8 +136,8 @@ public class Route {
 			}
 		}
 		if (mappingPolicy == MappingPolicy.ALL) {
-			Mapping mapping = new Mapping(broker, httpMethod, path, actionName, opts, templateEngine, this,
-					beforeCall, afterCall, executor);
+			Mapping mapping = new Mapping(broker, httpMethod, path, actionName, opts, templateEngine, this, beforeCall,
+					afterCall, executor);
 			if (!routeMiddlewares.isEmpty()) {
 				mapping.use(routeMiddlewares);
 			}
@@ -168,7 +168,7 @@ public class Route {
 
 	// --- START MIDDLEWARES ---
 
-	public void started(ServiceBroker broker, Set<HttpMiddleware> globalMiddlewares) throws Exception {
+	public void started(ServiceBroker broker, Set<HttpMiddleware> globalMiddlewares, boolean debug) throws Exception {
 
 		// Set pointer of parent broker
 		this.broker = broker;
@@ -177,8 +177,10 @@ public class Route {
 		for (HttpMiddleware middleware : routeMiddlewares) {
 			if (!globalMiddlewares.contains(middleware)) {
 				middleware.started(broker);
-				String p = path == null || path.isEmpty() ? p = "/" : path;
-				logger.info(nameOf(middleware, false) + " middleware started on route \"" + p + "\".");
+				if (debug) {
+					String p = path == null || path.isEmpty() ? p = "/" : path;
+					logger.info(nameOf(middleware, false) + " middleware started on route \"" + p + "\".");
+				}
 			}
 		}
 	}
@@ -277,13 +279,14 @@ public class Route {
 		}
 		for (String whiteListEntry : whiteListEntries) {
 			if (whiteListEntry != null && !whiteListEntry.isEmpty()) {
-				if ("*".equals(whiteListEntry) || "**".equals(whiteListEntry) || "/*".equals(whiteListEntry) || "/**".equals(whiteListEntry)) {
+				if ("*".equals(whiteListEntry) || "**".equals(whiteListEntry) || "/*".equals(whiteListEntry)
+						|| "/**".equals(whiteListEntry)) {
 					list.clear();
 					list.addLast("/**");
 					break;
 				}
 				boolean simple = true;
-				for (char c: whiteListEntry.toCharArray()) {
+				for (char c : whiteListEntry.toCharArray()) {
 					if (c == '?' || c == '\\' || c == '^' || c == '$' || c == '[') {
 						simple = false;
 						break;

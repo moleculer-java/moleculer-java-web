@@ -295,14 +295,14 @@ public class ApiGateway extends Service implements RequestProcessor {
 
 		// Start routes and route-specific middlewares
 		for (Route route : routes) {
-			route.started(broker, globalMiddlewares);
+			route.started(broker, globalMiddlewares, debug);
 			logRoute(route);
 		}
 
 		// Set last route (ServeStatic, "404 Not Found", etc.)
 		lastRoute = new Route("", lastMiddleware);
 		lastRoute.setMappingPolicy(MappingPolicy.ALL);
-		lastRoute.started(broker, globalMiddlewares);
+		lastRoute.started(broker, globalMiddlewares, debug);
 		logRoute(lastRoute);
 
 		// Prepare mappings
@@ -725,7 +725,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 		// Already started? -> start
 		if (broker != null) {
 			try {
-				route.started(broker, globalMiddlewares);
+				route.started(broker, globalMiddlewares, debug);
 			} catch (Exception cause) {
 				logger.warn("Unable to start route!", cause);
 			}
@@ -772,7 +772,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 			if (broker != null) {
 				lastRoute = new Route("", lastMiddleware);
 				try {
-					lastRoute.started(broker, globalMiddlewares);
+					lastRoute.started(broker, globalMiddlewares, debug);
 				} catch (Exception cause) {
 					logger.warn("Unable to start last route!", cause);
 				}

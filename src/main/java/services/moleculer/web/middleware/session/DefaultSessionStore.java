@@ -32,6 +32,7 @@ import javax.servlet.http.HttpSession;
 
 import io.datatree.Tree;
 import services.moleculer.cacher.Cacher;
+import services.moleculer.cacher.MemoryCacher;
 import services.moleculer.util.CheckedTree;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.common.HttpConstants;
@@ -53,7 +54,7 @@ public class DefaultSessionStore implements SessionStore, HttpConstants {
 	// --- CONSTRUCTOR ---
 
 	public DefaultSessionStore(Cacher cacher, int sessionTimeout) {
-		this.cacher = cacher;
+		this.cacher = cacher == null ? new MemoryCacher() : cacher;
 		this.sessionTimeout = sessionTimeout;
 	}
 

@@ -901,7 +901,7 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 	}
 
 	public void setPacketSize(int packetSize) {
-		this.packetSize = Math.max(0, packetSize);
+		this.packetSize = packetSize;
 	}
 
 	public long getPacketDelay() {
@@ -909,7 +909,7 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 	}
 
 	public void setPacketDelay(long packetDelay) {
-		this.packetDelay = Math.max(0L, packetDelay);
+		this.packetDelay = packetDelay;
 	}
 
 	public String getLocalDirectory() {
