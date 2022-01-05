@@ -107,6 +107,9 @@ public class Route {
 		String shortPath = path.substring(this.path.length());
 		if (aliases != null && aliases.length > 0) {
 			for (Alias alias : aliases) {
+				if (alias == null) {
+					continue;
+				}
 				if (Alias.ALL.equals(alias.httpMethod) || httpMethod.equals(alias.httpMethod)) {
 					Mapping mapping = new Mapping(broker, httpMethod, this.path + alias.pathPattern, alias.actionName,
 							opts, templateEngine, this, beforeCall, afterCall, executor);
@@ -125,6 +128,9 @@ public class Route {
 		}
 		if (whiteList != null && whiteList.length > 0) {
 			for (String pattern : whiteList) {
+				if (pattern == null) {
+					continue;
+				}
 				if (Matcher.matches(shortPath, pattern)) {
 					Mapping mapping = new Mapping(broker, httpMethod, path, actionName, opts, templateEngine, this,
 							beforeCall, afterCall, executor);
@@ -246,22 +252,27 @@ public class Route {
 			return this;
 		}
 		LinkedList<Alias> list = new LinkedList<>();
-		if (this.aliases != null) {
-			list.addAll(Arrays.asList(this.aliases));
-		}
-		for (Alias alias : aliases) {
-			if (Alias.REST.endsWith(alias.httpMethod)) {
-				list.addLast(new Alias(Alias.GET, alias.pathPattern, alias.actionName + ".list"));
-				list.addLast(new Alias(Alias.GET, alias.pathPattern + "/:id", alias.actionName + ".get"));
-				list.addLast(new Alias(Alias.POST, alias.pathPattern, alias.actionName + ".create"));
-				list.addLast(new Alias(Alias.PUT, alias.pathPattern + "/:id", alias.actionName + ".update"));
-				list.addLast(new Alias(Alias.DELETE, alias.pathPattern + "/:id", alias.actionName + ".remove"));
-			} else {
-				list.addLast(alias);
+
+		// Only the changes need to be synchronized, the contents of the array
+		// do not change at runtime.
+		synchronized (this) {
+			if (this.aliases != null) {
+				list.addAll(Arrays.asList(this.aliases));
 			}
+			for (Alias alias : aliases) {
+				if (Alias.REST.endsWith(alias.httpMethod)) {
+					list.addLast(new Alias(Alias.GET, alias.pathPattern, alias.actionName + ".list"));
+					list.addLast(new Alias(Alias.GET, alias.pathPattern + "/:id", alias.actionName + ".get"));
+					list.addLast(new Alias(Alias.POST, alias.pathPattern, alias.actionName + ".create"));
+					list.addLast(new Alias(Alias.PUT, alias.pathPattern + "/:id", alias.actionName + ".update"));
+					list.addLast(new Alias(Alias.DELETE, alias.pathPattern + "/:id", alias.actionName + ".remove"));
+				} else {
+					list.addLast(alias);
+				}
+			}
+			this.aliases = new Alias[list.size()];
+			list.toArray(this.aliases);
 		}
-		this.aliases = new Alias[list.size()];
-		list.toArray(this.aliases);
 
 		// Return this (for method chaining)
 		return this;
@@ -274,33 +285,37 @@ public class Route {
 			return this;
 		}
 		LinkedList<String> list = new LinkedList<>();
-		if (whiteList != null) {
-			list.addAll(Arrays.asList(whiteList));
-		}
-		for (String whiteListEntry : whiteListEntries) {
-			if (whiteListEntry != null && !whiteListEntry.isEmpty()) {
-				if ("*".equals(whiteListEntry) || "**".equals(whiteListEntry) || "/*".equals(whiteListEntry)
-						|| "/**".equals(whiteListEntry)) {
-					list.clear();
-					list.addLast("/**");
-					break;
-				}
-				boolean simple = true;
-				for (char c : whiteListEntry.toCharArray()) {
-					if (c == '?' || c == '\\' || c == '^' || c == '$' || c == '[') {
-						simple = false;
+
+		// Only the changes need to be synchronized, the contents of the array
+		// do not change at runtime.
+		synchronized (this) {
+			if (whiteList != null) {
+				list.addAll(Arrays.asList(whiteList));
+			}
+			for (String whiteListEntry : whiteListEntries) {
+				if (whiteListEntry != null && !whiteListEntry.isEmpty()) {
+					if ("*".equals(whiteListEntry) || "**".equals(whiteListEntry) || "/*".equals(whiteListEntry)
+							|| "/**".equals(whiteListEntry)) {
+						list.clear();
+						list.addLast("/**");
 						break;
 					}
+					boolean simple = true;
+					for (char c : whiteListEntry.toCharArray()) {
+						if (c == '?' || c == '\\' || c == '^' || c == '$' || c == '[') {
+							simple = false;
+							break;
+						}
+					}
+					if (simple && !whiteListEntry.startsWith("/")) {
+						whiteListEntry = "/" + whiteListEntry;
+					}
+					list.addLast(whiteListEntry);
 				}
-				if (simple && !whiteListEntry.startsWith("/")) {
-					whiteListEntry = "/" + whiteListEntry;
-				}
-				list.addLast(whiteListEntry);
 			}
+			whiteList = new String[list.size()];
+			list.toArray(whiteList);
 		}
-
-		whiteList = new String[list.size()];
-		list.toArray(whiteList);
 
 		// Return this (for method chaining)
 		return this;
@@ -385,19 +400,29 @@ public class Route {
 	}
 
 	public void setWhiteList(String... whiteList) {
-		this.whiteList = null;
-		if (whiteList != null && whiteList.length > 0) {
-			for (String whiteListEntry : whiteList) {
-				addToWhiteList(whiteListEntry);
+
+		// Only the changes need to be synchronized, the contents of the array
+		// do not change at runtime.
+		synchronized (this) {
+			this.whiteList = null;
+			if (whiteList != null && whiteList.length > 0) {
+				for (String whiteListEntry : whiteList) {
+					addToWhiteList(whiteListEntry);
+				}
 			}
 		}
 	}
 
 	public void setAliases(Alias... aliases) {
-		this.aliases = null;
-		if (aliases != null && aliases.length > 0) {
-			for (Alias alias : aliases) {
-				addAlias(alias);
+
+		// Only the changes need to be synchronized, the contents of the array
+		// do not change at runtime.
+		synchronized (this) {
+			this.aliases = null;
+			if (aliases != null && aliases.length > 0) {
+				for (Alias alias : aliases) {
+					addAlias(alias);
+				}
 			}
 		}
 	}

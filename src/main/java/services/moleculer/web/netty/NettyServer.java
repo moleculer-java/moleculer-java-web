@@ -36,6 +36,7 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import javax.net.ssl.KeyManagerFactory;
@@ -125,22 +126,20 @@ public class NettyServer extends Service {
 
 	// --- INIT GATEWAY ---
 
-	@Subscribe("$services.changed")
+	@Subscribe("$broker.started")
 	private Listener evt = ctx -> {
-		boolean localService = ctx.params.get("localService", false);
-		if (localService) {
-			synchronized (gatewayLock) {
-				ApiGateway g = getService(broker, ApiGateway.class);
-				if (g != null && gateway == null) {
-					gateway = g;
-					if (webSocketRegistry == null) {
-						webSocketRegistry = new NettyWebSocketRegistry(broker, webSocketCleanupSeconds);
-					}
-					gateway.setWebSocketRegistry(webSocketRegistry);
-					logger.info("ApiGateway connected to Netty Server.");
-					gatewayLock.notifyAll();
-				}
-			}
+		gateway = getService(broker, ApiGateway.class);
+		if (gateway == null) {
+			logger.error("Unable to run Netty Server - ApiGateway not loaded!");
+			return;
+		}
+		if (webSocketRegistry == null) {
+			webSocketRegistry = new NettyWebSocketRegistry(broker, webSocketCleanupSeconds);
+		}
+		gateway.setWebSocketRegistry(webSocketRegistry);
+		logger.info("ApiGateway connected to Netty Server.");
+		synchronized (gatewayLock) {
+			gatewayLock.notifyAll();
 		}
 	};
 
@@ -185,16 +184,15 @@ public class NettyServer extends Service {
 
 				@Override
 				protected void initChannel(Channel ch) throws Exception {
+					if (gateway == null) {
+						ch.close();
+						return;
+					}
 					ChannelPipeline p = ch.pipeline();
 					if (useSSL) {
 						p.addLast("ssl", createSslHandler(ch));
 					}
 					p.addLast("decoder", new HttpRequestDecoder());
-					while (gateway == null) {
-						synchronized (gatewayLock) {
-							gatewayLock.wait(200);
-						}
-					}
 					p.addLast("handler", new MoleculerHandler(gateway, broker, webSocketRegistry));
 				}
 
