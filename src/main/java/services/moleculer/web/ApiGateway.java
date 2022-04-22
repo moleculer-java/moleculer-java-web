@@ -327,12 +327,8 @@ public class ApiGateway extends Service implements RequestProcessor {
 			Mapping[] mappingArray = new Mapping[mappingList.size()];
 			mappingList.toArray(mappingArray);
 			Arrays.sort(mappingArray, (m1, m2) -> {
-				int v1 = m1.getVariables();
-				int v2 = m2.getVariables();
-				if (v1 == v2) {
-					v1 = m1.getPathPrefix().length();
-					v2 = m2.getPathPrefix().length();
-				}
+				int v1 = m1.getPathPrefix().length();
+				int v2 = m2.getPathPrefix().length();
 				return Integer.compare(v1, v2);
 			});
 			cachedRoutes = Math.max(cachedRoutes, mappingArray.length);

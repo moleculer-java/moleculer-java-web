@@ -25,17 +25,17 @@
  */
 package services.moleculer.web.router;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.concurrent.ExecutorService;
 import java.util.regex.Pattern;
 
 import io.datatree.Tree;
-import io.datatree.dom.Cache;
 import services.moleculer.ServiceBroker;
 import services.moleculer.config.ServiceBrokerConfig;
 import services.moleculer.context.CallOptions;
@@ -56,9 +56,6 @@ public class Mapping implements RequestProcessor, HttpConstants {
 
 	protected final String httpMethod;
 	protected final String actionName;
-	protected final boolean isStatic;
-	protected final String pathPrefix;
-	protected final int hashCode;
 	protected final Tree config;
 	protected final Route route;
 	protected final CallProcessor beforeCall;
@@ -68,18 +65,14 @@ public class Mapping implements RequestProcessor, HttpConstants {
 
 	protected RequestProcessor lastProcessor;
 
-	// --- REGEX PATTERN ---
+	// --- PATTERN ---
+
+	protected final boolean isStatic;
+	protected final String pathPrefix;
+	protected final String pathPattern;
+	protected final int hashCode;
 
 	protected Pattern pattern;
-
-	// --- REGEX RESULT CACHE ---
-
-	protected Cache<String, Boolean> cache;
-
-	// --- SEPARATOR AND VARIABLE CHARACTERS ---
-
-	protected int separators;
-	protected int variables;
 
 	// --- INSTALLED MIDDLEWARES ---
 
@@ -90,8 +83,9 @@ public class Mapping implements RequestProcessor, HttpConstants {
 	public Mapping(ServiceBroker broker, String httpMethod, String pathPattern, String actionName,
 			CallOptions.Options opts, AbstractTemplateEngine templateEngine, Route route, CallProcessor beforeCall,
 			CallProcessor afterCall, ExecutorService executor) {
-		
+
 		this.httpMethod = "ALL".equals(httpMethod) ? null : httpMethod;
+		this.pathPattern = pathPattern;
 		this.actionName = Objects.requireNonNull(actionName);
 		this.route = route;
 		this.beforeCall = beforeCall;
@@ -99,86 +93,86 @@ public class Mapping implements RequestProcessor, HttpConstants {
 
 		// Parse "path pattern"
 		int starPos = pathPattern.indexOf('*');
-		isStatic = pathPattern.indexOf(':') == -1 && starPos == -1;
-		String[] tokens = null;
-		ArrayList<Integer> indexList = new ArrayList<>();
-		ArrayList<String> nameList = new ArrayList<>();
+		int colonPos = pathPattern.indexOf(':');
+		isStatic = colonPos == -1 && starPos == -1;
+
+		IndexedVariable[] variables = null;
 		if (isStatic) {
 			pathPrefix = pathPattern;
 		} else if (starPos > -1) {
 			pathPrefix = pathPattern.substring(0, starPos);
 		} else {
-			tokens = pathPattern.split("/");
-			int endIndex = 0;
-			boolean useRegex = false;
-			for (int i = 0; i < tokens.length; i++) {
-				String token = tokens[i].trim();
-				if (token.startsWith(":")) {
-					token = token.substring(1);
-					indexList.add(i);
-					nameList.add(token);
-					continue;
-				} else if (!indexList.isEmpty()) {
-					useRegex = true;
-				}
-				if (indexList.isEmpty()) {
-					endIndex += token.length() + 1;
-				}
-			}
-			if (useRegex) {
-
-				// Use regex
-				StringBuilder regex = new StringBuilder(pathPattern.length() + 32);
-				regex.append('^');
-				for (int i = 0; i < tokens.length; i++) {
-					String token = tokens[i].trim();
-					if (token.startsWith(":")) {
-						regex.append("[\\w\\d_]+");
-					} else {
-						regex.append(token);
-					}
-					if (i < tokens.length - 1) {
-						regex.append("\\/");
-					}
-				}
-				regex.append('$');
-				pattern = Pattern.compile(regex.toString());
-				cache = new Cache<String, Boolean>(128);
-			}
-
-			// Count separator characters
-			int s = 0;
-			int v = 0;
-			for (char c : pathPattern.toCharArray()) {
-				if (c == '/') {
-					s++;
-				} else if (c == ':') {
-					v++;
-				}
-			}
-			separators = s;
-			variables = v;
+			pathPrefix = pathPattern.substring(0, colonPos);
 			
-			// Set prefix
-			if (endIndex <= pathPattern.length()) {
-				pathPrefix = pathPattern.substring(0, endIndex);
-			} else {
-				pathPrefix = pathPattern;
+			// TODO Parse regex
+			if (!pathPattern.startsWith("/")) {
+				pathPattern = '/' + pathPattern;
 			}
-		}
-		int[] indexes = new int[indexList.size()];
-		String[] names = new String[nameList.size()];
-		for (int i = 0; i < indexes.length; i++) {
-			indexes[i] = indexList.get(i);
-			names[i] = nameList.get(i);
+			StringTokenizer st = new StringTokenizer(pathPattern, ":/.+?$^\\", true);
+
+			boolean inName = false;
+			String name = "";
+			int index = 1;
+
+			StringBuilder regex = new StringBuilder(pathPattern.length() * 2);
+			regex.append('(');
+
+			LinkedList<IndexedVariable> list = new LinkedList<>();
+			while (st.hasMoreTokens()) {
+				String token = st.nextToken();
+				if ("+".equals(token) || "?".equals(token) || "$".equals(token) || "^".equals(token)
+						|| "\\".equals(token)) {
+					regex.append("\\").append(token);
+					continue;
+				}
+				if (".".equals(token)) {
+					if (inName) {
+						regex.append(")(\\.");
+						list.addLast(new IndexedVariable(index, name));
+						index++;
+						inName = false;
+						name = "";
+						continue;
+					}
+					regex.append("\\").append(token);
+					continue;				
+				}
+				if (":".equals(token)) {
+					regex.append(")(");
+					index++;
+					regex.append(".*");
+					inName = true;
+					continue;
+				}
+				if ("/".equals(token)) {
+					if (inName) {
+						regex.append(")(").append(token);
+						list.addLast(new IndexedVariable(index, name));
+						index++;
+						inName = false;
+						name = "";
+						continue;
+					}
+					regex.append(token);
+					continue;
+				}
+				if (inName) {
+					name += token;
+					continue;
+				}
+				regex.append(token);
+			}
+			if (inName) {
+				list.addLast(new IndexedVariable(index, name));
+			}
+			regex.append(')');
+			pattern = Pattern.compile(regex.toString());
+			variables = new IndexedVariable[list.size()];
+			list.toArray(variables);
 		}
 
 		// Generate hashcode
-		final int prime = 31;
-		int result = 1;
-		result = prime * result + actionName.hashCode();
-		result = prime * result + pathPrefix.hashCode();
-		hashCode = result;
+		hashCode = pathPattern.hashCode();
 
 		// Create config
 		config = new Tree();
@@ -197,8 +191,8 @@ public class Mapping implements RequestProcessor, HttpConstants {
 		ServiceInvoker serviceInvoker = cfg.getServiceInvoker();
 		ExecutorService runner = executor == null ? cfg.getExecutor() : executor;
 		Eventbus eventbus = cfg.getEventbus();
-		lastProcessor = new ActionInvoker(actionName, pathPattern, pathPrefix, indexes, names, opts, serviceInvoker,
-				templateEngine, route, beforeCall, afterCall, runner, eventbus);
+		lastProcessor = new ActionInvoker(actionName, pattern, variables, opts, serviceInvoker, templateEngine, route,
+				beforeCall, afterCall, runner, eventbus);
 	}
 
 	// --- MATCH TEST ---
@@ -214,26 +208,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 			return false;
 		}
 		if (pattern != null) {
-			Boolean result = cache.get(path);
-			if (result != null) {
-				return result;
-			}
-		}
-		if (separators > 0) {
-			int i = 0;
-			for (char c : path.toCharArray()) {
-				if (c == '/') {
-					i++;
-				}
-			}
-			if (i != separators) {
-				return false;
-			}
-		}
-		if (pattern != null) {
-			Boolean result = pattern.matcher(path).matches();
-			cache.put(path, result);
-			return result;
+			return pattern.matcher(path).matches();
 		}
 		return true;
 	}
@@ -341,12 +316,8 @@ public class Mapping implements RequestProcessor, HttpConstants {
 		return httpMethod;
 	}
 
-	public int getSeparators() {
-		return separators;
-	}
-
-	public int getVariables() {
-		return variables;
+	public String getPathPattern() {
+		return pathPattern;
 	}
 
 	// --- COLLECTION HELPERS ---
@@ -368,7 +339,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 			return false;
 		}
 		Mapping other = (Mapping) obj;
-		return hashCode == other.hashCode && actionName.equals(other.actionName) && pathPrefix.equals(other.pathPrefix);
+		return hashCode == other.hashCode && pathPattern.equals(other.pathPattern);
 	}
 
 }

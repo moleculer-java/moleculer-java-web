@@ -37,6 +37,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,8 +49,8 @@ import io.datatree.dom.TreeWriterRegistry;
 import services.moleculer.config.ServiceBrokerConfig;
 import services.moleculer.context.CallOptions;
 import services.moleculer.context.CallOptions.Options;
-import services.moleculer.eventbus.Eventbus;
 import services.moleculer.context.Context;
+import services.moleculer.eventbus.Eventbus;
 import services.moleculer.service.ServiceInvoker;
 import services.moleculer.stream.PacketStream;
 import services.moleculer.uid.UidGenerator;
@@ -74,10 +76,8 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 	// --- PROPERTIES ---
 
 	protected final String actionName;
-	protected final String pathPattern;
-	protected final String pathPrefix;
-	protected final int[] indexes;
-	protected final String[] names;
+	protected final Pattern pattern;
+	protected final IndexedVariable[] variables;
 	protected final CallOptions.Options opts;
 	protected final String nodeID;
 
@@ -100,14 +100,12 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 	// --- CONSTRUCTOR ---
 
-	public ActionInvoker(String actionName, String pathPattern, String pathPrefix, int[] indexes, String[] names,
-			Options opts, ServiceInvoker serviceInvoker, AbstractTemplateEngine templateEngine, Route route,
-			CallProcessor beforeCall, CallProcessor afterCall, ExecutorService executor, Eventbus eventbus) {
+	public ActionInvoker(String actionName, Pattern pattern, IndexedVariable[] variables, Options opts,
+			ServiceInvoker serviceInvoker, AbstractTemplateEngine templateEngine, Route route, CallProcessor beforeCall,
+			CallProcessor afterCall, ExecutorService executor, Eventbus eventbus) {
 		this.actionName = actionName;
-		this.pathPattern = pathPattern;
-		this.pathPrefix = pathPrefix;
-		this.indexes = indexes;
-		this.names = names;
+		this.pattern = pattern;
+		this.variables = variables;
 		this.opts = opts;
 		this.serviceInvoker = serviceInvoker;
 		this.templateEngine = templateEngine;
@@ -148,12 +146,19 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 		// Parse URL
 		final Tree params = new Tree();
-		if (indexes.length > 0) {
+		if (pattern != null && variables != null) {
 
 			// Parameters in URL (eg "/path/:id/:name")
-			String[] tokens = req.getPath().split("/");
-			for (int i = 0; i < indexes.length; i++) {
-				params.put(names[i], tokens[indexes[i]]);
+			Matcher matcher = pattern.matcher(req.getPath());
+			if (matcher.find()) {
+				int max = matcher.groupCount();
+				IndexedVariable var;
+				for (int i = 0; i < variables.length; i++) {
+					var = variables[i];
+					if (var.index <= max) {
+						params.put(var.name, matcher.group(var.index));
+					}
+				}
 			}
 		}
 
@@ -178,13 +183,13 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				if (meta != null) {
 					meta.clear();
 				}
-				
+
 				// Custom "before call" processor
 				// (eg. copy HTTP headers into the "params" variable)
 				if (invokeBeforeCall(req, rsp, params)) {
 					return;
 				}
-				
+
 				// Invoke service
 				serviceInvoker.call(new Context(serviceInvoker, eventbus, uidGenerator, uidGenerator.nextUID(),
 						actionName, params, 1, null, null, req.getBody(), opts, nodeID)).then(out -> {
@@ -279,7 +284,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 	protected boolean invokeBeforeCall(WebRequest req, WebResponse rsp, Tree data) {
 		if (beforeCall != null) {
 			try {
-				beforeCall.onCall(route, req, rsp, data);						
+				beforeCall.onCall(route, req, rsp, data);
 			} catch (Throwable cause) {
 				logger.error("Unable to invoke 'beforeCall' method!", cause);
 				sendError(rsp, cause);
@@ -288,7 +293,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		}
 		return false;
 	}
-	
+
 	// --- PARSE BODY OF THE GET / POST REQUEST ---
 
 	protected Tree parsePostBody(Tree params, byte[] bytes, String contentType) throws Exception {
@@ -357,14 +362,14 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		// (eg. insert custom HTTP headers by data)
 		if (afterCall != null) {
 			try {
-				afterCall.onCall(route, req, rsp, data);						
+				afterCall.onCall(route, req, rsp, data);
 			} catch (Throwable cause) {
 				logger.error("Unable to invoke 'afterCall' method!", cause);
 				sendError(rsp, cause);
 				return;
 			}
 		}
-		
+
 		// Disable cache
 		rsp.setHeader(CACHE_CONTROL, NO_CACHE);
 		if (data == null) {
