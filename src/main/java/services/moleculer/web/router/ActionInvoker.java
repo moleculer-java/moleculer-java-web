@@ -372,11 +372,12 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 		// Disable cache
 		rsp.setHeader(CACHE_CONTROL, NO_CACHE);
-		if (data == null) {
+		
+		// Null response = 204 No Content
+		if (data == null || data.isNull()) {
 			try {
-				rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_JSON);
-				rsp.setHeader(CONTENT_LENGTH, "2");
-				rsp.send(EMPTY_RESPONSE);
+				rsp.setStatus(204);
+				rsp.setHeader(CONTENT_LENGTH, "0");
 			} finally {
 				rsp.end();
 			}
