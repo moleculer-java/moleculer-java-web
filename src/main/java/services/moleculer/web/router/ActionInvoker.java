@@ -44,6 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import io.datatree.Tree;
+import io.datatree.dom.Cache;
 import io.datatree.dom.TreeWriter;
 import io.datatree.dom.TreeWriterRegistry;
 import services.moleculer.config.ServiceBrokerConfig;
@@ -77,6 +78,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 	protected final String actionName;
 	protected final Pattern pattern;
+	protected final Cache<String, Matcher> cache;
 	protected final IndexedVariable[] variables;
 	protected final CallOptions.Options opts;
 	protected final String nodeID;
@@ -100,11 +102,12 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 	// --- CONSTRUCTOR ---
 
-	public ActionInvoker(String actionName, Pattern pattern, IndexedVariable[] variables, Options opts,
-			ServiceInvoker serviceInvoker, AbstractTemplateEngine templateEngine, Route route, CallProcessor beforeCall,
-			CallProcessor afterCall, ExecutorService executor, Eventbus eventbus) {
+	public ActionInvoker(String actionName, Pattern pattern, Cache<String, Matcher> cache, IndexedVariable[] variables,
+			Options opts, ServiceInvoker serviceInvoker, AbstractTemplateEngine templateEngine, Route route,
+			CallProcessor beforeCall, CallProcessor afterCall, ExecutorService executor, Eventbus eventbus) {
 		this.actionName = actionName;
 		this.pattern = pattern;
+		this.cache = cache;
 		this.variables = variables;
 		this.opts = opts;
 		this.serviceInvoker = serviceInvoker;
@@ -146,11 +149,22 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 		// Parse URL
 		final Tree params = new Tree();
-		if (pattern != null && variables != null) {
+		if (pattern != null) {
 
 			// Parameters in URL (eg "/path/:id/:name")
-			Matcher matcher = pattern.matcher(req.getPath());
-			if (matcher.find()) {
+			String cacheKey = req.getPath();
+			Matcher matcher = cache.get(cacheKey);
+			boolean find;
+			if (matcher == null) {
+				matcher = pattern.matcher(cacheKey);
+				find = matcher.find();
+				if (find) {
+					cache.put(cacheKey, matcher);
+				}
+			} else {
+				find = true;
+			}
+			if (find) {
 				int max = matcher.groupCount();
 				IndexedVariable var;
 				for (int i = 0; i < variables.length; i++) {
@@ -372,7 +386,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 		// Disable cache
 		rsp.setHeader(CACHE_CONTROL, NO_CACHE);
-		
+
 		// Null response = 204 No Content
 		if (data == null || data.isNull()) {
 			try {

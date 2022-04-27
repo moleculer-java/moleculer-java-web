@@ -33,9 +33,11 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.concurrent.ExecutorService;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import io.datatree.Tree;
+import io.datatree.dom.Cache;
 import services.moleculer.ServiceBroker;
 import services.moleculer.config.ServiceBrokerConfig;
 import services.moleculer.context.CallOptions;
@@ -72,11 +74,15 @@ public class Mapping implements RequestProcessor, HttpConstants {
 	protected final String pathPattern;
 	protected final int hashCode;
 
-	protected Pattern pattern;
+	protected final Pattern pattern;
+
+	// --- MATCHER CACHE ---
+
+	protected final Cache<String, Matcher> cache;
 
 	// --- INSTALLED MIDDLEWARES ---
 
-	protected Set<HttpMiddleware> installedMiddlewares = new HashSet<>(32);
+	protected final Set<HttpMiddleware> installedMiddlewares = new HashSet<>(32);
 
 	// --- CONSTRUCTOR ---
 
@@ -99,12 +105,16 @@ public class Mapping implements RequestProcessor, HttpConstants {
 		IndexedVariable[] variables = null;
 		if (isStatic) {
 			pathPrefix = pathPattern;
+			pattern = null;
+			cache = null;
 		} else if (starPos > -1) {
 			pathPrefix = pathPattern.substring(0, starPos);
+			pattern = null;
+			cache = null;
 		} else {
 			pathPrefix = pathPattern.substring(0, colonPos);
-			
-			// TODO Parse regex
+
+			// Parse regex
 			if (!pathPattern.startsWith("/")) {
 				pathPattern = '/' + pathPattern;
 			}
@@ -135,12 +145,11 @@ public class Mapping implements RequestProcessor, HttpConstants {
 						continue;
 					}
 					regex.append("\\").append(token);
-					continue;				
+					continue;
 				}
 				if (":".equals(token)) {
-					regex.append(")(");
+					regex.append(")([^/]*");
 					index++;
-					regex.append(".*");
 					inName = true;
 					continue;
 				}
@@ -169,6 +178,9 @@ public class Mapping implements RequestProcessor, HttpConstants {
 			pattern = Pattern.compile(regex.toString());
 			variables = new IndexedVariable[list.size()];
 			list.toArray(variables);
+
+			// Create matcher cache
+			cache = new Cache<>(64);
 		}
 
 		// Generate hashcode
@@ -191,8 +203,8 @@ public class Mapping implements RequestProcessor, HttpConstants {
 		ServiceInvoker serviceInvoker = cfg.getServiceInvoker();
 		ExecutorService runner = executor == null ? cfg.getExecutor() : executor;
 		Eventbus eventbus = cfg.getEventbus();
-		lastProcessor = new ActionInvoker(actionName, pattern, variables, opts, serviceInvoker, templateEngine, route,
-				beforeCall, afterCall, runner, eventbus);
+		lastProcessor = new ActionInvoker(actionName, pattern, cache, variables, opts, serviceInvoker, templateEngine,
+				route, beforeCall, afterCall, runner, eventbus);
 	}
 
 	// --- MATCH TEST ---
@@ -208,7 +220,16 @@ public class Mapping implements RequestProcessor, HttpConstants {
 			return false;
 		}
 		if (pattern != null) {
-			return pattern.matcher(path).matches();
+			Matcher matcher = cache.get(path);
+			if (matcher == null) {
+				matcher = pattern.matcher(path);
+				if (matcher.matches()) {
+					cache.put(path, matcher);				
+					return true;
+				}
+				return false;
+			}
+			return true;
 		}
 		return true;
 	}
