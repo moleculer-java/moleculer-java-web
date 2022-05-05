@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -212,7 +213,7 @@ public abstract class AbstractWebRequest implements WebRequest {
 	 * Returns the value of the specified request header as a String. If the
 	 * request did not include a header of the specified name, this method
 	 * returns null. If there are multiple headers with the same name, this
-	 * method returns the first head in the request. The header name is case
+	 * method returns the first head in the request.  The header name is case
 	 * insensitive. You can use this method with any request header.
 	 * 
 	 * @param name
@@ -223,7 +224,16 @@ public abstract class AbstractWebRequest implements WebRequest {
 	 */
 	@Override
 	public String getHeader(String name) {
-		return headers.get(name);
+		String value = headers.get(name.toLowerCase());
+		if (value == null) {
+			for (Map.Entry<String, String> entry: headers.entrySet()) {
+				if (name.equalsIgnoreCase(entry.getKey())) {
+					value = entry.getValue();
+					break;
+				}
+			}
+		}
+		return value;
 	}
 
 	/**

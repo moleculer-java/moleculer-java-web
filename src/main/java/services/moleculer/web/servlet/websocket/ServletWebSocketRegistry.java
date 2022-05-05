@@ -110,7 +110,7 @@ public class ServletWebSocketRegistry extends WebSocketRegistry {
 
 				@Override
 				public final String getHeader(String name) {
-					return getHeader(name);
+					return getHeader(name, (String) null);
 				}
 
 				@Override
@@ -161,9 +161,13 @@ public class ServletWebSocketRegistry extends WebSocketRegistry {
 					if (map.isEmpty()) {
 						return defaultValue;
 					}
+					List<String> list = map.get(name.toLowerCase());
+					if (list != null && !list.isEmpty()) {
+						return list.get(0);
+					}
 					for (String key : map.keySet()) {
 						if (name.equalsIgnoreCase(key)) {
-							List<String> list = map.get(key);
+							list = map.get(key);
 							if (list != null && !list.isEmpty()) {
 								return list.get(0);
 							}
