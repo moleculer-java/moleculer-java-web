@@ -90,7 +90,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 
 			@SuppressWarnings("unused")
 			Action html = ctx -> {
-				
+
 				Tree rsp = new Tree();
 				rsp.put("a", 1);
 				rsp.put("b", true);
@@ -112,7 +112,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 				// Set language/locale of the template
 				Tree meta = rsp.getMeta();
 				meta.put(HttpConstants.META_LOCALE, locale);
-				
+
 				// Set template file (test.xxx)
 				meta.put(HttpConstants.META_TEMPLATE, "test");
 				return rsp;
@@ -135,19 +135,19 @@ public abstract class AbstractTemplateTest extends TestCase {
 			Action first = ctx -> {
 				return ctx.params.put("src", "first");
 			};
-			
+
 			@SuppressWarnings("unused")
 			Action second = ctx -> {
 				return ctx.params.put("src", "second");
 			};
-			
+
 		});
 
 		br.createService(new Service("session") {
 
 			@SuppressWarnings("unused")
 			Action check = ctx -> {
-				Tree meta = ctx.params.getMeta();				
+				Tree meta = ctx.params.getMeta();
 				Tree session = meta.get("$session");
 				Tree storeit = ctx.params.get("storeit");
 				if (storeit != null) {
@@ -155,11 +155,11 @@ public abstract class AbstractTemplateTest extends TestCase {
 				}
 				return session;
 			};
-			
+
 		});
-	
+
 		br.createService(new ChunkedService());
-		
+
 		gw.use(new RequestLogger());
 		gw.use(new Favicon());
 
@@ -167,25 +167,25 @@ public abstract class AbstractTemplateTest extends TestCase {
 		Route r0 = new Route();
 
 		r0.use(new BasicAuthenticator("testuser", "testpassword"));
-		
+
 		r0.addAlias(Alias.GET, "/auth", "math.add");
-	
+
 		r0.use(new ResponseHeaders("Test-Header", "Test-Value"));
-		
+
 		r0.use(new ResponseTime("Response-Time"));
-		
+
 		r0.use(new RateLimiter(10, true));
-		
+
 		r0.use(new ResponseTimeout(700));
-		
+
 		gw.addRoute(r0);
-		
+
 		// REST route
 		Route r1 = new Route();
 
 		r1.addAlias(Alias.GET, "/api/users/:a/any", "math.first");
 		r1.addAlias(Alias.GET, "/api/users/:b/change-password", "math.second");
-		
+
 		r1.addAlias(Alias.GET, "/math/add/:a/:b", "math.add");
 		r1.addAlias(Alias.GET, "/math/addshort/:a", "math.add");
 		r1.use(new CorsHeaders());
@@ -202,14 +202,14 @@ public abstract class AbstractTemplateTest extends TestCase {
 		SessionHandler sessionHandler = new SessionHandler(br);
 		gw.setBeforeCall(sessionHandler.beforeCall());
 		gw.setAfterCall(sessionHandler.afterCall());
-		
+
 		// Chunked test
 		r1.addAlias(Alias.POST, "/chunked/stream", "chunkedService.stream");
 		r1.addAlias(Alias.POST, "/chunked/rest", "chunkedService.rest");
 
 		// Session test
 		r1.addAlias(Alias.POST, "/session", "session.check");
-		
+
 		gw.addRoute(r1);
 
 		// Create route for serving html content
@@ -226,9 +226,9 @@ public abstract class AbstractTemplateTest extends TestCase {
 
 		// ...and a sample Redirector middleware
 		r2.use(new Redirector("/missing", "/index.html", 307));
-		
+
 		gw.addRoute(r2);
-	
+
 		cl = HttpAsyncClients.createDefault();
 		cl.start();
 	}
@@ -296,10 +296,10 @@ public abstract class AbstractTemplateTest extends TestCase {
 		engine.setTemplatePath("www");
 		engine.setDefaultExtension("handlebars");
 		gw.setTemplateEngine(engine);
-		doTemplateTests("handlebars");	
+		doTemplateTests("handlebars");
 		doTemplateTests("handlebars");
 	}
-	
+
 	@Test
 	public void testPebbleTemplateEngine() throws Exception {
 		PebbleEngine engine = new PebbleEngine();
@@ -333,30 +333,30 @@ public abstract class AbstractTemplateTest extends TestCase {
 		doTemplateTests("velocity");
 		doTemplateTests("velocity");
 	}
-	
+
 	@Test
 	public void testChunked() throws Exception {
 		HttpPost post = new HttpPost("http://localhost:3000/chunked/stream");
-		
+
 		ByteArrayOutputStream out = new ByteArrayOutputStream();
 		for (int i = 0; i < 10000; i++) {
 			out.write(i % 128);
 		}
 		ByteArrayInputStream in = new ByteArrayInputStream(out.toByteArray());
-        InputStreamEntity reqEntity = new InputStreamEntity(in, -1, ContentType.APPLICATION_OCTET_STREAM);
-        reqEntity.setChunked(true);
-        post.setEntity(reqEntity);
-        
-        HttpResponse rsp = cl.execute(post, null).get(300, TimeUnit.SECONDS);
-        byte[] bytes = CommonUtils.readFully(rsp.getEntity().getContent());
-        
+		InputStreamEntity reqEntity = new InputStreamEntity(in, -1, ContentType.APPLICATION_OCTET_STREAM);
+		reqEntity.setChunked(true);
+		post.setEntity(reqEntity);
+
+		HttpResponse rsp = cl.execute(post, null).get(300, TimeUnit.SECONDS);
+		byte[] bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+
 		assertEquals(200, rsp.getStatusLine().getStatusCode());
 		for (int i = 0; i < 10000; i++) {
 			assertEquals(i % 128, bytes[i]);
 		}
 
 		post = new HttpPost("http://localhost:3000/chunked/rest");
-		
+
 		out = new ByteArrayOutputStream();
 		Tree t = new Tree();
 		for (int i = 0; i < 10; i++) {
@@ -364,22 +364,22 @@ public abstract class AbstractTemplateTest extends TestCase {
 		}
 		out.write(t.toBinary());
 		in = new ByteArrayInputStream(out.toByteArray());
-        reqEntity = new InputStreamEntity(in, -1, ContentType.APPLICATION_JSON);
-        reqEntity.setChunked(true);
-        post.setEntity(reqEntity);
-        
-        rsp = cl.execute(post, null).get(300, TimeUnit.SECONDS);
-        bytes = CommonUtils.readFully(rsp.getEntity().getContent());
-        
+		reqEntity = new InputStreamEntity(in, -1, ContentType.APPLICATION_JSON);
+		reqEntity.setChunked(true);
+		post.setEntity(reqEntity);
+
+		rsp = cl.execute(post, null).get(300, TimeUnit.SECONDS);
+		bytes = CommonUtils.readFully(rsp.getEntity().getContent());
+
 		assertEquals(200, rsp.getStatusLine().getStatusCode());
 		Tree r = new Tree(bytes);
 		for (int i = 0; i < 10; i++) {
 			assertEquals("value" + i, r.get("key" + i, ""));
-		}		
+		}
 	}
-	
+
 	public static class ChunkedService extends Service {
-		
+
 		public Action stream = ctx -> {
 			ByteArrayOutputStream out = new ByteArrayOutputStream();
 			return ctx.stream.transferTo(out).then(rsp -> {
@@ -390,13 +390,13 @@ public abstract class AbstractTemplateTest extends TestCase {
 				return stream;
 			});
 		};
-		
+
 		public Action rest = ctx -> {
 			return ctx.params;
 		};
-		
+
 	}
-	
+
 	@Test
 	public void testPath() throws Exception {
 		HttpGet get = new HttpGet("http://localhost:3000/api/users/4/any");
@@ -404,7 +404,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 		byte[] bytes = CommonUtils.readFully(rsp.getEntity().getContent());
 		String txt = new String(bytes, StandardCharsets.UTF_8);
 		assertTrue(txt.contains("first"));
-		
+
 		get = new HttpGet("http://localhost:3000/api/users/3/change-password");
 		rsp = cl.execute(get, null).get();
 		System.out.println(rsp.getStatusLine());
@@ -412,18 +412,17 @@ public abstract class AbstractTemplateTest extends TestCase {
 		txt = new String(bytes, StandardCharsets.UTF_8);
 		assertTrue(txt.contains("second"));
 	}
-	
-	
+
 	@Test
 	public void testMiddlewares() throws Exception {
 
 		// Session test
 		Tree t = checkSession(new Tree().put("a", 3));
 		assertEquals(3, t.get("a", 0));
-		
+
 		t = checkSession(new Tree());
 		assertEquals(3, t.get("a", 0));
-		
+
 		t = checkSession(new Tree().put("b", "xyz"));
 		assertEquals(3, t.get("a", 0));
 		assertEquals("xyz", t.get("b", ""));
@@ -458,6 +457,9 @@ public abstract class AbstractTemplateTest extends TestCase {
 		// Invalid page
 		get("invalid.html", 404, "text/html", "<html>NOT FOUND</html>");
 
+		// Space in path
+		get("static/space space/space space space.html", 200, "text/html", "<html>SPACE</html>");
+
 		// Deflated REST
 		get = new HttpGet("http://localhost:3000/math/add/3/4");
 		get.setHeader("Accept-Encoding", "deflate");
@@ -486,10 +488,10 @@ public abstract class AbstractTemplateTest extends TestCase {
 
 		// Invoke authenticated method
 		get("auth", 401, null, null);
-		
-		// Invoke authenticated method with userid/password		
+
+		// Invoke authenticated method with userid/password
 		get = new HttpGet("http://localhost:3000/auth?a=1&b=2");
-		
+
 		String secret = "BASIC " + new String(BASE64.encode("testuser:testpassword".getBytes()));
 		get.setHeader("Authorization", secret);
 		rsp = cl.execute(get, null).get();
@@ -499,18 +501,18 @@ public abstract class AbstractTemplateTest extends TestCase {
 		assertTrue(txt.contains("{"));
 		assertTrue(txt.contains(","));
 		assertTrue(txt.contains("3"));
-		
+
 		// Custom response header test
 		assertEquals("Test-Value", rsp.getLastHeader("Test-Header").getValue());
-		
+
 		// Response time test
 		String time = rsp.getLastHeader("Response-Time").getValue();
 		assertTrue(time.contains("ms"));
 		assertTrue(Integer.parseInt(time.substring(0, time.length() - 2)) >= 0);
-		
+
 		// Rate limiter test
 		Thread.sleep(1500);
-		for (int n = 9; n > -2; n--) { 
+		for (int n = 9; n > -2; n--) {
 			rsp = cl.execute(get, null).get();
 			int remaining = Integer.parseInt(rsp.getLastHeader("X-Rate-Limit-Remaining").getValue());
 			if (n < 0) {
@@ -521,7 +523,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 				assertEquals(n, remaining);
 			}
 		}
-		
+
 		// Response timeout
 		Thread.sleep(1500);
 		get = new HttpGet("http://localhost:3000/auth?a=2&b=-3");
@@ -532,7 +534,8 @@ public abstract class AbstractTemplateTest extends TestCase {
 
 	private final void get(String path, Integer requiredCode, String requiredType, String requiredText)
 			throws Exception {
-		HttpGet get = new HttpGet("http://localhost:3000/" + path);
+		path = "http://localhost:3000/" + path;	
+		HttpGet get = new HttpGet(path.replace(" ", "%20"));
 		HttpResponse rsp = cl.execute(get, null).get();
 		if (requiredCode != null) {
 			assertEquals(requiredCode.intValue(), rsp.getStatusLine().getStatusCode());
@@ -556,7 +559,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 
 		Header[] headers = rsp.getHeaders("Set-Cookie");
 		boolean found = false;
-		for (Header header: headers) {
+		for (Header header : headers) {
 			if (header.getValue().contains("SID=")) {
 				found = true;
 				break;
@@ -565,7 +568,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 		if (!found) {
 			fail("SID cookie not found!");
 		}
-		
+
 		assertEquals(200, rsp.getStatusLine().getStatusCode());
 		byte[] bytes = CommonUtils.readFully(rsp.getEntity().getContent());
 		String html = new String(bytes, StandardCharsets.UTF_8);
@@ -575,7 +578,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 		assertTrue(html.contains("<li>Hello!"));
 		assertTrue(html.contains("<li>Goodbye!"));
 		assertTrue(html.contains("<li>How are you?"));
-		
+
 		// Table
 		assertTrue(html.contains("<h1>header</h1>"));
 		assertTrue(html.contains(name));
@@ -616,31 +619,31 @@ public abstract class AbstractTemplateTest extends TestCase {
 		t = new Tree(new String(bytes, StandardCharsets.UTF_8));
 		assertEquals("11", t.get("a", ""));
 		assertNull(t.get("b"));
-		assertEquals("11", t.get("c", ""));	
-		
+		assertEquals("11", t.get("c", ""));
+
 		get = new HttpGet("http://localhost:3000/math/addshort/11?b=22");
 		rsp = cl.execute(get, null).get();
 		bytes = CommonUtils.readFully(rsp.getEntity().getContent());
 		t = new Tree(new String(bytes, StandardCharsets.UTF_8));
 		assertEquals("11", t.get("a", ""));
 		assertEquals("22", t.get("b", ""));
-		assertEquals("33", t.get("c", ""));	
-		
+		assertEquals("33", t.get("c", ""));
+
 		get = new HttpGet("http://localhost:3000/math/add/11/22?b=33");
 		rsp = cl.execute(get, null).get();
 		bytes = CommonUtils.readFully(rsp.getEntity().getContent());
 		t = new Tree(new String(bytes, StandardCharsets.UTF_8));
 		assertEquals("11", t.get("a", ""));
 		assertEquals("33", t.get("b", ""));
-		assertEquals("44", t.get("c", ""));		
-		
+		assertEquals("44", t.get("c", ""));
+
 		// #2.) Multilanguage (French language)
 		get = new HttpGet("http://localhost:3000/html/fr");
 		rsp = cl.execute(get, null).get();
 		assertEquals(200, rsp.getStatusLine().getStatusCode());
 		bytes = CommonUtils.readFully(rsp.getEntity().getContent());
 		html = new String(bytes, StandardCharsets.UTF_8);
-		
+
 		assertTrue(html.contains("<li>Ok"));
 		assertTrue(html.contains("<li>Bonjour!"));
 		assertTrue(html.contains("<li>Au revoir!"));
@@ -652,7 +655,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 		assertEquals(200, rsp.getStatusLine().getStatusCode());
 		bytes = CommonUtils.readFully(rsp.getEntity().getContent());
 		html = new String(bytes, StandardCharsets.UTF_8);
-		
+
 		assertTrue(html.contains("<li>Ok"));
 		assertTrue(html.contains("<li>Bonjour!"));
 		assertTrue(html.contains("<li>Au revoir!"));
@@ -667,7 +670,7 @@ public abstract class AbstractTemplateTest extends TestCase {
 		HttpResponse rsp = cl.execute(post, null).get();
 		Header[] headers = rsp.getHeaders("Set-Cookie");
 		boolean found = false;
-		for (Header header: headers) {
+		for (Header header : headers) {
 			if (header.getValue().contains("SID=")) {
 				found = true;
 				break;
@@ -680,5 +683,5 @@ public abstract class AbstractTemplateTest extends TestCase {
 		byte[] bytes = CommonUtils.readFully(rsp.getEntity().getContent());
 		return new Tree(bytes);
 	}
-	
+
 }

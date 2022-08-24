@@ -42,9 +42,10 @@ import io.netty.handler.codec.http.HttpVersion;
 import services.moleculer.ServiceBroker;
 import services.moleculer.stream.PacketStream;
 import services.moleculer.web.WebRequest;
+import services.moleculer.web.common.HttpConstants;
 import services.moleculer.web.common.ParserListener;
 
-public class NettyWebRequest implements WebRequest {
+public class NettyWebRequest implements WebRequest, HttpConstants {
 
 	// --- REQUEST VARIABLES ----
 
@@ -74,13 +75,13 @@ public class NettyWebRequest implements WebRequest {
 		method = req.method().name();
 
 		// Get content type
-		contentType = headers.get("Content-Type");
+		contentType = headers.get(CONTENT_TYPE);
 
 		// Get protocol
 		httpVersion = req.protocolVersion();
 		
 		// Get QueryString
-		boolean isConnect = "CONNECT".equals(method);
+		boolean isConnect = CONNECT.equals(method);
 		if (isConnect) {
 			this.query = null;
 			this.path = "/";
@@ -96,14 +97,14 @@ public class NettyWebRequest implements WebRequest {
 		}
 
 		// Has body?
-		if ("GET".equals(method) || "HEAD".equals(method) || "OPTIONS".equals(method) || "TRACE".equals(method) || isConnect) {
+		if (GET.equals(method) || HEAD.equals(method) || OPTIONS.equals(method) || TRACE.equals(method) || isConnect) {
 
 			// Not a stream
 			multipart = false;
 			contentLength = 0;
 			return;
 		}
-		contentLength = headers.getInt("Content-Length", -1);
+		contentLength = headers.getInt(CONTENT_LENGTH, -1);
 		if (contentLength == 0) {
 
 			// Zero Content Length -> not a stream

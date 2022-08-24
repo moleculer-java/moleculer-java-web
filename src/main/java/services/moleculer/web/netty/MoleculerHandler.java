@@ -27,6 +27,8 @@ package services.moleculer.web.netty;
 
 import static services.moleculer.web.common.GatewayUtils.sendError;
 
+import java.net.URLDecoder;
+
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
@@ -93,6 +95,9 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 
 				// Get URI + QueryString
 				path = httpRequest.uri();
+				if (path.indexOf('%') > -1) {
+					path = URLDecoder.decode(path, "UTF8");
+				}
 
 				// Get HTTP headers
 				HttpHeaders httpHeaders = httpRequest.headers();
@@ -108,7 +113,7 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 							WebSocketServerHandshakerFactory factory = new WebSocketServerHandshakerFactory(path, null, true);
 							handshaker = factory.newHandshaker(httpRequest);
 							if (handshaker == null) {
-								WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel());
+								WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel()).addListener(ChannelFutureListener.CLOSE);
 							} else {
 								DefaultFullHttpRequest req = new DefaultFullHttpRequest(httpRequest.protocolVersion(),
 										httpRequest.method(), path, Unpooled.buffer(0), httpHeaders,
@@ -127,6 +132,8 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 												path = path.substring(0, i);
 											}
 											webSocketRegistry.register(path, ctx);
+										} else {
+											ctx.close();
 										}
 									}
 								});

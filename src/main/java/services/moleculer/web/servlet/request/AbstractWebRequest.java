@@ -26,6 +26,7 @@
 package services.moleculer.web.servlet.request;
 
 import java.io.IOException;
+import java.net.URLDecoder;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -37,8 +38,9 @@ import org.synchronoss.cloud.nio.multipart.MultipartUtils;
 
 import services.moleculer.stream.PacketStream;
 import services.moleculer.web.WebRequest;
+import services.moleculer.web.common.HttpConstants;
 
-public abstract class AbstractWebRequest implements WebRequest {
+public abstract class AbstractWebRequest implements WebRequest, HttpConstants {
 
 	// --- REQUEST VARIABLES ----
 
@@ -84,6 +86,9 @@ public abstract class AbstractWebRequest implements WebRequest {
 				requestPath = requestPath.substring(contextPathLength);
 			}
 		}
+		if (requestPath.indexOf('%') > -1) {
+			requestPath = URLDecoder.decode(requestPath, "UTF8");
+		}		
 		path = requestPath;
 		
 		// Headers
@@ -97,7 +102,7 @@ public abstract class AbstractWebRequest implements WebRequest {
 		}
 
 		// Has body?
-		if (!"POST".equals(method) && !"PUT".equals(method)) {
+		if (!POST.equals(method) && !PUT.equals(method)) {
 
 			// Not POST or PUT -> not a stream
 			multipart = false;
