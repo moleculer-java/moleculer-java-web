@@ -185,10 +185,12 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 			// Process close/ping/continue WebSocket frames
 			if (request instanceof CloseWebSocketFrame) {
 				try {
-					handshaker.close(ctx.channel(), ((CloseWebSocketFrame) request).retain());
+					CloseWebSocketFrame frame = (CloseWebSocketFrame) request;
+					handshaker.close(ctx.channel(), frame.retain());
 				} catch (Exception ignored) {
 
 					// Ignore I/O exception
+					
 				} finally {
 
 					// Deregister
@@ -197,7 +199,8 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 				return;
 			}
 			if (request instanceof PingWebSocketFrame) {
-				ctx.channel().writeAndFlush(new PongWebSocketFrame(((PingWebSocketFrame) request).content().retain()));
+				PingWebSocketFrame frame = (PingWebSocketFrame) request;
+				ctx.channel().writeAndFlush(new PongWebSocketFrame(frame.content().retain()));
 				return;
 			}
 			if (request instanceof ContinuationWebSocketFrame) {
@@ -207,7 +210,7 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 			// Process WebSocket message frame
 			if (request instanceof WebSocketFrame) {
 				WebSocketFrame frame = (WebSocketFrame) request;
-				ByteBuf byteBuffer = frame.content().retain();
+				ByteBuf byteBuffer = frame.content();
 				if (byteBuffer == null) {
 					return;
 				}
