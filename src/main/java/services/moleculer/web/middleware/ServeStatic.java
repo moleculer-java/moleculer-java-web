@@ -337,6 +337,13 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 							// Read all bytes of the file
 							byte[] body = readAllBytes(absolutePath);
 
+							// 404 Not Found (directory)
+							if (size == -1 && body.length == 0) {
+								fileCache.remove(relativePath);
+								next.service(req, rsp);
+								return;
+							}
+							
 							// Store in cache
 							cached = new CachedFile();
 							cached.lastChecked = now;
