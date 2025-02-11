@@ -36,16 +36,24 @@ import static services.moleculer.web.common.GatewayUtils.sendError;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.BooleanSupplier;
 import java.util.zip.Deflater;
 
 import io.datatree.Tree;
 import io.datatree.dom.Cache;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelOutboundBuffer;
+import io.netty.channel.ChannelPipeline;
 import services.moleculer.service.Name;
 import services.moleculer.stream.PacketStream;
 import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
+import services.moleculer.web.netty.NettyWebResponse;
 
 /**
  * Service to serve files from within a given root directory. When a file is not
@@ -130,7 +138,7 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 	 * Threads will get some CPU-time.
 	 */
 	protected long packetDelay = 20;
-	
+		
 	// --- CONTENT TYPES ---
 
 	protected final HashMap<String, String> contentTypes = new HashMap<>();
@@ -376,9 +384,36 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 							}
 
 							// Create stream
-							PacketStream stream = broker.createStream();
+							final PacketStream stream;
+							final ScheduledExecutorService scheduler;
+							long max = Math.max(maxCachedFileSize, packetSize);
+							boolean singleThreaded = size > max * 16;
+							if (singleThreaded) {
+								scheduler = Executors.newSingleThreadScheduledExecutor();
+								stream = new PacketStream(broker.getNodeID(), scheduler);							
+							} else {
+								scheduler = null;
+								stream = broker.createStream();
+							}
 							stream.setPacketDelay(packetDelay);
 							stream.setPacketSize(packetSize);
+							
+							BooleanSupplier blocker = null;
+							if (rsp instanceof NettyWebResponse) {
+								ChannelHandlerContext ctx = (ChannelHandlerContext) ((NettyWebResponse) rsp).getInternalObject();
+								ChannelPipeline pipeline = ctx.pipeline();
+								Channel channel = pipeline.channel();
+								ChannelOutboundBuffer out = channel.unsafe().outboundBuffer();
+								final long limit = max * 16;
+								blocker = () -> {
+									long count = out.totalPendingWriteBytes();
+									if (count < 0 || count > Integer.MAX_VALUE) {
+										return false;
+									}
+									return count > limit;
+								};
+							}
+							
 							stream.onPacket((bytes, cause, close) -> {
 								if (bytes != null) {
 									if (size > -1) {
@@ -399,7 +434,13 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 							});
 							
 							// Transfer data
-							stream.transferFrom(getFileURL(absolutePath).openStream());
+							stream.transferFrom(getFileURL(absolutePath).openStream(), blocker).catchError(err -> {
+								logger.warn("Unable stream file!", err);
+							}).then(finished -> {
+								if (scheduler != null) {
+									scheduler.shutdown();
+								}
+							});
 							return;
 						}
 					}
@@ -1009,5 +1050,5 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 	public void setCompressionLevel(int compressionLevel) {
 		this.compressionLevel = compressionLevel;
 	}
-
+	
 }
