@@ -2,3 +2,5 @@
 /log/
 /build/
 /.gradle/
+gradle.properties
+.claude/
