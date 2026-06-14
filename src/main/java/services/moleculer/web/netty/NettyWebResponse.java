@@ -159,6 +159,20 @@ public class NettyWebResponse implements WebResponse, HttpConstants {
 	 */
 	@Override
 	public boolean end() {
+
+		// If no response body has been written (e.g. "204 No Content", or an
+		// action that returned null), the response is complete with zero
+		// length. Emit an explicit "Content-Length: 0" so the message is
+		// properly framed and the keep-alive connection can be reused. Without
+		// it, the block below closes the channel (no Content-Length is present)
+		// but no "Connection: close" header is sent, so pooled HTTP clients
+		// (browsers, Node http.Agent/axios, ...) reuse the socket and fail the
+		// next request with "ECONNRESET" / "socket hang up".
+		if (first.get() && (req == null || req.parser == null)
+				&& (headers == null || headers.get(CONTENT_LENGTH) == null)) {
+			setHeader(CONTENT_LENGTH, "0");
+		}
+
 		sendHeaders();
 		if (req != null && req.parser != null) {
 			try {
