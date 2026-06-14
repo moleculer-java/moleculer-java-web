@@ -35,14 +35,14 @@ import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicReference;
 
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.servlet.ServletRequest;
-import javax.servlet.ServletResponse;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
@@ -209,7 +209,7 @@ public class MoleculerServlet extends HttpServlet {
 					try {
 						
 						// Check classpath
-						Class.forName("javax.servlet.ReadListener");
+						Class.forName("jakarta.servlet.ReadListener");
 
 						@SuppressWarnings("unchecked")
 						Class<ServiceMode> clazz = (Class<ServiceMode>) Class

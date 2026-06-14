@@ -1,0 +1,434 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>com.github.berkesa</groupId>
+	<artifactId>moleculer-java-web</artifactId>
+	<version>2.0.0-SNAPSHOT</version>
+	<packaging>jar</packaging>
+
+	<name>Java API gateway service for Moleculer</name>
+	<description>Non-blocking J2EE and Netty connector with WebSocket and SSL support.</description>
+	<url>https://moleculer-java.github.io/moleculer-java-web/</url>
+	<inceptionYear>2019</inceptionYear>
+
+	<licenses>
+		<license>
+			<name>The MIT License</name>
+			<url>http://www.opensource.org/licenses/MIT</url>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
+
+	<developers>
+		<developer>
+			<id>berkesa</id>
+			<name>Andras Berkes</name>
+			<email>andras.berkes@programmer.net</email>
+		</developer>
+	</developers>
+
+	<scm>
+		<url>https://github.com/moleculer-java/moleculer-java-web</url>
+		<connection>scm:git:https://github.com/moleculer-java/moleculer-java-web.git</connection>
+		<developerConnection>scm:git:git://github.com/moleculer-java/moleculer-java-web.git</developerConnection>
+	</scm>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		<maven.compiler.release>21</maven.compiler.release>
+
+		<!-- Inter-project dependencies (lockstep 2.0.0) -->
+		<moleculer.version>2.0.0-SNAPSHOT</moleculer.version>
+		<datatree-templates.version>2.0.0-SNAPSHOT</datatree-templates.version>
+
+		<!-- Shared dependency versions (kept in sync across the workspace) -->
+		<slf4j.version>2.0.18</slf4j.version>
+		<spring.version>6.2.8</spring.version>
+		<junit.version>5.14.4</junit.version>
+		<openpojo.version>0.9.1</openpojo.version>
+
+		<!-- Web connectors -->
+		<netty.version>4.2.15.Final</netty.version>
+		<jakarta-servlet.version>6.0.0</jakarta-servlet.version>
+		<jakarta-websocket.version>2.1.1</jakarta-websocket.version>
+		<nio-multipart.version>1.1.0</nio-multipart.version>
+
+		<!-- Template engines (lockstep with datatree-templates: freemarker,
+		     mustache, thymeleaf, pebble) -->
+		<freemarker.version>2.3.34</freemarker.version>
+		<mustache.version>0.9.14</mustache.version>
+		<thymeleaf.version>3.1.5.RELEASE</thymeleaf.version>
+		<pebble.version>3.2.4</pebble.version>
+		<handlebars.version>4.5.1</handlebars.version>
+		<velocity.version>2.4.1</velocity.version>
+
+		<!-- Test-only servers / HTTP driver -->
+		<jetty.version>12.0.36</jetty.version>
+		<java-websocket.version>1.6.0</java-websocket.version>
+		<httpclient5.version>5.6.1</httpclient5.version>
+
+		<!-- Build plugin versions (lockstep; see DEPENDENCY-MATRIX.md) -->
+		<maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
+		<maven-surefire-plugin.version>3.5.4</maven-surefire-plugin.version>
+		<maven-source-plugin.version>3.3.1</maven-source-plugin.version>
+		<maven-javadoc-plugin.version>3.11.2</maven-javadoc-plugin.version>
+		<maven-gpg-plugin.version>3.2.7</maven-gpg-plugin.version>
+		<central-publishing-plugin.version>0.9.0</central-publishing-plugin.version>
+	</properties>
+
+	<dependencyManagement>
+		<dependencies>
+
+			<!-- Align all org.junit.* artifacts -->
+			<dependency>
+				<groupId>org.junit</groupId>
+				<artifactId>junit-bom</artifactId>
+				<version>${junit.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+
+		</dependencies>
+	</dependencyManagement>
+
+	<dependencies>
+
+		<!-- ====================== MOLECULER ====================== -->
+
+		<!-- Moleculer core (required) -->
+		<dependency>
+			<groupId>com.github.berkesa</groupId>
+			<artifactId>moleculer-java</artifactId>
+			<version>${moleculer.version}</version>
+		</dependency>
+
+		<!-- Moleculer developer console (optional) -->
+		<dependency>
+			<groupId>com.github.berkesa</groupId>
+			<artifactId>moleculer-java-repl</artifactId>
+			<version>${moleculer.version}</version>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- ====================== LOGGING ====================== -->
+
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>${slf4j.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-jdk14</artifactId>
+			<version>${slf4j.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>log4j-over-slf4j</artifactId>
+			<version>${slf4j.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>jcl-over-slf4j</artifactId>
+			<version>${slf4j.version}</version>
+		</dependency>
+
+		<!-- ====================== CDI / SPRING ====================== -->
+
+		<!-- Spring Framework (used by MoleculerServlet to bootstrap the broker) -->
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-context</artifactId>
+			<version>${spring.version}</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.springframework</groupId>
+					<artifactId>spring-jcl</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
+		<!-- ====================== WEB CONNECTORS ====================== -->
+
+		<!-- Netty (standalone, non-blocking HTTP/WebSocket server) -->
+		<dependency>
+			<groupId>io.netty</groupId>
+			<artifactId>netty-handler</artifactId>
+			<version>${netty.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.netty</groupId>
+			<artifactId>netty-codec-http</artifactId>
+			<version>${netty.version}</version>
+		</dependency>
+
+		<!-- Servlet API (provided by the container: Tomcat 10+, Jetty 12, WildFly) -->
+		<dependency>
+			<groupId>jakarta.servlet</groupId>
+			<artifactId>jakarta.servlet-api</artifactId>
+			<version>${jakarta-servlet.version}</version>
+			<scope>provided</scope>
+		</dependency>
+
+		<!-- Jakarta WebSocket API (provided by the servlet container). The
+		     jakarta.websocket-api artifact ships only the server.* packages and
+		     pulls the base jakarta.websocket.* classes (Session, Endpoint, ...)
+		     from jakarta.websocket-client-api at provided scope (non-transitive),
+		     so the client-api must be declared explicitly for compilation. -->
+		<dependency>
+			<groupId>jakarta.websocket</groupId>
+			<artifactId>jakarta.websocket-api</artifactId>
+			<version>${jakarta-websocket.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>jakarta.websocket</groupId>
+			<artifactId>jakarta.websocket-client-api</artifactId>
+			<version>${jakarta-websocket.version}</version>
+			<scope>provided</scope>
+		</dependency>
+
+		<!-- Streaming multipart/form-data parser (Netty + servlet upload streaming) -->
+		<dependency>
+			<groupId>org.synchronoss.cloud</groupId>
+			<artifactId>nio-multipart-parser</artifactId>
+			<version>${nio-multipart.version}</version>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- ====================== TEMPLATE ENGINES (optional) ====================== -->
+
+		<!-- DataTree template engine (the built-in / reference engine) -->
+		<dependency>
+			<groupId>com.github.berkesa</groupId>
+			<artifactId>datatree-templates</artifactId>
+			<version>${datatree-templates.version}</version>
+		</dependency>
+
+		<!-- FreeMarker -->
+		<dependency>
+			<groupId>org.freemarker</groupId>
+			<artifactId>freemarker</artifactId>
+			<version>${freemarker.version}</version>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- Mustache -->
+		<dependency>
+			<groupId>com.github.spullara.mustache.java</groupId>
+			<artifactId>compiler</artifactId>
+			<version>${mustache.version}</version>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- Thymeleaf -->
+		<dependency>
+			<groupId>org.thymeleaf</groupId>
+			<artifactId>thymeleaf</artifactId>
+			<version>${thymeleaf.version}</version>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- Pebble (re-coordinated com.mitchellbosecke -> io.pebbletemplates) -->
+		<dependency>
+			<groupId>io.pebbletemplates</groupId>
+			<artifactId>pebble</artifactId>
+			<version>${pebble.version}</version>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- Handlebars -->
+		<dependency>
+			<groupId>com.github.jknack</groupId>
+			<artifactId>handlebars</artifactId>
+			<version>${handlebars.version}</version>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- Velocity -->
+		<dependency>
+			<groupId>org.apache.velocity</groupId>
+			<artifactId>velocity-engine-core</artifactId>
+			<version>${velocity.version}</version>
+			<optional>true</optional>
+		</dependency>
+
+		<!-- ====================== TESTS (JUNIT 5 / JUPITER) ====================== -->
+
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- POJO tester (PojoTest) -->
+		<dependency>
+			<groupId>com.openpojo</groupId>
+			<artifactId>openpojo</artifactId>
+			<version>${openpojo.version}</version>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- HTTP driver for the connector tests -->
+		<dependency>
+			<groupId>org.apache.httpcomponents.client5</groupId>
+			<artifactId>httpclient5</artifactId>
+			<version>${httpclient5.version}</version>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- WebSocket client for the WebSocket tests -->
+		<dependency>
+			<groupId>org.java-websocket</groupId>
+			<artifactId>Java-WebSocket</artifactId>
+			<version>${java-websocket.version}</version>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- Embedded Jetty 12 (ee10) servlet + Jakarta WebSocket container for the
+		     BlockingServlet / NonBlockingServlet / JettyWebSocket tests -->
+		<dependency>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-server</artifactId>
+			<version>${jetty.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty.ee10</groupId>
+			<artifactId>jetty-ee10-servlet</artifactId>
+			<version>${jetty.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty.ee10.websocket</groupId>
+			<artifactId>jetty-ee10-websocket-jakarta-server</artifactId>
+			<version>${jetty.version}</version>
+			<scope>test</scope>
+		</dependency>
+
+	</dependencies>
+
+	<build>
+
+		<!-- Reproduce the Gradle resource quirk: bundle only the Favicon
+		     middleware's *.ico from src/main/java; test fixtures live under
+		     src/test/java (templates, html, message bundles, Spring XML). -->
+		<resources>
+			<resource>
+				<directory>src/main/java</directory>
+				<includes>
+					<include>**/*.ico</include>
+				</includes>
+			</resource>
+		</resources>
+		<testResources>
+			<testResource>
+				<directory>src/test/java</directory>
+				<excludes>
+					<exclude>**/*.java</exclude>
+				</excludes>
+			</testResource>
+		</testResources>
+
+		<plugins>
+
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>${maven-compiler-plugin.version}</version>
+			</plugin>
+
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>${maven-surefire-plugin.version}</version>
+				<configuration>
+					<!-- openpojo (PojoTest) uses deep reflection on JDK types (e.g. the
+					     RateLimiter's java.util.concurrent.TimeUnit field); open the
+					     modules it needs so it works under the Java 17+ module system. -->
+					<argLine>--add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.util.concurrent=ALL-UNNAMED --add-opens java.base/java.lang.reflect=ALL-UNNAMED</argLine>
+					<systemPropertyVariables>
+						<java.util.logging.SimpleFormatter.format>%4$-7s %5$s %n</java.util.logging.SimpleFormatter.format>
+					</systemPropertyVariables>
+				</configuration>
+			</plugin>
+
+		</plugins>
+	</build>
+
+	<profiles>
+
+		<!-- Release profile: sources + javadoc + GPG signing + Central Portal publishing -->
+		<profile>
+			<id>release</id>
+			<build>
+				<plugins>
+
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-source-plugin</artifactId>
+						<version>${maven-source-plugin.version}</version>
+						<executions>
+							<execution>
+								<id>attach-sources</id>
+								<goals>
+									<goal>jar-no-fork</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-javadoc-plugin</artifactId>
+						<version>${maven-javadoc-plugin.version}</version>
+						<executions>
+							<execution>
+								<id>attach-javadocs</id>
+								<goals>
+									<goal>jar</goal>
+								</goals>
+							</execution>
+						</executions>
+						<configuration>
+							<doclint>none</doclint>
+						</configuration>
+					</plugin>
+
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-gpg-plugin</artifactId>
+						<version>${maven-gpg-plugin.version}</version>
+						<executions>
+							<execution>
+								<id>sign-artifacts</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>sign</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+
+					<plugin>
+						<groupId>org.sonatype.central</groupId>
+						<artifactId>central-publishing-maven-plugin</artifactId>
+						<version>${central-publishing-plugin.version}</version>
+						<extensions>true</extensions>
+						<configuration>
+							<publishingServerId>central</publishingServerId>
+						</configuration>
+					</plugin>
+
+				</plugins>
+			</build>
+		</profile>
+
+	</profiles>
+
+</project>

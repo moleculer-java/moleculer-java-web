@@ -28,7 +28,7 @@ package services.moleculer.web.servlet.response;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponse;
 
 public class BlockingWebResponse extends AbstractWebResponse {
 

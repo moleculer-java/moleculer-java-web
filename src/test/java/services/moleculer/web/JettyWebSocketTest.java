@@ -25,24 +25,27 @@
  */
 package services.moleculer.web;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 
+import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee10.servlet.ServletHolder;
+import org.eclipse.jetty.ee10.websocket.jakarta.server.config.JakartaWebSocketServletContainerInitializer;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.handler.HandlerCollection;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
-import org.eclipse.jetty.websocket.jsr356.server.deploy.WebSocketServerContainerInitializer;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.handshake.ServerHandshake;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import io.datatree.Promise;
 import io.datatree.Tree;
-import junit.framework.TestCase;
 import services.moleculer.ServiceBroker;
 import services.moleculer.service.Action;
 import services.moleculer.service.Service;
@@ -53,19 +56,19 @@ import services.moleculer.web.servlet.websocket.EndpointDeployer;
 /**
  * "J2EE" server mode (run as Servlet).
  */
-public class JettyWebSocketTest extends TestCase {
+public class JettyWebSocketTest {
 
 	protected Server server;
 	protected ServiceBroker broker;
 	protected ApiGateway gateway;
 	protected WebSocketClient client;
 
-	@SuppressWarnings("deprecation")
-	@Override
+	@BeforeEach
 	protected void setUp() throws Exception {
 
 		// --- TEST SERVLET CONTAINER ---
 
+		AbstractTemplateTest.waitForFreePort(3000);
 		server = new Server();
 		ServerConnector serverConnector = new ServerConnector(server);
 		serverConnector.setHost("127.0.0.1");
@@ -73,7 +76,8 @@ public class JettyWebSocketTest extends TestCase {
 		ServletContextHandler servletContextHandler = new ServletContextHandler(ServletContextHandler.NO_SESSIONS);
 		servletContextHandler.setContextPath("/");
 
-		WebSocketServerContainerInitializer.configureContext(servletContextHandler);
+		// Enable the Jakarta WebSocket (JSR 356) server container on this context
+		JakartaWebSocketServletContainerInitializer.configure(servletContextHandler, null);
 		servletContextHandler.addEventListener(new EndpointDeployer());
 
 		// Create non-blocking servlet
@@ -85,9 +89,7 @@ public class JettyWebSocketTest extends TestCase {
 		servletHolder.setInitParameter("moleculer.inprocess", "false");
 		servletContextHandler.addServlet(servletHolder, "/*");
 
-		HandlerCollection handlerCollection = new HandlerCollection();
-		handlerCollection.addHandler(servletContextHandler);
-		server.setHandler(handlerCollection);
+		server.setHandler(servletContextHandler);
 		server.addConnector(serverConnector);
 
 		server.start();
@@ -195,7 +197,7 @@ public class JettyWebSocketTest extends TestCase {
 
 	// ---------------- STOP ----------------
 
-	@Override
+	@AfterEach
 	protected void tearDown() throws Exception {
 		if (server != null) {
 			server.stop();

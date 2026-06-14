@@ -34,24 +34,24 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 
-import com.mitchellbosecke.pebble.error.LoaderException;
-import com.mitchellbosecke.pebble.loader.Loader;
+import io.pebbletemplates.pebble.error.LoaderException;
+import io.pebbletemplates.pebble.loader.Loader;
 
 import io.datatree.Tree;
+import services.moleculer.web.common.GatewayUtils;
 
 /**
  * Server-side template engine based on Pebble API. Required dependency:
  * 
  * <pre>
- * // https://mvnrepository.com/artifact/com.mitchellbosecke/pebble
- * compile group: 'com.mitchellbosecke', name: 'pebble', version: '2.4.0'
+ * // https://mvnrepository.com/artifact/io.pebbletemplates/pebble
+ * compile group: 'io.pebbletemplates', name: 'pebble', version: '3.2.4'
  * </pre>
  * 
  * @see VelocityEngine
  * @see DataTreeEngine
  * @see FreeMarkerEngine
  * @see HandlebarsEngine
- * @see JadeEngine
  * @see MustacheEngine
  * @see ThymeleafEngine
  */
@@ -59,7 +59,7 @@ public class PebbleEngine extends AbstractTemplateEngine {
 
 	// --- VARIABLES ---
 
-	protected com.mitchellbosecke.pebble.PebbleEngine engine;
+	protected io.pebbletemplates.pebble.PebbleEngine engine;
 
 	protected PebbleLoader loader = new PebbleLoader();
 
@@ -70,7 +70,7 @@ public class PebbleEngine extends AbstractTemplateEngine {
 	}
 
 	protected void buildEngine() {
-		engine = new com.mitchellbosecke.pebble.PebbleEngine.Builder().loader(loader).cacheActive(!reloadable)
+		engine = new io.pebbletemplates.pebble.PebbleEngine.Builder().loader(loader).cacheActive(!reloadable)
 				.executorService(executor).build();
 	}
 
@@ -128,11 +128,11 @@ public class PebbleEngine extends AbstractTemplateEngine {
 
 	// --- GET/SET PEBBLE ENGINE ---
 
-	public com.mitchellbosecke.pebble.PebbleEngine getEngine() {
+	public io.pebbletemplates.pebble.PebbleEngine getEngine() {
 		return engine;
 	}
 
-	public void setEngine(com.mitchellbosecke.pebble.PebbleEngine engine) {
+	public void setEngine(io.pebbletemplates.pebble.PebbleEngine engine) {
 		this.engine = Objects.requireNonNull(engine);
 	}
 
@@ -149,6 +149,11 @@ public class PebbleEngine extends AbstractTemplateEngine {
 		@Override
 		public Reader getReader(String cacheKey) throws LoaderException {
 			return new StringReader(loadResource(templatePath, cacheKey, extension, charset));
+		}
+
+		@Override
+		public boolean resourceExists(String templateName) {
+			return GatewayUtils.isReadable(getAbsolutePath(templatePath, templateName, extension));
 		}
 
 		@Override

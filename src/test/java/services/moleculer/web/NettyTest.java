@@ -32,22 +32,27 @@ import services.moleculer.web.netty.NettyServer;
 public class NettyTest extends AbstractTemplateTest {
 
 	protected NettyServer server;
-	
+
 	@Override
-	protected void setUp() throws Exception {
+	protected void startServer() throws Exception {
 		br = ServiceBroker.builder().monitor(new ConstantMonitor()).build();
-		
+
 		server = new NettyServer();
 		br.createService(server);
-		
-		gw = new ApiGateway();		
+
+		gw = new ApiGateway();
 		br.createService(gw);
-	
+
 		br.start();
-		
+
 		System.out.println(br.getConfig().getCacher());
-		
-		super.setUp();
 	}
-	
+
+	@Override
+	protected void stopServer() throws Exception {
+
+		// The Netty server is registered as a broker service, so it is stopped
+		// together with the broker in AbstractTemplateTest#tearDown().
+	}
+
 }

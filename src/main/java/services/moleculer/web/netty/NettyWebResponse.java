@@ -147,6 +147,17 @@ public class NettyWebResponse implements WebResponse, HttpConstants {
 				throw new IOException("Socket closed!");
 			}
 			sendHeaders();
+
+			// A HEAD response carries the same headers (including Content-Length)
+			// as the equivalent GET, but MUST NOT include a message body
+			// (RFC 9110, section 9.3.2). Emit the headers and drop the body so
+			// HTTP clients that strictly honor the no-body rule (eg.
+			// AsyncHttpClient 3.x) do not leave the kept-alive connection out of
+			// sync with leftover body bytes.
+			if (req != null && HEAD.equals(req.getMethod())) {
+				ctx.flush();
+				return;
+			}
 			ctx.write(Unpooled.wrappedBuffer(bytes));
 			ctx.flush();
 		}

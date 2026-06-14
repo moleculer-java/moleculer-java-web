@@ -30,11 +30,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import javax.servlet.ServletConfig;
-import javax.servlet.ServletContext;
-import javax.servlet.ServletException;
-import javax.websocket.MessageHandler;
-import javax.websocket.Session;
+import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.ServletException;
+import jakarta.websocket.MessageHandler;
+import jakarta.websocket.Session;
 
 import io.datatree.Promise;
 import services.moleculer.ServiceBroker;

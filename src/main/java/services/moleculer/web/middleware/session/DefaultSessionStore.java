@@ -27,8 +27,8 @@ package services.moleculer.web.middleware.session;
 
 import java.util.Map;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpSession;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 
 import io.datatree.Tree;
 import services.moleculer.cacher.Cacher;

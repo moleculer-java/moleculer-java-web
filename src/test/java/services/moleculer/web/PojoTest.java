@@ -25,7 +25,8 @@
  */
 package services.moleculer.web;
 
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import com.openpojo.reflection.PojoClass;
 import com.openpojo.reflection.PojoClassFilter;
@@ -34,21 +35,19 @@ import com.openpojo.validation.ValidatorBuilder;
 import com.openpojo.validation.test.impl.GetterTester;
 import com.openpojo.validation.test.impl.SetterTester;
 
-import junit.framework.TestCase;
-
-public class PojoTest extends TestCase {
+public class PojoTest {
 
 	private Validator validator;
 	private PojoClassFilter filterTestClasses = new FilterTestClasses();
 
-	@Override
-	protected void setUp() throws Exception {
+	@BeforeEach
+	public void setUp() throws Exception {
 		validator = ValidatorBuilder.create().with(new SetterTester()).with(new GetterTester()).build();
 	}
 
 	@Test
 	public void testProductionClasses() throws Exception {
-		try {		
+		try {
 			validator.validate("services.moleculer.web.middleware", filterTestClasses);
 			validator.validate("services.moleculer.web.template", filterTestClasses);
 		} catch (Exception e) {

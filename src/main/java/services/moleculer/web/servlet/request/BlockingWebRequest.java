@@ -28,8 +28,8 @@ package services.moleculer.web.servlet.request;
 import java.io.IOException;
 import java.io.InputStream;
 
-import javax.servlet.ServletInputStream;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.ServletInputStream;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.synchronoss.cloud.nio.multipart.BlockingIOAdapter.ParserToken;
 import org.synchronoss.cloud.nio.multipart.BlockingIOAdapter.Part;

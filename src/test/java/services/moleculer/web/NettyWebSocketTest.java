@@ -1,5 +1,8 @@
 package services.moleculer.web;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
@@ -7,11 +10,12 @@ import java.net.URL;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.handshake.ServerHandshake;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import io.datatree.Promise;
 import io.datatree.Tree;
-import junit.framework.TestCase;
 import services.moleculer.ServiceBroker;
 import services.moleculer.config.ServiceBrokerConfig;
 import services.moleculer.service.Action;
@@ -22,18 +26,19 @@ import services.moleculer.web.router.Route;
 /**
  * "STANDALONE" server mode (without J2EE server / servlet container). Using Netty.
  */
-public class NettyWebSocketTest extends TestCase {
+public class NettyWebSocketTest {
 
 	protected NettyServer server;
 	protected ServiceBroker broker;
 	protected ApiGateway gateway;
 	protected WebSocketClient client;
 
-	@Override
+	@BeforeEach
 	protected void setUp() throws Exception {
 
 		// --- SERVICE BROKER ---
-		
+
+		AbstractTemplateTest.waitForFreePort(3000);
 		ServiceBrokerConfig cfg = new ServiceBrokerConfig();
 		// cfg.setTransporter(new NatsTransporter());
 		// ...
@@ -43,20 +48,20 @@ public class NettyWebSocketTest extends TestCase {
 		// broker.repl();
 
 		// --- NETTY WEBSERVER ---
-		
+
 		// Create standalone Netty server
 		NettyServer server = new NettyServer();
 		broker.createService(server);
 
 		// --- ADD A ROUTE TO REST SERVICE ---
-		
+
 		Route route = new Route();
 		route.addAlias("/test", "test.send");
 
 		gateway = new ApiGateway();
 		gateway.setDebug(true);
 		gateway.addRoute(route);
-		
+
 		gateway.setWebSocketFilter(new WebSocketFilter() {
 
 			@Override
@@ -77,11 +82,11 @@ public class NettyWebSocketTest extends TestCase {
 				});
 			};
 		});
-		
+
 		broker.createService(gateway);
-		
+
 		// --- TEST MOLCEULER SERVICE ---
-			
+
 		// Moleculer Service, which sends a websocket message
 		broker.createService(new Service("test") {
 
@@ -103,11 +108,11 @@ public class NettyWebSocketTest extends TestCase {
 		broker.start();
 
 		// --- TEST CLIENT ---
-		
+
 		// Emulate web browser (see "websocket.js")
 		URI uri = new URI("ws://localhost:3000/ws/test?key=value");
 		client = new WebSocketClient(uri, new Draft_6455()) {
-			
+
 			@Override
 			public void onMessage(String message) {
 				System.out.println("MSG RECEIVED: " + message);
@@ -143,14 +148,14 @@ public class NettyWebSocketTest extends TestCase {
 		Thread.sleep(1000);
 		URL url = new URL("http://localhost:3000/test?key=value");
 		HttpURLConnection c = (HttpURLConnection) url.openConnection();
-		assertEquals(200, c.getResponseCode());		
+		assertEquals(200, c.getResponseCode());
 		Thread.sleep(500);
 		assertEquals("123", msg);
 	}
 
 	// ---------------- STOP ----------------
 
-	@Override
+	@AfterEach
 	protected void tearDown() throws Exception {
 		if (broker != null) {
 			broker.stop();

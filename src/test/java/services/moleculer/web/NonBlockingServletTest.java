@@ -25,12 +25,12 @@
  */
 package services.moleculer.web;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.eclipse.jetty.ee10.servlet.ServletContextHandler;
+import org.eclipse.jetty.ee10.servlet.ServletHolder;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
-import org.eclipse.jetty.server.handler.HandlerCollection;
-import org.eclipse.jetty.server.session.SessionHandler;
-import org.eclipse.jetty.servlet.ServletContextHandler;
-import org.eclipse.jetty.servlet.ServletHolder;
 
 import services.moleculer.web.servlet.MoleculerServlet;
 import services.moleculer.web.servlet.service.AsyncService;
@@ -38,46 +38,34 @@ import services.moleculer.web.servlet.service.AsyncService;
 public class NonBlockingServletTest extends AbstractTemplateTest {
 
 	protected Server server;
-	
+
 	@Override
-	protected void setUp() throws Exception {
-		try {
-			if (server != null) {
-				server.stop();
-				server = null;
-			}
-		} catch (Exception ignored) {
-		}
+	protected void startServer() throws Exception {
 		server = new Server();
 		ServerConnector pContext = new ServerConnector(server);
 		pContext.setHost("127.0.0.1");
 		pContext.setPort(3000);
 		ServletContextHandler publicContext = new ServletContextHandler(ServletContextHandler.SESSIONS);
-		publicContext.setSessionHandler(new SessionHandler());
 		publicContext.setContextPath("/");
-		
+
 		// Create non-blocking servlet
 		MoleculerServlet sc = new MoleculerServlet();
 		ServletHolder sh = new ServletHolder(sc);
 		sh.setInitParameter("moleculer.config", "/services/moleculer/web/moleculer.config.xml");
 		sh.setInitParameter("moleculer.force.blocking", "false");
 		publicContext.addServlet(sh, "/*");
-		HandlerCollection collection = new HandlerCollection();
-		collection.addHandler(publicContext);
-		server.setHandler(collection);
+		server.setHandler(publicContext);
 		server.addConnector(pContext);
 		server.start();
-				
+
 		assertEquals(AsyncService.class, sc.getServiceMode().getClass());
-		
+
 		br = sc.getBroker();
 		gw = sc.getGateway();
-		
-		super.setUp();
 	}
 
 	@Override
-	protected void tearDown() throws Exception {
+	protected void stopServer() throws Exception {
 		try {
 			if (server != null) {
 				server.stop();
@@ -85,11 +73,7 @@ public class NonBlockingServletTest extends AbstractTemplateTest {
 			}
 		} catch (Exception ignored) {
 		}
-		try {
-			Thread.sleep(1000);
-		} catch (Exception ignored) {
-		}
-		super.tearDown();
+		Thread.sleep(1000);
 	}
-	
+
 }

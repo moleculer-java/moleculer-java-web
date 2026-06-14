@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Sample (Netty gateway on :8080)",
+      "request": "launch",
+      "mainClass": "services.moleculer.web.Sample",
+      "projectName": "moleculer-java-web",
+      "args": ""
+    }
+  ]
+}

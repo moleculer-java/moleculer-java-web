@@ -27,6 +27,7 @@ package services.moleculer.web.template;
 
 import static services.moleculer.web.common.HttpConstants.META_LOCALE;
 
+import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Locale;
@@ -42,7 +43,6 @@ import org.thymeleaf.context.IContext;
 import org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver;
 import org.thymeleaf.templateresource.ITemplateResource;
 import org.thymeleaf.templateresource.StringTemplateResource;
-import org.thymeleaf.util.FastStringWriter;
 
 import io.datatree.Tree;
 
@@ -58,7 +58,6 @@ import io.datatree.Tree;
  * @see DataTreeEngine
  * @see FreeMarkerEngine
  * @see HandlebarsEngine
- * @see JadeEngine
  * @see MustacheEngine
  * @see PebbleEngine
  */
@@ -89,7 +88,7 @@ public class ThymeleafEngine extends AbstractTemplateEngine {
 
 	@Override
 	public byte[] transform(String templatePath, Tree data) throws Exception {
-		FastStringWriter writer = new FastStringWriter(writeBufferSize);
+		StringWriter writer = new StringWriter(writeBufferSize);
 		engine.process(templatePath, new TreeContext(data), writer);
 		return writer.toString().getBytes(charset);
 	}
