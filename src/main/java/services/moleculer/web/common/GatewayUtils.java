@@ -98,7 +98,11 @@ public final class GatewayUtils implements HttpConstants {
 			}
 			Tree json = error.toTree();
 			byte[] body = json.toBinary();
-			rsp.setStatus(error.getCode());
+			int statusCode = error.getCode();
+			if (statusCode < 100 || statusCode > 599) {
+				statusCode = 500;
+			}
+			rsp.setStatus(statusCode);
 			rsp.setHeader(CACHE_CONTROL, NO_CACHE);
 			rsp.setHeader(CONTENT_TYPE, CONTENT_TYPE_JSON);
 			rsp.setHeader(CONTENT_LENGTH, Integer.toString(body.length));
