@@ -35,7 +35,7 @@ mvn test -Dtest='NettyTest#testMiddlewares'
 
 ### Build gotchas
 
-- **Resource quirk (reproduced from the old Gradle build):** only `**/*.ico` files under `src/main/java`
+- **Resource quirk:** only `**/*.ico` files under `src/main/java`
   are bundled into the jar (used by the `Favicon` middleware) — see `<build><resources>` in `pom.xml`.
   Test fixtures (templates, html, message bundles, `moleculer.config.xml`) live under `src/test/java` and
   are picked up via `<testResources>`.
@@ -103,8 +103,7 @@ Every middleware extends `HttpMiddleware` (which is itself a Moleculer `Service`
 ### Template engines (`services.moleculer.web.template`)
 
 Pluggable server-side HTML rendering, all extending `AbstractTemplateEngine`: DataTree, FreeMarker,
-Mustache, Thymeleaf, Pebble, Handlebars, Velocity. (The legacy **Jade** engine was dropped in 2.0.0 — the
-`jade4j` library is dead.) Set globally on the gateway (`setTemplateEngine`) or per route. Each engine's
+Mustache, Thymeleaf, Pebble, Handlebars, Velocity. Set globally on the gateway (`setTemplateEngine`) or per route. Each engine's
 library is an `<optional>` dependency in `pom.xml`, so a consumer only needs the one it actually uses.
 
 ### WebSockets
