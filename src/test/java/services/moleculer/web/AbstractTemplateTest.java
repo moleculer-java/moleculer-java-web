@@ -63,9 +63,11 @@ import services.moleculer.service.Action;
 import services.moleculer.service.Service;
 import services.moleculer.stream.PacketStream;
 import services.moleculer.web.common.HttpConstants;
+import services.moleculer.web.middleware.AbstractRequestProcessor;
 import services.moleculer.web.middleware.BasicAuthenticator;
 import services.moleculer.web.middleware.CorsHeaders;
 import services.moleculer.web.middleware.Favicon;
+import services.moleculer.web.middleware.HttpMiddleware;
 import services.moleculer.web.middleware.NotFound;
 import services.moleculer.web.middleware.RateLimiter;
 import services.moleculer.web.middleware.Redirector;
@@ -209,6 +211,30 @@ public abstract class AbstractTemplateTest {
 
 		gw.use(new RequestLogger());
 		gw.use(new Favicon());
+
+		// Body-less-204 endpoint used by the keep-alive regression test
+		// (NettyTest#testKeepAliveAfterNoContent). It emits a 204 with a header
+		// but no Content-Length, exercising NettyWebResponse.end()'s framing
+		// guard directly. Path-gated, so it is inert for every other test.
+		gw.use(new HttpMiddleware() {
+
+			@Override
+			public RequestProcessor install(RequestProcessor next, Tree config) {
+				return new AbstractRequestProcessor(next) {
+
+					@Override
+					public void service(WebRequest req, WebResponse rsp) throws Exception {
+						if ("/nocontent".equals(req.getPath())) {
+							rsp.setStatus(204);
+							rsp.setHeader("X-Test", "nocontent");
+							rsp.end();
+							return;
+						}
+						next.service(req, rsp);
+					}
+				};
+			}
+		});
 
 		// Create authenticated route
 		Route r0 = new Route();

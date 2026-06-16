@@ -170,6 +170,18 @@ public class NettyWebResponse implements WebResponse, HttpConstants {
 	 */
 	@Override
 	public boolean end() {
+
+		// Body-less responses (eg. 204 No Content, or an action returning null)
+		// that never set a Content-Length would otherwise fall into the close
+		// branch below and reset the (silently kept-alive) socket, breaking
+		// pooled HTTP/1.1 clients with ECONNRESET. Emit an explicit
+		// Content-Length: 0 so the response stays framed and the connection is
+		// reused. first.get() == true means send() never wrote a body; the
+		// parser check leaves multipart requests to the branch below.
+		if (first.get() && (req == null || req.parser == null)
+				&& (headers == null || headers.get(CONTENT_LENGTH) == null)) {
+			setHeader(CONTENT_LENGTH, "0");
+		}
 		sendHeaders();
 		if (req != null && req.parser != null) {
 			try {
