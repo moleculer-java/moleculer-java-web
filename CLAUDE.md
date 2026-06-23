@@ -18,7 +18,7 @@ structure from the datatree library that the whole Moleculer ecosystem uses).
 
 Maven build (one `pom.xml`); bytecode target **Java 17** (`<maven.compiler.release>17</maven.compiler.release>`),
 build JDK 17+ (JDK 25 in use), minimum consumer runtime **JDK 17** (Spring 6 direct dep),
-compiled with `javac`. Version is **2.0.0** (use `2.0.0-SNAPSHOT` while developing).
+compiled with `javac`. Version is **2.0.0**.
 
 ```bash
 mvn clean verify             # compile + run all tests
