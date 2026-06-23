@@ -55,6 +55,14 @@ public class AsyncService extends ServiceMode {
 			// Start async
 			async = request.startAsync(request, response);
 
+			// Cap how long a half-received request may keep the async context
+			// open (0 = leave the container's default). Defends against slow /
+			// incomplete uploads that would otherwise hang until the container
+			// default (or forever, if the container has none).
+			if (asyncTimeout > 0) {
+				async.setTimeout(asyncTimeout);
+			}
+
 			// Process request
 			gateway.service(new NonBlockingWebRequest(broker, async), new NonBlockingWebResponse(async));
 

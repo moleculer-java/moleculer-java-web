@@ -39,11 +39,27 @@ public abstract class ServiceMode {
 	protected final ServiceBroker broker;
 	protected final ApiGateway gateway;
 
+	/**
+	 * Async request timeout in MILLISECONDS (0 = leave the servlet container's
+	 * default untouched). Used only by the non-blocking {@code AsyncService} to
+	 * cap how long a half-received request may keep an async context open
+	 * (Slowloris defence-in-depth); ignored in blocking mode.
+	 */
+	protected long asyncTimeout = 0;
+
 	public ServiceMode(ServiceBroker broker, ApiGateway gateway) {
 		this.broker = broker;
-		this.gateway = gateway;		
+		this.gateway = gateway;
 	}
 
 	public abstract void service(HttpServletRequest request, HttpServletResponse response) throws Exception;
+
+	public void setAsyncTimeout(long asyncTimeout) {
+		this.asyncTimeout = asyncTimeout;
+	}
+
+	public long getAsyncTimeout() {
+		return asyncTimeout;
+	}
 
 }

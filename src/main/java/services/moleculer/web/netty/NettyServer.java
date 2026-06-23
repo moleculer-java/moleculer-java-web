@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.ManagerFactoryParameters;
@@ -65,6 +66,7 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.util.SimpleTrustManagerFactory;
+import io.netty.handler.timeout.IdleStateHandler;
 import services.moleculer.ServiceBroker;
 import services.moleculer.eventbus.Listener;
 import services.moleculer.eventbus.Subscribe;
@@ -88,6 +90,18 @@ public class NettyServer extends Service {
 	protected ChannelHandler handler;
 
 	protected int webSocketCleanupSeconds = 15;
+
+	/**
+	 * Maximum time (in SECONDS) a client may stay silent while the server is
+	 * still waiting for (the rest of) an HTTP request. When no inbound data
+	 * arrives within this period the connection is closed. This defends against
+	 * Slowloris-style attacks that open many connections and send incomplete
+	 * requests (half a header block or half a body) to exhaust file descriptors
+	 * and memory. <b>0 = disabled</b> (default, no behaviour change). The timer
+	 * is removed once a connection is upgraded to a WebSocket (long-lived idle
+	 * WebSockets are handled by the {@link NettyWebSocketRegistry} instead).
+	 */
+	protected int readTimeout = 0;
 
 	protected boolean shutDownThreadPools = true;
 
@@ -190,6 +204,13 @@ public class NettyServer extends Service {
 					ChannelPipeline p = ch.pipeline();
 					if (useSSL) {
 						p.addLast("ssl", createSslHandler(ch));
+					}
+					if (readTimeout > 0) {
+
+						// Close connections that stay silent while a request is
+						// still being read (Slowloris protection); reader-idle
+						// only, so it does not interfere with slow responses.
+						p.addLast("idle", new IdleStateHandler(readTimeout, 0, 0, TimeUnit.SECONDS));
 					}
 					p.addLast("decoder", new HttpRequestDecoder());
 					p.addLast("handler", new MoleculerHandler(gateway, broker, webSocketRegistry));
@@ -348,6 +369,24 @@ public class NettyServer extends Service {
 
 	public void setWebSocketCleanupSeconds(int webSocketCleanupSeconds) {
 		this.webSocketCleanupSeconds = webSocketCleanupSeconds;
+	}
+
+	public int getReadTimeout() {
+		return readTimeout;
+	}
+
+	/**
+	 * Sets the read (reader-idle) timeout in SECONDS. When a client opens a
+	 * connection but does not finish sending its request within this period of
+	 * silence, the connection is closed. Set a small value (e.g. 30-60) on
+	 * Internet-facing standalone deployments to mitigate Slowloris-style DoS;
+	 * 0 disables the timeout (default).
+	 *
+	 * @param readTimeout
+	 *            read timeout in seconds (0 = disabled)
+	 */
+	public void setReadTimeout(int readTimeout) {
+		this.readTimeout = readTimeout;
 	}
 
 	public int getPort() {

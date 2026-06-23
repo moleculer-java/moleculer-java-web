@@ -62,6 +62,36 @@ public class NonBlockingWebRequest extends AbstractWebRequest {
 
 	protected void createStream(ServiceBroker broker, AsyncContext async) throws IOException {
 		stream = broker.createStream();
+
+		// Abort the body stream if the async request times out or errors before
+		// the client finishes sending it (Slowloris defence-in-depth); without
+		// this the downstream action would keep waiting on a half-open stream.
+		async.addListener(new AsyncListener() {
+
+			@Override
+			public final void onTimeout(AsyncEvent event) throws IOException {
+				stream.sendError(new IOException("Async read timeout: the client did not finish sending the request."));
+			}
+
+			@Override
+			public final void onError(AsyncEvent event) throws IOException {
+				Throwable cause = event.getThrowable();
+				stream.sendError(cause != null ? cause : new IOException("Async I/O error while reading the request."));
+			}
+
+			@Override
+			public final void onComplete(AsyncEvent event) throws IOException {
+
+				// Do nothing
+			}
+
+			@Override
+			public final void onStartAsync(AsyncEvent event) throws IOException {
+
+				// Do nothing
+			}
+
+		});
 		ServletInputStream in = req.getInputStream();
 		in.setReadListener(new ReadListener() {
 

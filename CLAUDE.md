@@ -16,7 +16,8 @@ structure from the datatree library that the whole Moleculer ecosystem uses).
 
 ## Build / test / run
 
-Maven build (one `pom.xml`); baseline is **JDK 21** (`<maven.compiler.release>21</maven.compiler.release>`),
+Maven build (one `pom.xml`); bytecode target **Java 17** (`<maven.compiler.release>17</maven.compiler.release>`),
+build JDK 17+ (JDK 25 in use), minimum consumer runtime **JDK 17** (Spring 6 direct dep),
 compiled with `javac`. Version is **2.0.0** (use `2.0.0-SNAPSHOT` while developing).
 
 ```bash
@@ -54,13 +55,21 @@ either. The flow:
 1. **Connector** adapts the native request to `WebRequest`/`WebResponse` and calls `ApiGateway.service(...)`:
    - **Netty** — `NettyServer` builds the channel pipeline; `MoleculerHandler` wraps requests as
      `NettyWebRequest`/`NettyWebResponse`. Standalone, non-blocking, supports SSL (JDK or OpenSSL) and WebSocket.
+     **Slowloris hardening:** `NettyServer.setReadTimeout(seconds)` (off by default, `0`) inserts an
+     `IdleStateHandler` so connections that stall mid-request are closed; `MoleculerHandler`'s
+     `userEventTriggered`/`channelInactive`/`exceptionCaught` release the half-open `req.stream`, and the idle
+     handler is removed from the pipeline on a successful WebSocket upgrade (long-lived sockets are managed by
+     `NettyWebSocketRegistry` instead). See `NettySlowRequestTest`.
    - **Servlet** — `MoleculerServlet` boots a Spring 6 context (Spring Boot via `moleculer.application`, or XML
      via `moleculer.config`), finds the `ApiGateway`, and auto-detects **blocking vs non-blocking** mode
      (`AsyncService` when async I/O is available — detected via `Class.forName("jakarta.servlet.ReadListener")`
      — else `BlockingService`; falls back to blocking on `IllegalStateException`, and forces blocking on WebLogic).
      The servlet/WebSocket layer is **Jakarta** (`jakarta.servlet.*` / `jakarta.websocket.*`); the J2EE
      WebSocket connector (`ServletWebSocketRegistry` + the `websocket` package) targets the JSR-356 API
-     supplied by a Jakarta container (e.g. Jetty 12 ee10).
+     supplied by a Jakarta container (e.g. Jetty 12 ee10). Request read timeouts are owned by the container;
+     for non-blocking mode the `moleculer.async.timeout` init-param (ms, `0` = container default) caps the
+     async context (`ServiceMode.setAsyncTimeout` → `AsyncContext.setTimeout`), and `NonBlockingWebRequest`
+     registers an `AsyncListener` that aborts the body stream on timeout/error.
 
 2. **`ApiGateway.service(...)`** resolves the request to a `Mapping`:
    - looks in the **static mapping cache** (exact `METHOD path` key, e.g. `GET /user`), then the

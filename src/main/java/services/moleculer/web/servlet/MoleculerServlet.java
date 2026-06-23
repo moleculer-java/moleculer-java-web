@@ -63,6 +63,8 @@ import services.moleculer.web.servlet.websocket.ServletWebSocketRegistry;
  * <li>moleculer.config = For XML-based Spring Context, the path of the config
  * <li>moleculer.force.blocking = Force blocking mode (default = auto)
  * <li>moleculer.blocking.timeout = Timeout in blocking mode (default = 0)
+ * <li>moleculer.async.timeout = Async request timeout in msec, non-blocking
+ * mode (0 = use container default; default = 0)
  * <li>moleculer.inprocess = Inprocess execution blocking mode (default = true)
  * <li>moleculer.check.period = WebSocket check period (sec, default = 15)
  * </ul>
@@ -97,6 +99,8 @@ public class MoleculerServlet extends HttpServlet {
 	// --- OTHER VARIABLES ---
 
 	protected long timeout;
+
+	protected long asyncTimeout;
 
 	// --- INIT / START ---
 
@@ -189,7 +193,14 @@ public class MoleculerServlet extends HttpServlet {
 			if (timeout < 1) {
 				timeout = 60000 * 3;
 			}
-			
+
+			// Async timeout (only in non-blocking mode; 0 = container default)
+			String asyncTimeoutParam = config.getInitParameter("moleculer.async.timeout");
+			asyncTimeout = asyncTimeoutParam == null ? 0 : Long.parseLong(asyncTimeoutParam);
+			if (asyncTimeout < 0) {
+				asyncTimeout = 0;
+			}
+
 			// Get or autodetect service mode
 			if (serviceMode == null) {
 				String forceBlocking = config.getInitParameter("moleculer.force.blocking");
@@ -225,6 +236,9 @@ public class MoleculerServlet extends HttpServlet {
 					serviceMode = new BlockingService(broker, gateway, timeout);
 				}
 			}
+
+			// Apply async timeout (no-op in blocking mode)
+			serviceMode.setAsyncTimeout(asyncTimeout);
 
 			// Set in-process (not real) executor (vs. Join-Fork Executor)
 			String inprocess = config == null ? null : config.getInitParameter("moleculer.inprocess");

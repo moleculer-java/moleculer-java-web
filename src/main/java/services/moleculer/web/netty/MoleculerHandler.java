@@ -27,6 +27,7 @@ package services.moleculer.web.netty;
 
 import static services.moleculer.web.common.GatewayUtils.sendError;
 
+import java.io.IOException;
 import java.net.URLDecoder;
 
 import io.netty.buffer.ByteBuf;
@@ -51,6 +52,7 @@ import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
+import io.netty.handler.timeout.IdleStateEvent;
 import services.moleculer.ServiceBroker;
 import services.moleculer.web.ApiGateway;
 
@@ -127,6 +129,14 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 									@Override
 									public void operationComplete(ChannelFuture future) throws Exception {
 										if (future.isSuccess()) {
+
+											// A WebSocket is intentionally long-lived and may stay
+											// idle for long periods; the request read-timeout must
+											// not close it. Liveness is handled separately by the
+											// NettyWebSocketRegistry (webSocketCleanupSeconds).
+											if (ctx.pipeline().get("idle") != null) {
+												ctx.pipeline().remove("idle");
+											}
 											int i = path.indexOf('?');
 											if (i > 0) {
 												path = path.substring(0, i);
@@ -239,6 +249,88 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 				}
 			} else {
 				broker.getLogger(MoleculerHandler.class).error("Unable to process request!", cause);
+			}
+		}
+	}
+
+	// --- CONNECTION TIMEOUT / SHUTDOWN HANDLING ---
+
+	/**
+	 * Closes connections that go silent while an HTTP request is still being
+	 * read. The {@link io.netty.handler.timeout.IdleStateHandler} (added by the
+	 * {@code NettyServer} only when a read-timeout is configured) fires a
+	 * reader-idle event; we abort any half-received request body and close the
+	 * channel. This is the Slowloris defence. Established WebSockets never reach
+	 * this code, because the idle handler is removed from the pipeline on a
+	 * successful handshake.
+	 */
+	@Override
+	public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+		if (evt instanceof IdleStateEvent) {
+			if (isRequestStreamOpen()) {
+				abortRequestStream(new IOException("Read timeout: the client did not finish sending the request."));
+			}
+			ctx.close();
+			return;
+		}
+		super.userEventTriggered(ctx, evt);
+	}
+
+	/**
+	 * Releases the half-open request stream when the connection drops in the
+	 * middle of an upload, so a waiting action does not leak the stream. Runs on
+	 * every connection close, so it allocates the exception only when there is
+	 * actually an in-flight body stream to abort (the abnormal case) - a normal,
+	 * completed request takes the cheap, allocation-free path.
+	 */
+	@Override
+	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+		if (isRequestStreamOpen()) {
+			abortRequestStream(new IOException("Connection closed before the request was fully received."));
+		}
+		super.channelInactive(ctx);
+	}
+
+	/**
+	 * Aborts the request stream and closes the channel on a transport-level
+	 * error (e.g. an HTTP decoder failure on a malformed request, or a reset by
+	 * the peer). Closing silently here also avoids log-flooding from malformed
+	 * or malicious clients.
+	 */
+	@Override
+	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+		abortRequestStream(cause);
+		ctx.close();
+	}
+
+	/**
+	 * Cheap, allocation-free check for an in-flight request body stream that is
+	 * still open. Used to skip building an exception on the common path (no body,
+	 * or the request already completed).
+	 *
+	 * @return true if there is an open request body stream to abort
+	 */
+	protected boolean isRequestStreamOpen() {
+		NettyWebRequest r = req;
+		return r != null && r.stream != null && !r.stream.isClosed();
+	}
+
+	/**
+	 * Sends an error to the in-flight request body stream (if any), releasing
+	 * downstream resources. Idempotent: {@code PacketStream.sendError} is a
+	 * no-op once the stream is closed.
+	 *
+	 * @param cause
+	 *            the reason the request was aborted (never null)
+	 */
+	protected void abortRequestStream(Throwable cause) {
+		NettyWebRequest r = req;
+		if (r != null && r.stream != null && cause != null && !r.stream.isClosed()) {
+			try {
+				r.stream.sendError(cause);
+			} catch (Throwable ignored) {
+
+				// The action may have already finished reading the body.
 			}
 		}
 	}
