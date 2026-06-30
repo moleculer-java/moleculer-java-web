@@ -64,7 +64,7 @@
 		<mustache.version>0.9.14</mustache.version>
 		<thymeleaf.version>3.1.5.RELEASE</thymeleaf.version>
 		<pebble.version>3.2.4</pebble.version>
-		<handlebars.version>4.5.1</handlebars.version>
+		<handlebars.version>4.5.2</handlebars.version>
 		<velocity.version>2.4.1</velocity.version>
 
 		<!-- Test-only servers / HTTP driver -->
