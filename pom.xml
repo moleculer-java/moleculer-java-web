@@ -53,7 +53,7 @@
 		<openpojo.version>0.9.1</openpojo.version>
 
 		<!-- Web connectors -->
-		<netty.version>4.2.15.Final</netty.version>
+		<netty.version>4.2.16.Final</netty.version>
 		<jakarta-servlet.version>6.0.0</jakarta-servlet.version>
 		<jakarta-websocket.version>2.1.1</jakarta-websocket.version>
 		<nio-multipart.version>1.1.0</nio-multipart.version>
