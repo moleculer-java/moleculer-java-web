@@ -70,7 +70,7 @@
 		<!-- Test-only servers / HTTP driver -->
 		<jetty.version>12.0.36</jetty.version>
 		<java-websocket.version>1.6.0</java-websocket.version>
-		<httpclient5.version>5.6.1</httpclient5.version>
+		<httpclient5.version>5.6.3</httpclient5.version>
 
 		<!-- Build plugin versions (lockstep; see DEPENDENCY-MATRIX.md) -->
 		<maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
