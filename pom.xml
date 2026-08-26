@@ -7,7 +7,7 @@
 
 	<groupId>com.github.berkesa</groupId>
 	<artifactId>moleculer-java-web</artifactId>
-	<version>2.0.0</version>
+	<version>2.1.0</version>
 	<packaging>jar</packaging>
 
 	<name>Java API gateway service for Moleculer</name>
@@ -42,18 +42,18 @@
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<maven.compiler.release>17</maven.compiler.release>
 
-		<!-- Inter-project dependencies (lockstep 2.0.0) -->
-		<moleculer.version>2.0.0</moleculer.version>
-		<datatree-templates.version>2.0.0</datatree-templates.version>
+		<!-- Inter-project dependencies (lockstep 2.1.0) -->
+		<moleculer.version>2.1.0</moleculer.version>
+		<datatree-templates.version>2.1.0</datatree-templates.version>
 
 		<!-- Shared dependency versions (kept in sync across the workspace) -->
 		<slf4j.version>2.0.18</slf4j.version>
-		<spring.version>6.2.8</spring.version>
+		<spring.version>6.2.19</spring.version>
 		<junit.version>5.14.4</junit.version>
 		<openpojo.version>0.9.1</openpojo.version>
 
 		<!-- Web connectors -->
-		<netty.version>4.2.15.Final</netty.version>
+		<netty.version>4.2.17.Final</netty.version>
 		<jakarta-servlet.version>6.0.0</jakarta-servlet.version>
 		<jakarta-websocket.version>2.1.1</jakarta-websocket.version>
 		<nio-multipart.version>1.1.0</nio-multipart.version>
@@ -64,21 +64,21 @@
 		<mustache.version>0.9.14</mustache.version>
 		<thymeleaf.version>3.1.5.RELEASE</thymeleaf.version>
 		<pebble.version>3.2.4</pebble.version>
-		<handlebars.version>4.5.1</handlebars.version>
+		<handlebars.version>4.5.4</handlebars.version>
 		<velocity.version>2.4.1</velocity.version>
 
 		<!-- Test-only servers / HTTP driver -->
-		<jetty.version>12.0.36</jetty.version>
+		<jetty.version>12.0.38</jetty.version>
 		<java-websocket.version>1.6.0</java-websocket.version>
-		<httpclient5.version>5.6.1</httpclient5.version>
+		<httpclient5.version>5.6.4</httpclient5.version>
 
 		<!-- Build plugin versions (lockstep; see DEPENDENCY-MATRIX.md) -->
 		<maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
-		<maven-surefire-plugin.version>3.5.4</maven-surefire-plugin.version>
-		<maven-source-plugin.version>3.3.1</maven-source-plugin.version>
-		<maven-javadoc-plugin.version>3.11.2</maven-javadoc-plugin.version>
-		<maven-gpg-plugin.version>3.2.7</maven-gpg-plugin.version>
-		<central-publishing-plugin.version>0.9.0</central-publishing-plugin.version>
+		<maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
+		<maven-source-plugin.version>3.4.0</maven-source-plugin.version>
+		<maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
+		<maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
+		<central-publishing-plugin.version>0.11.0</central-publishing-plugin.version>
 	</properties>
 
 	<dependencyManagement>
