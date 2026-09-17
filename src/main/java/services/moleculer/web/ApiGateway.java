@@ -37,6 +37,7 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
@@ -59,7 +60,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 
 	// --- ROUTES ---
 
-	protected Route[] routes = new Route[0];
+	protected volatile Route[] routes = new Route[0];
 
 	/**
 	 * Last route (for the last middleware)
@@ -103,7 +104,7 @@ public class ApiGateway extends Service implements RequestProcessor {
 	/**
 	 * Checked services with @HttpAlias annotations.
 	 */
-	protected Set<String> checkedNames = new HashSet<>();
+	protected final Set<String> checkedNames = ConcurrentHashMap.newKeySet();
 
 	// --- TEMPLATE ENGINE ---
 
@@ -198,12 +199,12 @@ public class ApiGateway extends Service implements RequestProcessor {
 			return;
 		}
 		StringBuilder msg = new StringBuilder(128);
+		boolean routingChanged = false;
 		for (Tree service : services) {
 			String serviceName = service.get("name", "");
 			if (serviceName == null || serviceName.isEmpty() || !checkedNames.add(serviceName)) {
 				continue;
 			}
-			checkedNames.add(serviceName);
 			Tree actions = service.get("actions");
 			if (actions == null) {
 				continue;
@@ -238,8 +239,29 @@ public class ApiGateway extends Service implements RequestProcessor {
 				Alias alias = new Alias(httpMethod, pathPattern, actionName);
 				route.addAlias(alias);
 				logAlias(msg, route, alias);
+				routingChanged = true;
 			}
 		}
+
+		// The routing table just changed: any Mapping cached before this point
+		// may now resolve to the wrong Route. Without this the requests that
+		// arrived while the broker was still starting up would keep their stale
+		// (typically 404) Mapping until the next restart.
+		if (routingChanged) {
+			clearMappings();
+		}
+	};
+
+	// --- FINAL INVALIDATION WHEN THE BROKER IS UP ---
+
+	/**
+	 * Closes the last gap: a request that arrives after the final alias has
+	 * been deployed but before the broker finished starting would otherwise
+	 * keep a Mapping that was built against an incomplete service registry.
+	 */
+	@Subscribe("$broker.started")
+	private Listener brokerStartedListener = ctx -> {
+		clearMappings();
 	};
 
 	// --- CONSTRUCTORS ---
@@ -459,18 +481,35 @@ public class ApiGateway extends Service implements RequestProcessor {
 		setRoutes(new Route[0]);
 		lastRoute.stopped(globalMiddlewares, debug);
 
-		// Clear middleware registry and mappings
+		// Clear middleware registry, mappings and the auto-deploy history
 		globalMiddlewares.clear();
+		checkedNames.clear();
 		clearMappings();
 
 		// Log stop
 		logger.info("ApiGateway server stopped.");
 	}
 
+	/**
+	 * Drops every cached request-to-Mapping association. The mapping cache is a
+	 * pure performance optimization and is rebuilt lazily, so clearing it is
+	 * functionally neutral - but it is mandatory whenever the routing table
+	 * changes at runtime (a new Route, Alias or white list entry). Without it a
+	 * request served <b>before</b> the change keeps its stale Mapping for the
+	 * entire lifetime of the gateway.
+	 */
+	public void invalidateMappingCache() {
+		clearMappings();
+	}
+
 	protected void clearMappings() {
 		writeLock.lock();
 		try {
-			staticMappings.clear();
+
+			// "staticMappings" is created in started(), so it can be null here
+			if (staticMappings != null) {
+				staticMappings.clear();
+			}
 			dynamicMappings.clear();
 		} finally {
 			writeLock.unlock();
@@ -718,6 +757,9 @@ public class ApiGateway extends Service implements RequestProcessor {
 		copy[routes.length] = route;
 		routes = copy;
 
+		// Let the Route tell us when its aliases / white list change at runtime
+		route.setOnChanged(this::clearMappings);
+
 		// Already started? -> start
 		if (broker != null) {
 			try {
@@ -725,6 +767,9 @@ public class ApiGateway extends Service implements RequestProcessor {
 			} catch (Exception cause) {
 				logger.warn("Unable to start route!", cause);
 			}
+
+			// A new Route can shadow mappings that are already cached
+			clearMappings();
 		}
 
 		// Return route

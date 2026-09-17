@@ -85,6 +85,16 @@ public class Route {
 
 	protected final Set<HttpMiddleware> routeMiddlewares = new LinkedHashSet<>(32);
 
+	// --- RUNTIME CHANGE NOTIFICATION ---
+
+	/**
+	 * Invoked whenever something that influences findMapping() changes (path,
+	 * mapping policy, aliases, white list). The owner ApiGateway uses it to drop
+	 * its mapping cache, which would otherwise keep serving the Mapping that was
+	 * resolved before the change.
+	 */
+	protected volatile Runnable onChanged;
+
 	// --- CONSTRUCTORS ---
 
 	public Route() {
@@ -273,6 +283,7 @@ public class Route {
 			this.aliases = new Alias[list.size()];
 			list.toArray(this.aliases);
 		}
+		fireChanged();
 
 		// Return this (for method chaining)
 		return this;
@@ -316,6 +327,7 @@ public class Route {
 			whiteList = new String[list.size()];
 			list.toArray(whiteList);
 		}
+		fireChanged();
 
 		// Return this (for method chaining)
 		return this;
@@ -389,10 +401,27 @@ public class Route {
 
 	public void setPath(String path) {
 		this.path = formatPath(path);
+		fireChanged();
 	}
 
 	public void setMappingPolicy(MappingPolicy mappingPolicy) {
 		this.mappingPolicy = mappingPolicy;
+		fireChanged();
+	}
+
+	public void setOnChanged(Runnable onChanged) {
+		this.onChanged = onChanged;
+	}
+
+	public Runnable getOnChanged() {
+		return onChanged;
+	}
+
+	protected void fireChanged() {
+		Runnable listener = onChanged;
+		if (listener != null) {
+			listener.run();
+		}
 	}
 
 	public void setCallOptions(CallOptions.Options opts) {
@@ -411,6 +440,7 @@ public class Route {
 				}
 			}
 		}
+		fireChanged();
 	}
 
 	public void setAliases(Alias... aliases) {
@@ -425,6 +455,7 @@ public class Route {
 				}
 			}
 		}
+		fireChanged();
 	}
 
 	public ExecutorService getExecutor() {

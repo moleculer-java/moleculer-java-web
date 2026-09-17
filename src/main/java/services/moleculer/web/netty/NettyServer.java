@@ -30,6 +30,7 @@ import static services.moleculer.web.common.GatewayUtils.getService;
 
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -50,8 +51,12 @@ import javax.net.ssl.X509TrustManager;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
@@ -67,6 +72,7 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.util.SimpleTrustManagerFactory;
 import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.util.ReferenceCountUtil;
 import services.moleculer.ServiceBroker;
 import services.moleculer.eventbus.Listener;
 import services.moleculer.eventbus.Subscribe;
@@ -77,7 +83,7 @@ public class NettyServer extends Service {
 
 	// --- GATEWAY SERVICE ---
 
-	protected ApiGateway gateway;
+	protected volatile ApiGateway gateway;
 
 	// --- INTERNAL VARIABLES ---
 
@@ -133,10 +139,6 @@ public class NettyServer extends Service {
 
 	protected NettyWebSocketRegistry webSocketRegistry;
 
-	// --- LOCK ---
-
-	private final Object gatewayLock = new Object();
-
 	// --- INIT GATEWAY ---
 
 	@Subscribe("$broker.started")
@@ -151,9 +153,6 @@ public class NettyServer extends Service {
 		}
 		gateway.setWebSocketRegistry(webSocketRegistry);
 		logger.info("ApiGateway connected to Netty Server.");
-		synchronized (gatewayLock) {
-			gatewayLock.notifyAll();
-		}
 	};
 
 	// --- CONSTRUCTORS ---
@@ -198,7 +197,18 @@ public class NettyServer extends Service {
 				@Override
 				protected void initChannel(Channel ch) throws Exception {
 					if (gateway == null) {
-						ch.close();
+
+						// The broker has not finished starting up, so there is no
+						// ApiGateway to serve this connection yet. Answer with a
+						// short, non-cacheable 503 instead of dropping the socket
+						// silently, then close it - the next attempt gets a freshly
+						// initialized pipeline, so a kept-alive connection can never
+						// slip past this gate.
+						ChannelPipeline notReady = ch.pipeline();
+						if (useSSL) {
+							notReady.addLast("ssl", createSslHandler(ch));
+						}
+						notReady.addLast("notReady", new NotReadyHandler());
 						return;
 					}
 					ChannelPipeline p = ch.pipeline();
@@ -491,6 +501,45 @@ public class NettyServer extends Service {
 
 	public void setShutDownThreadPools(boolean shutDownThreadPools) {
 		this.shutDownThreadPools = shutDownThreadPools;
+	}
+
+	// --- "BROKER IS STILL STARTING" HANDLER ---
+
+	/**
+	 * Answers a single, minimal HTTP 503 and closes the connection. Installed
+	 * instead of the regular request chain while the ApiGateway is not connected
+	 * yet. The response is deliberately not cacheable, and the connection is
+	 * closed so that the client cannot keep reusing a pipeline that was built
+	 * before the gateway became available.
+	 */
+	protected static final class NotReadyHandler extends ChannelInboundHandlerAdapter {
+
+		private static final byte[] RESPONSE = ("HTTP/1.1 503 Service Unavailable\r\n"
+				+ "Retry-After: 5\r\n"
+				+ "Cache-Control: no-store\r\n"
+				+ "Content-Type: text/plain; charset=utf-8\r\n"
+				+ "Content-Length: 33\r\n"
+				+ "Connection: close\r\n"
+				+ "\r\n"
+				+ "Server is starting, please retry.").getBytes(StandardCharsets.UTF_8);
+
+		private boolean answered;
+
+		@Override
+		public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+			ReferenceCountUtil.release(msg);
+			if (answered) {
+				return;
+			}
+			answered = true;
+			ctx.writeAndFlush(Unpooled.wrappedBuffer(RESPONSE)).addListener(ChannelFutureListener.CLOSE);
+		}
+
+		@Override
+		public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+			ctx.close();
+		}
+
 	}
 
 }
