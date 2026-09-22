@@ -25,8 +25,6 @@
  */
 package services.moleculer.web.router;
 
-import static services.moleculer.web.common.GatewayUtils.sendError;
-
 import java.io.ByteArrayOutputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
@@ -57,9 +55,11 @@ import services.moleculer.stream.PacketStream;
 import services.moleculer.uid.UidGenerator;
 import services.moleculer.util.CheckedTree;
 import services.moleculer.web.CallProcessor;
+import services.moleculer.web.ErrorProcessor;
 import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
+import services.moleculer.web.common.GatewayUtils;
 import services.moleculer.web.common.HttpConstants;
 import services.moleculer.web.template.AbstractTemplateEngine;
 import services.moleculer.web.template.languages.MessageLoader;
@@ -90,6 +90,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 	protected final Route route;
 	protected final CallProcessor beforeCall;
 	protected final CallProcessor afterCall;
+	protected final ErrorProcessor onError;
 	protected final ExecutorService executor;
 	protected final AbstractTemplateEngine templateEngine;
 	protected final MessageLoader messageLoader;
@@ -105,6 +106,14 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 	public ActionInvoker(String actionName, Pattern pattern, Cache<String, Matcher> cache, IndexedVariable[] variables,
 			Options opts, ServiceInvoker serviceInvoker, AbstractTemplateEngine templateEngine, Route route,
 			CallProcessor beforeCall, CallProcessor afterCall, ExecutorService executor, Eventbus eventbus) {
+		this(actionName, pattern, cache, variables, opts, serviceInvoker, templateEngine, route, beforeCall, afterCall,
+				null, executor, eventbus);
+	}
+
+	public ActionInvoker(String actionName, Pattern pattern, Cache<String, Matcher> cache, IndexedVariable[] variables,
+			Options opts, ServiceInvoker serviceInvoker, AbstractTemplateEngine templateEngine, Route route,
+			CallProcessor beforeCall, CallProcessor afterCall, ErrorProcessor onError, ExecutorService executor,
+			Eventbus eventbus) {
 		this.actionName = actionName;
 		this.pattern = pattern;
 		this.cache = cache;
@@ -116,6 +125,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		this.route = route;
 		this.beforeCall = beforeCall;
 		this.afterCall = afterCall;
+		this.onError = onError;
 		this.executor = executor;
 		this.messageLoader = templateEngine == null ? null : templateEngine.getMessageLoader();
 		this.eventbus = eventbus;
@@ -209,7 +219,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 						actionName, params, 1, null, null, req.getBody(), opts, nodeID)).then(out -> {
 							sendResponse(req, rsp, out);
 						}).catchError(cause -> {
-							sendError(rsp, cause);
+							sendError(req, rsp, cause);
 						});
 			});
 			return;
@@ -238,7 +248,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 							sendResponse(req, rsp, out);
 						}).catchError(cause -> {
 							logger.error("Unable to invoke action!", cause);
-							sendError(rsp, cause);
+							sendError(req, rsp, cause);
 						});
 			});
 			return;
@@ -260,7 +270,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 			} else if (cause != null) {
 				faulty.set(true);
 				logger.error("Unexpected error occured while receiving and parsing client request!", cause);
-				sendError(rsp, cause);
+				sendError(req, rsp, cause);
 			}
 			if (close && !faulty.get()) {
 
@@ -288,7 +298,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 								sendResponse(req, rsp, out);
 							}).catchError(err -> {
 								logger.error("Unable to invoke action!", err);
-								sendError(rsp, err);
+								sendError(req, rsp, err);
 							});
 				});
 			}
@@ -301,11 +311,22 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				beforeCall.onCall(route, req, rsp, data);
 			} catch (Throwable cause) {
 				logger.error("Unable to invoke 'beforeCall' method!", cause);
-				sendError(rsp, cause);
+				sendError(req, rsp, cause);
 				return true;
 			}
 		}
 		return false;
+	}
+
+	// --- ERROR HANDLING ---
+
+	/**
+	 * Sends an error response through the custom "onError" handler of the
+	 * Route (or of the gateway), or the default JSON error response when there
+	 * is no handler (see {@link ErrorProcessor}).
+	 */
+	protected void sendError(WebRequest req, WebResponse rsp, Throwable cause) {
+		GatewayUtils.sendError(onError, route, req, rsp, cause);
 	}
 
 	// --- PARSE BODY OF THE GET / POST REQUEST ---
@@ -379,7 +400,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				afterCall.onCall(route, req, rsp, data);
 			} catch (Throwable cause) {
 				logger.error("Unable to invoke 'afterCall' method!", cause);
-				sendError(rsp, cause);
+				sendError(req, rsp, cause);
 				return;
 			}
 		}
@@ -464,7 +485,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				} else if (cause != null) {
 					failed.set(true);
 					logger.error("Unexpected error occured while streaming data to client!", cause);
-					sendError(rsp, cause);
+					sendError(req, rsp, cause);
 					return;
 				}
 				if (close && !failed.get()) {
@@ -504,7 +525,7 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 				}
 			} catch (Throwable cause) {
 				logger.error("Unable to serialize response!", cause);
-				sendError(rsp, cause);
+				sendError(req, rsp, cause);
 				return;
 			}
 			try {

@@ -45,6 +45,7 @@ import services.moleculer.eventbus.Eventbus;
 import services.moleculer.service.ServiceInvoker;
 import services.moleculer.util.CheckedTree;
 import services.moleculer.web.CallProcessor;
+import services.moleculer.web.ErrorProcessor;
 import services.moleculer.web.RequestProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
@@ -62,6 +63,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 	protected final Route route;
 	protected final CallProcessor beforeCall;
 	protected final CallProcessor afterCall;
+	protected final ErrorProcessor onError;
 
 	// --- LAST PROCESSOR ---
 
@@ -89,6 +91,13 @@ public class Mapping implements RequestProcessor, HttpConstants {
 	public Mapping(ServiceBroker broker, String httpMethod, String pathPattern, String actionName,
 			CallOptions.Options opts, AbstractTemplateEngine templateEngine, Route route, CallProcessor beforeCall,
 			CallProcessor afterCall, ExecutorService executor) {
+		this(broker, httpMethod, pathPattern, actionName, opts, templateEngine, route, beforeCall, afterCall, null,
+				executor);
+	}
+
+	public Mapping(ServiceBroker broker, String httpMethod, String pathPattern, String actionName,
+			CallOptions.Options opts, AbstractTemplateEngine templateEngine, Route route, CallProcessor beforeCall,
+			CallProcessor afterCall, ErrorProcessor onError, ExecutorService executor) {
 
 		this.httpMethod = "ALL".equals(httpMethod) ? null : httpMethod;
 		this.pathPattern = pathPattern;
@@ -96,6 +105,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 		this.route = route;
 		this.beforeCall = beforeCall;
 		this.afterCall = afterCall;
+		this.onError = onError;
 
 		// Parse "path pattern"
 		int starPos = pathPattern.indexOf('*');
@@ -204,7 +214,7 @@ public class Mapping implements RequestProcessor, HttpConstants {
 		ExecutorService runner = executor == null ? cfg.getExecutor() : executor;
 		Eventbus eventbus = cfg.getEventbus();
 		lastProcessor = new ActionInvoker(actionName, pattern, cache, variables, opts, serviceInvoker, templateEngine,
-				route, beforeCall, afterCall, runner, eventbus);
+				route, beforeCall, afterCall, onError, runner, eventbus);
 	}
 
 	// --- MATCH TEST ---

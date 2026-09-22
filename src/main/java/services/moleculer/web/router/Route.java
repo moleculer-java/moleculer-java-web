@@ -43,6 +43,7 @@ import services.moleculer.ServiceBroker;
 import services.moleculer.context.CallOptions;
 import services.moleculer.eventbus.Matcher;
 import services.moleculer.web.CallProcessor;
+import services.moleculer.web.ErrorProcessor;
 import services.moleculer.web.middleware.HttpMiddleware;
 import services.moleculer.web.template.AbstractTemplateEngine;
 
@@ -68,6 +69,10 @@ public class Route {
 
 	protected CallProcessor beforeCall;
 	protected CallProcessor afterCall;
+
+	// --- CUSTOM ERROR HANDLER ---
+
+	protected ErrorProcessor onError;
 
 	// --- TEMPLATE ENGINE ---
 
@@ -122,7 +127,7 @@ public class Route {
 				}
 				if (Alias.ALL.equals(alias.httpMethod) || httpMethod.equals(alias.httpMethod)) {
 					Mapping mapping = new Mapping(broker, httpMethod, this.path + alias.pathPattern, alias.actionName,
-							opts, templateEngine, this, beforeCall, afterCall, executor);
+							opts, templateEngine, this, beforeCall, afterCall, onError, executor);
 					if (mapping.matches(httpMethod, path)) {
 						if (!routeMiddlewares.isEmpty()) {
 							mapping.use(routeMiddlewares);
@@ -143,7 +148,7 @@ public class Route {
 				}
 				if (Matcher.matches(shortPath, pattern)) {
 					Mapping mapping = new Mapping(broker, httpMethod, path, actionName, opts, templateEngine, this,
-							beforeCall, afterCall, executor);
+							beforeCall, afterCall, onError, executor);
 					if (!routeMiddlewares.isEmpty()) {
 						mapping.use(routeMiddlewares);
 					}
@@ -153,7 +158,7 @@ public class Route {
 		}
 		if (mappingPolicy == MappingPolicy.ALL) {
 			Mapping mapping = new Mapping(broker, httpMethod, path, actionName, opts, templateEngine, this, beforeCall,
-					afterCall, executor);
+					afterCall, onError, executor);
 			if (!routeMiddlewares.isEmpty()) {
 				mapping.use(routeMiddlewares);
 			}
@@ -335,8 +340,15 @@ public class Route {
 
 	// --- PROPERTY GETTERS AND SETTERS ---
 
+	// The template engine, the hooks and the executor are baked into each
+	// Mapping (ActionInvoker) when it is created, and the owner ApiGateway
+	// caches Mappings - so changing any of them at runtime must invalidate
+	// the mapping cache (fireChanged), otherwise a path that was already
+	// served keeps the old value until the next restart.
+
 	public void setTemplateEngine(AbstractTemplateEngine templateEngine) {
 		this.templateEngine = templateEngine;
+		fireChanged();
 	}
 
 	public AbstractTemplateEngine getTemplateEngine() {
@@ -349,6 +361,7 @@ public class Route {
 
 	public void setBeforeCall(CallProcessor beforeCall) {
 		this.beforeCall = beforeCall;
+		fireChanged();
 	}
 
 	public CallProcessor getAfterCall() {
@@ -357,6 +370,27 @@ public class Route {
 
 	public void setAfterCall(CallProcessor afterCall) {
 		this.afterCall = afterCall;
+		fireChanged();
+	}
+
+	/**
+	 * @return the custom error handler of this Route (null = the gateway-level
+	 *         handler, or the default JSON error response)
+	 */
+	public ErrorProcessor getOnError() {
+		return onError;
+	}
+
+	/**
+	 * Sets the custom error handler of this Route (see {@link ErrorProcessor}).
+	 * A route-level handler takes precedence over the gateway-level one.
+	 *
+	 * @param onError
+	 *            the handler (null = use the gateway-level handler / default)
+	 */
+	public void setOnError(ErrorProcessor onError) {
+		this.onError = onError;
+		fireChanged();
 	}
 
 	public String getPath() {
@@ -464,6 +498,7 @@ public class Route {
 
 	public void setExecutor(ExecutorService executor) {
 		this.executor = executor;
+		fireChanged();
 	}
 
 }

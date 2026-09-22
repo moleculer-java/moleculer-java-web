@@ -48,6 +48,7 @@ import services.moleculer.ServiceBroker;
 import services.moleculer.eventbus.Listener;
 import services.moleculer.eventbus.Subscribe;
 import services.moleculer.service.Service;
+import services.moleculer.web.common.GatewayUtils;
 import services.moleculer.web.middleware.HttpMiddleware;
 import services.moleculer.web.middleware.NotFound;
 import services.moleculer.web.router.Alias;
@@ -136,6 +137,14 @@ public class ApiGateway extends Service implements RequestProcessor {
 	 * Custom message post-processor.
 	 */
 	protected CallProcessor afterCall;
+
+	// --- CUSTOM ERROR HANDLER ---
+
+	/**
+	 * Gateway-level (global) error handler; applies to every Route that has no
+	 * handler of its own, and to connector-level errors.
+	 */
+	protected ErrorProcessor onError;
 
 	// --- CUSTOM EXECUTOR SERVICE ---
 
@@ -632,6 +641,27 @@ public class ApiGateway extends Service implements RequestProcessor {
 		rsp.end();
 	}
 
+	// --- SEND ERROR RESPONSE (CONNECTOR-LEVEL ENTRY POINT) ---
+
+	/**
+	 * Sends an error response for a failure that occurred outside of a Route
+	 * (eg. a middleware threw before the request reached an Action, or the
+	 * connector could not process the request). The gateway-level "onError"
+	 * handler is invoked when set (with a null Route); otherwise the default
+	 * JSON error response is sent. Route-level errors go through the Route's
+	 * own handler automatically.
+	 *
+	 * @param req
+	 *            the request (can be null if it could not be parsed)
+	 * @param rsp
+	 *            the response
+	 * @param cause
+	 *            the error
+	 */
+	public void sendError(WebRequest req, WebResponse rsp, Throwable cause) {
+		GatewayUtils.sendError(onError, null, req, rsp, cause);
+	}
+
 	// --- GLOBAL MIDDLEWARES ---
 
 	public void use(HttpMiddleware... middlewares) {
@@ -744,6 +774,11 @@ public class ApiGateway extends Service implements RequestProcessor {
 		// Set "afterCall" hook
 		if (afterCall != null && route.getAfterCall() == null) {
 			route.setAfterCall(afterCall);
+		}
+
+		// Set "onError" handler
+		if (onError != null && route.getOnError() == null) {
+			route.setOnError(onError);
 		}
 
 		// Set Executor
@@ -881,6 +916,37 @@ public class ApiGateway extends Service implements RequestProcessor {
 			for (Route route : routes) {
 				if (route.getAfterCall() == null) {
 					route.setAfterCall(afterCall);
+				}
+			}
+		}
+	}
+
+	/**
+	 * @return the gateway-level (global) error handler, or null
+	 */
+	public ErrorProcessor getOnError() {
+		return onError;
+	}
+
+	/**
+	 * Sets the gateway-level (global) error handler (see
+	 * {@link ErrorProcessor}). It is applied to every Route that has no
+	 * route-level handler, and to connector-level errors that occur before the
+	 * request is routed.
+	 *
+	 * @param onError
+	 *            the handler (null = default JSON error response)
+	 */
+	public void setOnError(ErrorProcessor onError) {
+
+		// Set method
+		this.onError = onError;
+
+		// Set "onError" handler of Routes
+		if (onError != null) {
+			for (Route route : routes) {
+				if (route.getOnError() == null) {
+					route.setOnError(onError);
 				}
 			}
 		}

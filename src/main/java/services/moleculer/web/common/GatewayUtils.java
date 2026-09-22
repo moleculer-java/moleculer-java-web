@@ -28,12 +28,15 @@ package services.moleculer.web.common;
 import static services.moleculer.util.CommonUtils.readFully;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpCookie;
 import java.net.URI;
 import java.net.URL;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,9 +47,11 @@ import services.moleculer.ServiceBroker;
 import services.moleculer.error.MoleculerError;
 import services.moleculer.service.Service;
 import services.moleculer.service.ServiceRegistry;
+import services.moleculer.web.ErrorProcessor;
 import services.moleculer.web.WebRequest;
 import services.moleculer.web.WebResponse;
 import services.moleculer.web.middleware.ServeStatic;
+import services.moleculer.web.router.Route;
 
 public final class GatewayUtils implements HttpConstants {
 
@@ -62,40 +67,63 @@ public final class GatewayUtils implements HttpConstants {
 
 	// --- ERROR HANDLER ---
 
+	/**
+	 * Converts any Throwable into a MoleculerError the same way the default
+	 * error response does: the cause chain is searched for a MoleculerError
+	 * (whose status code, type and "data" payload are preserved); when there is
+	 * none, a new 500 error is synthesized whose "type" is the SCREAMING_SNAKE
+	 * form of the exception's simple class name (eg. "ILLEGAL_STATE_EXCEPTION").
+	 * Useful inside a custom {@link ErrorProcessor} that wants the default
+	 * status code / type but a different response body.
+	 *
+	 * @param cause
+	 *            the error (can be null)
+	 *
+	 * @return a MoleculerError, never null
+	 */
+	public static final MoleculerError toMoleculerError(Throwable cause) {
+		Throwable err = cause;
+		while (err != null) {
+			if (err instanceof MoleculerError) {
+				return (MoleculerError) err;
+			}
+			if (err.getCause() == null) {
+				break;
+			}
+			err = err.getCause();
+		}
+		String msg = null;
+		String type = null;
+		if (err != null) {
+			msg = err.getMessage();
+			type = err.getClass().getName();
+			int i = type.lastIndexOf('.');
+			if (i > -1) {
+				type = type.substring(i + 1);
+			}
+			type = type.replaceAll("(.)(\\p{Upper})", "$1_$2").toUpperCase();
+		}
+		if (msg == null || msg.isEmpty()) {
+			msg = "Unknown error occured!";
+		}
+		if (type == null || type.isEmpty()) {
+			type = "MOLECULER_ERROR";
+		}
+		return new MoleculerError(msg, cause, "unknown", false, 500, type, null);
+	}
+
+	/**
+	 * Sends the default error response (the JSON form of
+	 * {@link #toMoleculerError(Throwable)}) and ends the response.
+	 *
+	 * @param rsp
+	 *            the response
+	 * @param cause
+	 *            the error
+	 */
 	public static final void sendError(WebResponse rsp, Throwable cause) {
 		try {
-			MoleculerError error = null;
-			Throwable err = cause;
-			while (err != null) {
-				if (err instanceof MoleculerError) {
-					error = (MoleculerError) err;
-					break;
-				}
-				if (err.getCause() == null) {
-					break;
-				}
-				err = err.getCause();
-			}
-			if (error == null) {
-				String msg = null;
-				String type = null;
-				if (err != null) {
-					msg = err.getMessage();
-					type = err.getClass().getName();
-					int i = type.lastIndexOf('.');
-					if (i > -1) {
-						type = type.substring(i + 1);
-					}
-					type = type.replaceAll("(.)(\\p{Upper})", "$1_$2").toUpperCase();
-				}
-				if (msg == null || msg.isEmpty()) {
-					msg = "Unknown error occured!";
-				}
-				if (type == null || type.isEmpty()) {
-					type = "MOLECULER_ERROR";
-				}
-				error = new MoleculerError(msg, cause, "unknown", false, 500, type, null);
-			}
+			MoleculerError error = toMoleculerError(cause);
 			Tree json = error.toTree();
 			byte[] body = json.toBinary();
 			int statusCode = error.getCode();
@@ -112,6 +140,116 @@ public final class GatewayUtils implements HttpConstants {
 		} finally {
 			rsp.end();
 		}
+	}
+
+	/**
+	 * Sends an error response through the custom "onError" handler, or the
+	 * default JSON error response when there is no handler. A handler that
+	 * throws before writing anything yields the default response for the
+	 * ORIGINAL cause; a handler that throws after it started writing gets its
+	 * (partial) response ended as-is. See {@link ErrorProcessor}.
+	 *
+	 * @param onError
+	 *            custom handler (null = default JSON error response)
+	 * @param route
+	 *            the Route whose action failed (null for connector-level
+	 *            errors)
+	 * @param req
+	 *            the request (null when it could not be parsed)
+	 * @param rsp
+	 *            the response
+	 * @param cause
+	 *            the error
+	 */
+	public static final void sendError(ErrorProcessor onError, Route route, WebRequest req, WebResponse rsp,
+			Throwable cause) {
+		if (onError == null) {
+			sendError(rsp, cause);
+			return;
+		}
+
+		// Unwrap the Promise / CompletableFuture plumbing, so the handler sees
+		// the real error (the default response does the same via
+		// toMoleculerError, which walks the whole cause chain)
+		Throwable error = cause;
+		while ((error instanceof CompletionException || error instanceof ExecutionException)
+				&& error.getCause() != null) {
+			error = error.getCause();
+		}
+		TrackedWebResponse tracked = new TrackedWebResponse(rsp);
+		try {
+			onError.onError(route, req, tracked, error);
+		} catch (Throwable handlerError) {
+			logger.error("Unable to invoke 'onError' handler!", handlerError);
+			if (tracked.written) {
+				rsp.end();
+			} else {
+				sendError(rsp, cause);
+			}
+		}
+	}
+
+	/**
+	 * WebResponse wrapper that remembers whether the custom error handler has
+	 * already written to (or ended) the response, so that a failing handler can
+	 * safely fall back to the default error response.
+	 */
+	private static final class TrackedWebResponse implements WebResponse {
+
+		private final WebResponse rsp;
+		private volatile boolean written;
+
+		private TrackedWebResponse(WebResponse rsp) {
+			this.rsp = rsp;
+		}
+
+		@Override
+		public void setStatus(int code) {
+			rsp.setStatus(code);
+		}
+
+		@Override
+		public int getStatus() {
+			return rsp.getStatus();
+		}
+
+		@Override
+		public void setHeader(String name, String value) {
+			rsp.setHeader(name, value);
+		}
+
+		@Override
+		public String getHeader(String name) {
+			return rsp.getHeader(name);
+		}
+
+		@Override
+		public void send(byte[] bytes) throws IOException {
+			written = true;
+			rsp.send(bytes);
+		}
+
+		@Override
+		public boolean end() {
+			written = true;
+			return rsp.end();
+		}
+
+		@Override
+		public void setProperty(String name, Object value) {
+			rsp.setProperty(name, value);
+		}
+
+		@Override
+		public Object getProperty(String name) {
+			return rsp.getProperty(name);
+		}
+
+		@Override
+		public Object getInternalObject() {
+			return rsp.getInternalObject();
+		}
+
 	}
 
 	// --- FIND SERVICE BY CLASS ---

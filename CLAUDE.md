@@ -124,8 +124,16 @@ gates which clients may connect.
 
 ### Customization hooks
 
-`CallProcessor` `beforeCall`/`afterCall` (mutate the request `Tree`/response around the action call) and a
-custom `ExecutorService` can be set on the `ApiGateway` (applied to all routes) or per `Route`.
+`CallProcessor` `beforeCall`/`afterCall` (mutate the request `Tree`/response around the action call),
+`ErrorProcessor` `onError` (custom error response instead of the default `GatewayUtils.sendError` JSON; the
+handler must call `rsp.end()`, a route-level handler overrides the gateway-level one) and a custom
+`ExecutorService` can be set on the `ApiGateway` (applied to all routes) or per `Route`. All of them are baked
+into the `Mapping`/`ActionInvoker` when a mapping is created, so the `Route` setters fire `onChanged` to
+invalidate the gateway's mapping cache — setting a hook after start therefore takes effect on the next request.
+Errors go through `GatewayUtils.sendError(onError, route, req, rsp, cause)`: the 8 `ActionInvoker` sites and
+the Netty connector catch (`MoleculerHandler` → `ApiGateway.sendError`, route = `null`) use it; the
+middleware-internal catches in `ServeStatic`/`TopLevelCache` and the servlet connector's `handleError` still
+use the default response.
 
 ## Wiring it together
 

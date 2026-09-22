@@ -42,6 +42,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hc.client5.http.async.methods.SimpleHttpRequest;
 import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
@@ -96,6 +97,12 @@ public abstract class AbstractTemplateTest {
 	protected ServiceBroker br;
 	protected ApiGateway gw;
 	protected CloseableHttpAsyncClient cl;
+
+	/**
+	 * The shared routes installed by {@link #setUp()}: r0 = authenticated
+	 * route, r1 = REST / template / chunked route, r2 = static content route.
+	 */
+	protected Route r0, r1, r2;
 
 	// --- CONNECTOR LIFECYCLE (implemented by subclasses) ---
 
@@ -190,6 +197,12 @@ public abstract class AbstractTemplateTest {
 				return ctx.params.put("src", "second");
 			};
 
+			// Always fails - used by the error handler ("onError") tests
+			@SuppressWarnings("unused")
+			Action fail = ctx -> {
+				throw new IllegalStateException("Test failure");
+			};
+
 		});
 
 		br.createService(new Service("session") {
@@ -212,10 +225,12 @@ public abstract class AbstractTemplateTest {
 		gw.use(new RequestLogger());
 		gw.use(new Favicon());
 
-		// Body-less-204 endpoint used by the keep-alive regression test
-		// (NettyTest#testKeepAliveAfterNoContent). It emits a 204 with a header
-		// but no Content-Length, exercising NettyWebResponse.end()'s framing
-		// guard directly. Path-gated, so it is inert for every other test.
+		// Path-gated test endpoints of the raw-socket (NettyTest) regression
+		// tests; inert for every other path.
+		// - "/nocontent": a 204 with a header but no Content-Length, exercising
+		//   NettyWebResponse.end()'s framing guard (testKeepAliveAfterNoContent)
+		// - "/throw": a middleware that fails synchronously, before routing -
+		//   a connector-level error that goes to the gateway-level "onError"
 		gw.use(new HttpMiddleware() {
 
 			@Override
@@ -230,6 +245,9 @@ public abstract class AbstractTemplateTest {
 							rsp.end();
 							return;
 						}
+						if ("/throw".equals(req.getPath())) {
+							throw new IllegalStateException("Simulated middleware failure");
+						}
 						next.service(req, rsp);
 					}
 				};
@@ -237,7 +255,7 @@ public abstract class AbstractTemplateTest {
 		});
 
 		// Create authenticated route
-		Route r0 = new Route();
+		r0 = new Route();
 
 		r0.use(new BasicAuthenticator("testuser", "testpassword"));
 
@@ -254,7 +272,7 @@ public abstract class AbstractTemplateTest {
 		gw.addRoute(r0);
 
 		// REST route
-		Route r1 = new Route();
+		r1 = new Route();
 
 		r1.addAlias(Alias.GET, "/api/users/:a/any", "math.first");
 		r1.addAlias(Alias.GET, "/api/users/:b/change-password", "math.second");
@@ -280,13 +298,16 @@ public abstract class AbstractTemplateTest {
 		r1.addAlias(Alias.POST, "/chunked/stream", "chunkedService.stream");
 		r1.addAlias(Alias.POST, "/chunked/rest", "chunkedService.rest");
 
+		// Always-failing action - used by the error handler ("onError") tests
+		r1.addAlias(Alias.GET, "/math/fail", "math.fail");
+
 		// Session test
 		r1.addAlias(Alias.POST, "/session", "session.check");
 
 		gw.addRoute(r1);
 
 		// Create route for serving html content
-		Route r2 = new Route();
+		r2 = new Route();
 
 		// Enable all requests (not just the aliases or whitelist entries)
 		r2.setMappingPolicy(MappingPolicy.ALL);
@@ -470,6 +491,120 @@ public abstract class AbstractTemplateTest {
 			return ctx.params;
 		};
 
+	}
+
+	// --- ERROR HANDLER ("onError") TESTS ---
+
+	/**
+	 * Baseline: without a custom handler an Action failure yields the default
+	 * JSON error response (the serialized MoleculerError).
+	 */
+	@Test
+	public void testDefaultErrorResponse() throws Exception {
+		SimpleHttpResponse rsp = fetch("/math/fail");
+		assertEquals(500, rsp.getCode());
+		assertTrue(rsp.getLastHeader("Content-Type").getValue().contains("json"));
+		Tree t = new Tree(rsp.getBodyBytes());
+		assertEquals("Test failure", t.get("message", ""));
+		assertEquals(500, t.get("code", 0));
+	}
+
+	/**
+	 * Route-level handler. It is installed AFTER the broker started, when the
+	 * mapping of "/math/fail" is already cached - so this also verifies that
+	 * Route.setOnError() invalidates the gateway's mapping cache.
+	 */
+	@Test
+	public void testRouteOnError() throws Exception {
+		AtomicReference<Route> seenRoute = new AtomicReference<>();
+		AtomicReference<String> seenPath = new AtomicReference<>();
+		AtomicReference<Throwable> seenCause = new AtomicReference<>();
+		r1.setOnError((route, req, rsp, cause) -> {
+			seenRoute.set(route);
+			seenPath.set(req.getPath());
+			seenCause.set(cause);
+			sendCustomError(rsp, 418, "route:" + cause.getMessage());
+		});
+		SimpleHttpResponse rsp = fetch("/math/fail");
+		assertEquals(418, rsp.getCode());
+		assertTrue(rsp.getLastHeader("Content-Type").getValue().contains("text/plain"));
+		assertEquals("route:Test failure", body(rsp));
+		assertTrue(seenRoute.get() == r1, "handler must receive its own Route");
+		assertEquals("/math/fail", seenPath.get());
+		assertTrue(seenCause.get() != null, "handler must receive the live Throwable");
+	}
+
+	/**
+	 * Gateway-level (global) handler applies to a Route without its own one.
+	 */
+	@Test
+	public void testGatewayOnError() throws Exception {
+		gw.setOnError((route, req, rsp, cause) -> sendCustomError(rsp, 501, "gateway:" + cause.getMessage()));
+		SimpleHttpResponse rsp = fetch("/math/fail");
+		assertEquals(501, rsp.getCode());
+		assertEquals("gateway:Test failure", body(rsp));
+	}
+
+	/**
+	 * A route-level handler wins over the gateway-level one, whichever was set
+	 * first.
+	 */
+	@Test
+	public void testRouteOnErrorOverridesGatewayOnError() throws Exception {
+
+		// Gateway first, then route
+		gw.setOnError((route, req, rsp, cause) -> sendCustomError(rsp, 501, "gateway"));
+		r1.setOnError((route, req, rsp, cause) -> sendCustomError(rsp, 418, "route"));
+		SimpleHttpResponse rsp = fetch("/math/fail");
+		assertEquals(418, rsp.getCode());
+		assertEquals("route", body(rsp));
+
+		// Route already set, then a (new) gateway-level handler: the route keeps its own
+		gw.setOnError((route, req, rsp2, cause) -> sendCustomError(rsp2, 501, "gateway2"));
+		rsp = fetch("/math/fail");
+		assertEquals(418, rsp.getCode());
+		assertEquals("route", body(rsp));
+	}
+
+	/**
+	 * A handler that throws before writing anything falls back to the default
+	 * JSON error response of the ORIGINAL cause (not of the handler's error).
+	 */
+	@Test
+	public void testThrowingOnErrorFallsBackToDefault() throws Exception {
+		r1.setOnError((route, req, rsp, cause) -> {
+			throw new IllegalArgumentException("handler failure");
+		});
+		SimpleHttpResponse rsp = fetch("/math/fail");
+		assertEquals(500, rsp.getCode());
+		assertTrue(rsp.getLastHeader("Content-Type").getValue().contains("json"));
+		Tree t = new Tree(rsp.getBodyBytes());
+		assertEquals("Test failure", t.get("message", ""));
+	}
+
+	// --- HELPERS OF THE ERROR HANDLER TESTS ---
+
+	protected SimpleHttpResponse fetch(String path) throws Exception {
+		SimpleHttpRequest get = SimpleRequestBuilder.get("http://127.0.0.1:3000" + path).build();
+		return cl.execute(get, null).get();
+	}
+
+	protected static String body(SimpleHttpResponse rsp) {
+		byte[] bytes = rsp.getBodyBytes();
+		return bytes == null ? "" : new String(bytes, StandardCharsets.UTF_8);
+	}
+
+	/**
+	 * What a typical custom "onError" handler does: status + headers + body,
+	 * then end().
+	 */
+	protected static void sendCustomError(WebResponse rsp, int status, String text) throws IOException {
+		byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+		rsp.setStatus(status);
+		rsp.setHeader(HttpConstants.CONTENT_TYPE, "text/plain; charset=utf-8");
+		rsp.setHeader(HttpConstants.CONTENT_LENGTH, Integer.toString(bytes.length));
+		rsp.send(bytes);
+		rsp.end();
 	}
 
 	@Test

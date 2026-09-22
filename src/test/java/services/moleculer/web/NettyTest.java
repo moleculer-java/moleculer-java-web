@@ -25,6 +25,8 @@
  */
 package services.moleculer.web;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
@@ -32,12 +34,15 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicReference;
 
+import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
 import org.junit.jupiter.api.Test;
 
 import services.moleculer.ServiceBroker;
 import services.moleculer.monitor.ConstantMonitor;
 import services.moleculer.web.netty.NettyServer;
+import services.moleculer.web.router.Route;
 
 public class NettyTest extends AbstractTemplateTest {
 
@@ -97,6 +102,27 @@ public class NettyTest extends AbstractTemplateTest {
 			String second = readHttpResponse(is);
 			assertTrue(second.startsWith("HTTP/1.1 200"), "kept-alive socket was reset; got: " + second);
 		}
+	}
+
+	/**
+	 * A middleware that fails synchronously (before the request is routed to an
+	 * Action) is a connector-level error: it must reach the gateway-level
+	 * "onError" handler, with a null Route.
+	 */
+	@Test
+	public void testConnectorErrorReachesGatewayOnError() throws Exception {
+		AtomicReference<Route> seenRoute = new AtomicReference<>(new Route());
+		AtomicReference<String> seenPath = new AtomicReference<>();
+		gw.setOnError((route, req, rsp, cause) -> {
+			seenRoute.set(route);
+			seenPath.set(req.getPath());
+			sendCustomError(rsp, 502, "connector:" + cause.getMessage());
+		});
+		SimpleHttpResponse rsp = fetch("/throw");
+		assertEquals(502, rsp.getCode());
+		assertEquals("connector:Simulated middleware failure", body(rsp));
+		assertNull(seenRoute.get(), "connector-level errors have no Route");
+		assertEquals("/throw", seenPath.get());
 	}
 
 	/**

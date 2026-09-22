@@ -25,8 +25,6 @@
  */
 package services.moleculer.web.netty;
 
-import static services.moleculer.web.common.GatewayUtils.sendError;
-
 import java.io.IOException;
 import java.net.URLDecoder;
 
@@ -242,7 +240,10 @@ public class MoleculerHandler extends SimpleChannelInboundHandler<Object> {
 			throw new IllegalStateException("Unknown package type: " + request);
 
 		} catch (Throwable cause) {
-			sendError(new NettyWebResponse(ctx, req), cause);
+
+			// Connector-level failure (eg. a middleware threw synchronously):
+			// goes through the gateway-level "onError" handler, if any
+			gateway.sendError(req, new NettyWebResponse(ctx, req), cause);
 			if (broker == null) {
 				if (cause != null) {
 					cause.printStackTrace();
