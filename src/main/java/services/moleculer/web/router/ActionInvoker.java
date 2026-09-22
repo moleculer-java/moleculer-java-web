@@ -45,6 +45,7 @@ import io.datatree.Tree;
 import io.datatree.dom.Cache;
 import io.datatree.dom.TreeWriter;
 import io.datatree.dom.TreeWriterRegistry;
+import io.netty.channel.ChannelHandlerContext;
 import services.moleculer.config.ServiceBrokerConfig;
 import services.moleculer.context.CallOptions;
 import services.moleculer.context.CallOptions.Options;
@@ -329,6 +330,22 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 		GatewayUtils.sendError(onError, route, req, rsp, cause);
 	}
 
+	/**
+	 * Aborts a response whose headers and (part of the) body are already on
+	 * the wire. Under Netty the channel is closed without the chunked
+	 * terminator, so the client sees an incomplete (truncated) body instead of
+	 * a seemingly complete one. Under a servlet container the response is
+	 * ended; the container decides how the truncation is signalled.
+	 */
+	protected void abortResponse(WebResponse rsp) {
+		Object internal = rsp.getInternalObject();
+		if (internal instanceof ChannelHandlerContext) {
+			((ChannelHandlerContext) internal).close();
+		} else {
+			rsp.end();
+		}
+	}
+
 	// --- PARSE BODY OF THE GET / POST REQUEST ---
 
 	protected Tree parsePostBody(Tree params, byte[] bytes, String contentType) throws Exception {
@@ -478,17 +495,30 @@ public class ActionInvoker implements RequestProcessor, HttpConstants {
 
 			// Streamed response (large file, media, etc.)
 			PacketStream stream = (PacketStream) object;
+			AtomicBoolean started = new AtomicBoolean();
 			stream.onPacket((bytes, cause, close) -> {
-				AtomicBoolean failed = new AtomicBoolean();
-				if (bytes != null) {
-					rsp.send(bytes);
-				} else if (cause != null) {
-					failed.set(true);
+				if (cause != null) {
+
+					// Once body bytes are on the wire the status line and the
+					// headers cannot be changed any more, so an error response
+					// would only be APPENDED to the partial download and the
+					// client would take the truncated payload for a complete
+					// one. Abort the connection instead (no chunk terminator ->
+					// the client can detect the truncation). Before the first
+					// packet a regular error response is still possible.
 					logger.error("Unexpected error occured while streaming data to client!", cause);
-					sendError(req, rsp, cause);
+					if (started.get()) {
+						abortResponse(rsp);
+					} else {
+						sendError(req, rsp, cause);
+					}
 					return;
 				}
-				if (close && !failed.get()) {
+				if (bytes != null && bytes.length > 0) {
+					started.set(true);
+					rsp.send(bytes);
+				}
+				if (close) {
 					rsp.end();
 				}
 			});

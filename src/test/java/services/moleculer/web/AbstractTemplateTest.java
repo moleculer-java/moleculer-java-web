@@ -229,6 +229,8 @@ public abstract class AbstractTemplateTest {
 		// tests; inert for every other path.
 		// - "/nocontent": a 204 with a header but no Content-Length, exercising
 		//   NettyWebResponse.end()'s framing guard (testKeepAliveAfterNoContent)
+		// - "/rawbody": a body written with NO headers at all (neither
+		//   Content-Length nor Content-Type) - must be framed, not left hanging
 		// - "/throw": a middleware that fails synchronously, before routing -
 		//   a connector-level error that goes to the gateway-level "onError"
 		gw.use(new HttpMiddleware() {
@@ -242,6 +244,11 @@ public abstract class AbstractTemplateTest {
 						if ("/nocontent".equals(req.getPath())) {
 							rsp.setStatus(204);
 							rsp.setHeader("X-Test", "nocontent");
+							rsp.end();
+							return;
+						}
+						if ("/rawbody".equals(req.getPath())) {
+							rsp.send("raw-body".getBytes(StandardCharsets.UTF_8));
 							rsp.end();
 							return;
 						}
@@ -297,6 +304,11 @@ public abstract class AbstractTemplateTest {
 		// Chunked test
 		r1.addAlias(Alias.POST, "/chunked/stream", "chunkedService.stream");
 		r1.addAlias(Alias.POST, "/chunked/rest", "chunkedService.rest");
+
+		// Streamed (length-less) responses without a request body - used by the
+		// Netty response-framing tests; "fail" breaks mid-stream
+		r1.addAlias(Alias.GET, "/chunked/download", "chunkedService.download");
+		r1.addAlias(Alias.GET, "/chunked/fail", "chunkedService.fail");
 
 		// Always-failing action - used by the error handler ("onError") tests
 		r1.addAlias(Alias.GET, "/math/fail", "math.fail");
@@ -489,6 +501,63 @@ public abstract class AbstractTemplateTest {
 
 		public Action rest = ctx -> {
 			return ctx.params;
+		};
+
+		/**
+		 * Size of the payload streamed by the "download" action.
+		 */
+		public static final int DOWNLOAD_SIZE = 5000;
+
+		/**
+		 * The payload streamed by the "download" action (i % 128 pattern).
+		 */
+		public static byte[] downloadPattern() {
+			byte[] bytes = new byte[DOWNLOAD_SIZE];
+			for (int i = 0; i < bytes.length; i++) {
+				bytes[i] = (byte) (i % 128);
+			}
+			return bytes;
+		}
+
+		/**
+		 * Returns a PacketStream (a length-less, streamed response) without
+		 * consuming a request body, so it works with a plain GET - and with an
+		 * HTTP/1.0 request.
+		 */
+		public Action download = ctx -> {
+			PacketStream stream = ctx.createStream();
+			stream.setPacketSize(1000);
+			stream.setPacketDelay(10);
+			stream.transferFrom(new ByteArrayInputStream(downloadPattern()));
+			return stream;
+		};
+
+		/**
+		 * Streams one packet, then reports an error: reproduces an I/O failure
+		 * in the middle of a download, after the headers and part of the body
+		 * are already on the wire. The packets are pushed with a small delay so
+		 * that the gateway has attached its listener before the error arrives
+		 * (an error reported before that would replace the buffered data).
+		 * Note: PacketStream.transferFrom() cannot be used for this - it closes
+		 * the stream before reporting a read failure, so the listener only ever
+		 * sees a normal close.
+		 */
+		public Action fail = ctx -> {
+			PacketStream stream = ctx.createStream();
+			byte[] packet = new byte[1000];
+			java.util.Arrays.fill(packet, (byte) 'x');
+			Thread producer = new Thread(() -> {
+				try {
+					Thread.sleep(100);
+					stream.sendData(packet);
+					Thread.sleep(100);
+					stream.sendError(new IOException("Simulated read failure"));
+				} catch (InterruptedException ignored) {
+				}
+			}, "chunked-fail-producer");
+			producer.setDaemon(true);
+			producer.start();
+			return stream;
 		};
 
 	}

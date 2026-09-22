@@ -31,21 +31,54 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
 import services.moleculer.web.WebResponse;
 import services.moleculer.web.common.HttpConstants;
 
+/**
+ * WebResponse of the Netty connector. The response is written by hand (there
+ * is no HttpResponseEncoder in the pipeline): {@link #sendHeaders()} emits the
+ * status line and the headers once, {@link #send(byte[])} the body,
+ * {@link #end()} finishes the response.
+ * <p>
+ * <b>Framing</b> (RFC 9112 section 6): a response is delimited by its
+ * {@code Content-Length} when the caller set one; otherwise the body is sent
+ * with {@code Transfer-Encoding: chunked} (eg. a streamed Action result whose
+ * length is unknown), so the kept-alive connection can be reused and a
+ * truncated body is detectable. Only for HTTP/1.0 clients (no chunked
+ * support) is a length-less response close-delimited, advertised with
+ * {@code Connection: close}. A caller that sets a {@code Transfer-Encoding}
+ * header itself is responsible for the framing of the bytes it sends.
+ */
 public class NettyWebResponse implements WebResponse, HttpConstants {
+
+	// --- CONSTANTS ---
+
+	protected static final byte[] CRLF = "\r\n".getBytes(StandardCharsets.US_ASCII);
+	protected static final byte[] LAST_CHUNK = "0\r\n\r\n".getBytes(StandardCharsets.US_ASCII);
+
+	// --- LOGGER ---
+
+	protected static final Logger logger = LoggerFactory.getLogger(NettyWebResponse.class);
 
 	// --- REQUEST PROPERTIES ----
 
 	protected final ChannelHandlerContext ctx;
 	protected final NettyWebRequest req;
 	protected final Channel channel;
+
+	/**
+	 * HEAD request: the headers are sent, the body is dropped.
+	 */
+	protected final boolean head;
 
 	/**
 	 * Custom properties (for inter-middleware communication).
@@ -57,6 +90,19 @@ public class NettyWebResponse implements WebResponse, HttpConstants {
 	protected int code = 200;
 	protected HashMap<String, String> headers;
 	protected AtomicBoolean first = new AtomicBoolean(true);
+	protected final AtomicBoolean ended = new AtomicBoolean();
+
+	// --- FRAMING (decided once, in sendHeaders) ---
+
+	/**
+	 * The body is sent with "Transfer-Encoding: chunked" (no Content-Length).
+	 */
+	protected volatile boolean chunked;
+
+	/**
+	 * The connection is closed after the response ("Connection: close").
+	 */
+	protected volatile boolean closeOnEnd;
 
 	// --- CONSTRUCTOR ---
 
@@ -64,6 +110,7 @@ public class NettyWebResponse implements WebResponse, HttpConstants {
 		this.ctx = ctx;
 		this.req = req;
 		this.channel = ctx.channel();
+		this.head = req != null && HEAD.equals(req.getMethod());
 	}
 
 	// --- PUBLIC WEBRESPONSE METHODS ---
@@ -154,60 +201,103 @@ public class NettyWebResponse implements WebResponse, HttpConstants {
 			// HTTP clients that strictly honor the no-body rule (eg.
 			// AsyncHttpClient 3.x) do not leave the kept-alive connection out of
 			// sync with leftover body bytes.
-			if (req != null && HEAD.equals(req.getMethod())) {
+			if (head) {
 				ctx.flush();
 				return;
 			}
-			ctx.write(Unpooled.wrappedBuffer(bytes));
+			if (chunked) {
+
+				// Chunked transfer coding: <hex length> CRLF <bytes> CRLF
+				byte[] size = (Integer.toHexString(bytes.length) + "\r\n").getBytes(StandardCharsets.US_ASCII);
+				ctx.write(Unpooled.wrappedBuffer(size, bytes, CRLF));
+			} else {
+				ctx.write(Unpooled.wrappedBuffer(bytes));
+			}
 			ctx.flush();
 		}
 	}
 
 	/**
-	 * Completes the asynchronous operation that was started on the request.
-	 * 
-	 * @return return true, if all resources are released
+	 * Completes the asynchronous operation that was started on the request:
+	 * writes the chunked terminator (if the body was chunked), closes the
+	 * connection (if the response is close-delimited or the client asked for
+	 * it), and releases the multipart parser. Idempotent - only the first call
+	 * does anything.
+	 *
+	 * @return true on the first call, false afterwards
 	 */
 	@Override
 	public boolean end() {
+		if (!ended.compareAndSet(false, true)) {
+			return false;
+		}
 
 		// Body-less responses (eg. 204 No Content, or an action returning null)
-		// that never set a Content-Length would otherwise fall into the close
-		// branch below and reset the (silently kept-alive) socket, breaking
-		// pooled HTTP/1.1 clients with ECONNRESET. Emit an explicit
-		// Content-Length: 0 so the response stays framed and the connection is
-		// reused. first.get() == true means send() never wrote a body; the
-		// parser check leaves multipart requests to the branch below.
-		if (first.get() && (req == null || req.parser == null)
-				&& (headers == null || headers.get(CONTENT_LENGTH) == null)) {
+		// that never set a Content-Length: emit an explicit "Content-Length: 0"
+		// so the response is framed and the kept-alive connection is reused
+		// (pooled HTTP/1.1 clients hit ECONNRESET otherwise). first.get() ==
+		// true means send() never wrote a body.
+		if (first.get() && (headers == null || !headers.containsKey(CONTENT_LENGTH))) {
 			setHeader(CONTENT_LENGTH, "0");
 		}
 		sendHeaders();
+		try {
+			if (chunked) {
+				ctx.write(Unpooled.wrappedBuffer(LAST_CHUNK));
+			}
+			if (closeOnEnd) {
+				ctx.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
+			} else {
+				ctx.flush();
+			}
+		} catch (Exception cause) {
+			logger.debug("Unable to finish response!", cause);
+		}
 		if (req != null && req.parser != null) {
 			try {
 				req.parser.close();
 			} catch (Exception ignored) {
 			}
 			req.parser = null;
-			return true;
 		}
-		try {
-			boolean close = headers.get(CONTENT_LENGTH) == null;
-			if (!close) {
-				String connection = req.getHeader(CONNECTION);
-				close = connection != null && CLOSE.equalsIgnoreCase(connection);
-			}
-			if (close) {
-				ctx.flush();
-				ctx.writeAndFlush(Unpooled.EMPTY_BUFFER).addListener(ChannelFutureListener.CLOSE);
-			}
-		} catch (Exception ignored) {
-		}
-		return false;
+		return true;
 	}
 
+	/**
+	 * Writes the status line and the headers (once). This is the single point
+	 * where the framing of the response is decided, because the Content-Length
+	 * (if any) is final here for every caller: send() sets it before the first
+	 * write, end() sets "0" for body-less responses.
+	 */
 	protected void sendHeaders() {
 		if (first.compareAndSet(true, false)) {
+
+			// Framing decision (RFC 9112 section 6): Content-Length when set;
+			// otherwise chunked - except for HTTP/1.0 clients, which get a
+			// close-delimited response. A HEAD response has no body to frame.
+			// A caller-supplied Transfer-Encoding means the caller frames the
+			// body itself (never double-frame it).
+			boolean hasLength = headers != null && headers.containsKey(CONTENT_LENGTH);
+			boolean hasEncoding = headers != null && headers.containsKey(TRANSFER_ENCODING);
+			boolean http10 = req != null && HttpVersion.HTTP_1_0.equals(req.httpVersion);
+			String reqConnection = req == null ? null : req.getHeader(CONNECTION);
+			String rspConnection = headers == null ? null : headers.get(CONNECTION);
+			if (!hasLength && !hasEncoding && !head) {
+				if (http10) {
+					closeOnEnd = true;
+				} else {
+					chunked = true;
+				}
+			}
+
+			// Connection handling: the client asked for "close", the client is
+			// HTTP/1.0 without "keep-alive", or the response itself says "close"
+			if (CLOSE.equalsIgnoreCase(reqConnection) || (http10 && !KEEP_ALIVE.equalsIgnoreCase(reqConnection))
+					|| CLOSE.equalsIgnoreCase(rspConnection)) {
+				closeOnEnd = true;
+			}
+
+			// Status line + headers
 			StringBuilder header = new StringBuilder(512);
 			if (code == 200) {
 				header.append("HTTP/1.1 200 Ok\r\n");
@@ -223,6 +313,18 @@ public class NettyWebResponse implements WebResponse, HttpConstants {
 					header.append(entry.getValue());
 					header.append("\r\n");
 				}
+			}
+			if (chunked) {
+				header.append(TRANSFER_ENCODING);
+				header.append(": ");
+				header.append(CHUNKED);
+				header.append("\r\n");
+			}
+			if (closeOnEnd && rspConnection == null) {
+				header.append(CONNECTION);
+				header.append(": ");
+				header.append(CLOSE);
+				header.append("\r\n");
 			}
 			header.append("\r\n");
 			ctx.write(Unpooled.wrappedBuffer(header.toString().getBytes(StandardCharsets.UTF_8)));

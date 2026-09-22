@@ -34,7 +34,6 @@ import static services.moleculer.web.common.GatewayUtils.isReadable;
 import static services.moleculer.web.common.GatewayUtils.readAllBytes;
 import static services.moleculer.web.common.GatewayUtils.sendError;
 
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -375,13 +374,12 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 							rsp.send(body);
 
 						} else {
-							
-							// Add "Content-Length" header
-							if (size > -1) {
-								rsp.setHeader(CONTENT_LENGTH, Long.toString(size));
-							} else {
-								rsp.setHeader(TRANSFER_ENCODING, CHUNKED);
-							}
+
+							// Large file (above maxCachedFileSize): stream it with a
+							// Content-Length. The size is always known here - getFileSize()
+							// returns -1 only for a missing file, and -1 <= maxCachedFileSize
+							// always takes the cached branch above (404 hand-off).
+							rsp.setHeader(CONTENT_LENGTH, Long.toString(size));
 
 							// Create stream
 							final PacketStream stream;
@@ -415,20 +413,25 @@ public class ServeStatic extends HttpMiddleware implements HttpConstants {
 							}
 							
 							stream.onPacket((bytes, cause, close) -> {
-								if (bytes != null) {
-									if (size > -1) {
-										rsp.send(bytes);
+								if (cause != null) {
+
+									// Read failure in the middle of the download: the
+									// headers (with the full Content-Length) are already on
+									// the wire, so abort the connection - a client must not
+									// take the truncated file for a complete one.
+									logger.warn("Unable to stream file!", cause);
+									Object internal = rsp.getInternalObject();
+									if (internal instanceof ChannelHandlerContext) {
+										((ChannelHandlerContext) internal).close();
 									} else {
-										rsp.send(Integer.toString(bytes.length).getBytes(StandardCharsets.US_ASCII));
-										rsp.send("\r\n".getBytes(StandardCharsets.US_ASCII));
-										rsp.send(bytes);
-										rsp.send("\r\n".getBytes(StandardCharsets.US_ASCII));
+										rsp.end();
 									}
+									return;
+								}
+								if (bytes != null) {
+									rsp.send(bytes);
 								}
 								if (close) {
-									if (size == -1) {
-										rsp.send("0\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
-									}
 									rsp.end();
 								}
 							});
