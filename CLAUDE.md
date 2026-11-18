@@ -59,7 +59,9 @@ either. The flow:
      status line/headers by hand, and `sendHeaders()` is the single framing decision point): a response with a
      `Content-Length` is sent as-is; a length-less body (eg. a streamed `PacketStream` action result) goes out
      as `Transfer-Encoding: chunked` so keep-alive survives and truncation is detectable; only HTTP/1.0 clients
-     get a close-delimited body with `Connection: close`. A body-less `end()` emits `Content-Length: 0`. A
+     get a close-delimited body with `Connection: close`. A body-less `end()` emits `Content-Length: 0`. Every response gets a
+     `Date` header (IMF-fixdate, via Netty `DateFormatter`) unless the caller set one. A HEAD response keeps
+     the headers of the GET but drops the body. A
      mid-stream error after bytes are on the wire aborts the channel without the chunk terminator
      (`ActionInvoker.abortResponse`) instead of appending an error JSON to the partial body.
      **Slowloris hardening:** `NettyServer.setReadTimeout(seconds)` (off by default, `0`) inserts an

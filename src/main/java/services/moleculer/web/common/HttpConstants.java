@@ -57,6 +57,7 @@ public interface HttpConstants {
 	public static final String AUTHORIZATION = "Authorization";
 	public static final String WWW_AUTHENTICATE = "WWW-Authenticate";
 	public static final String TRANSFER_ENCODING = "Transfer-Encoding";
+	public static final String DATE = "Date";
 
 	// --- HTTP HEADER VALUES ---
 

@@ -37,6 +37,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
@@ -266,6 +269,73 @@ public class NettyTest extends AbstractTemplateTest {
 		assertEquals("connector:Simulated middleware failure", body(rsp));
 		assertNull(seenRoute.get(), "connector-level errors have no Route");
 		assertEquals("/throw", seenPath.get());
+	}
+
+	// --- DATE HEADER + HEAD REQUESTS ---
+
+	/**
+	 * Every Netty response must carry a "Date" header in IMF-fixdate format
+	 * (RFC 9110 section 5.6.7 / 6.6.1), close to the current time. Clients
+	 * without NTP (eg. embedded ticket dispensers) set their clock from it.
+	 */
+	@Test
+	public void testDateHeaderPresent() throws Exception {
+		try (Socket socket = new Socket("127.0.0.1", 3000)) {
+			socket.setSoTimeout(10000);
+			OutputStream os = socket.getOutputStream();
+			InputStream is = socket.getInputStream();
+
+			os.write("GET /math/add/3/4 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+			os.flush();
+			RawResponse rsp = readRawResponse(is);
+			assertTrue(rsp.headers.startsWith("HTTP/1.1 200"), "expected 200, got: " + rsp.headers);
+			assertImfFixdateNow(headerValue(rsp.headers, "Date"), rsp.headers);
+		}
+	}
+
+	/**
+	 * A HEAD request gets the same headers as the GET (Content-Length and
+	 * Date included) but no body (RFC 9110 section 9.3.2): the next request on
+	 * the same kept-alive connection must get its own, intact response - no
+	 * leftover body bytes in front of it.
+	 */
+	@Test
+	public void testHeadHasNoBodyAndKeepsAlive() throws Exception {
+		try (Socket socket = new Socket("127.0.0.1", 3000)) {
+			socket.setSoTimeout(10000);
+			OutputStream os = socket.getOutputStream();
+			InputStream is = socket.getInputStream();
+
+			// 1) HEAD of a static file: headers only (do not read a body)
+			os.write("HEAD /static/index.html HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+			os.flush();
+			String head = readHeaderBlock(is);
+			assertTrue(head.startsWith("HTTP/1.1 200"), "expected 200, got: " + head);
+			String contentLength = headerValue(head, "Content-Length");
+			assertTrue(contentLength != null && Integer.parseInt(contentLength.trim()) > 0,
+					"HEAD must advertise the Content-Length of the GET: " + head);
+			assertImfFixdateNow(headerValue(head, "Date"), head);
+
+			// 2) Reuse the SAME connection: the response must start right here
+			os.write("GET /math/add/3/4 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n".getBytes(StandardCharsets.UTF_8));
+			os.flush();
+			String second = readHttpResponse(is);
+			assertTrue(second.startsWith("HTTP/1.1 200"), "HEAD response leaked a body; got: " + second);
+		}
+	}
+
+	/**
+	 * Asserts that the value is an IMF-fixdate (two-digit day, GMT) within a
+	 * minute of the current time.
+	 */
+	protected static void assertImfFixdateNow(String value, String headers) {
+		assertTrue(value != null, "missing Date header: " + headers);
+		String date = value.trim();
+		assertTrue(date.matches("[A-Z][a-z]{2}, \\d{2} [A-Z][a-z]{2} \\d{4} \\d{2}:\\d{2}:\\d{2} GMT"),
+				"Date is not an IMF-fixdate: " + date);
+		ZonedDateTime parsed = ZonedDateTime.parse(date, DateTimeFormatter.RFC_1123_DATE_TIME);
+		long skew = Math.abs(Duration.between(parsed, ZonedDateTime.now()).getSeconds());
+		assertTrue(skew < 60, "Date is " + skew + " seconds off: " + date);
 	}
 
 	// --- RAW HTTP HELPERS ---

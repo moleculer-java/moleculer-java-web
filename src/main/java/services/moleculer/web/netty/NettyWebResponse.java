@@ -27,6 +27,7 @@ package services.moleculer.web.netty;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -38,6 +39,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.DateFormatter;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import services.moleculer.web.WebResponse;
@@ -268,6 +270,12 @@ public class NettyWebResponse implements WebResponse, HttpConstants {
 	 * where the framing of the response is decided, because the Content-Length
 	 * (if any) is final here for every caller: send() sets it before the first
 	 * write, end() sets "0" for body-less responses.
+	 * <p>
+	 * Every response carries a {@code Date} header (RFC 9110 section 6.6.1, an
+	 * origin server with a clock MUST send it), formatted as IMF-fixdate (eg.
+	 * {@code Wed, 04 Nov 2026 10:00:00 GMT}) - unless the caller has already
+	 * set one. Clients without NTP (eg. embedded devices) use it to set their
+	 * clock, typically from a cheap HEAD request.
 	 */
 	protected void sendHeaders() {
 		if (first.compareAndSet(true, false)) {
@@ -314,6 +322,12 @@ public class NettyWebResponse implements WebResponse, HttpConstants {
 					header.append("\r\n");
 				}
 			}
+			if (!hasHeaderIgnoreCase(DATE)) {
+				header.append(DATE);
+				header.append(": ");
+				header.append(DateFormatter.format(new Date()));
+				header.append("\r\n");
+			}
 			if (chunked) {
 				header.append(TRANSFER_ENCODING);
 				header.append(": ");
@@ -330,6 +344,26 @@ public class NettyWebResponse implements WebResponse, HttpConstants {
 			ctx.write(Unpooled.wrappedBuffer(header.toString().getBytes(StandardCharsets.UTF_8)));
 			ctx.flush();
 		}
+	}
+
+	/**
+	 * Case-insensitive check of a response header (header names are
+	 * case-insensitive, but the headers map is keyed by the caller's
+	 * spelling).
+	 */
+	protected boolean hasHeaderIgnoreCase(String name) {
+		if (headers == null) {
+			return false;
+		}
+		if (headers.containsKey(name)) {
+			return true;
+		}
+		for (String key : headers.keySet()) {
+			if (name.equalsIgnoreCase(key)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	// --- CUSTOM PROPERTIES ---
