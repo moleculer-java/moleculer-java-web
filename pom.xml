@@ -60,7 +60,7 @@
 
 		<!-- Template engines (lockstep with datatree-templates: freemarker,
 		     mustache, thymeleaf, pebble) -->
-		<freemarker.version>2.3.34</freemarker.version>
+		<freemarker.version>2.3.35</freemarker.version>
 		<mustache.version>0.9.14</mustache.version>
 		<thymeleaf.version>3.1.5.RELEASE</thymeleaf.version>
 		<pebble.version>3.2.4</pebble.version>
